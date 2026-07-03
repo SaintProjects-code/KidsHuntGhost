@@ -25,10 +25,17 @@ func _ready() -> void:
 func _on_started(player_index: int, spirit: Dictionary) -> void:
 	var p: PlayerData = GameState.players[player_index]
 	if p.is_cpu:
-		_auto_resolve(player_index, spirit)
+		# CPUs never battle trainer spirits and can't catch them either
+		if not spirit.get("_no_catch", false):
+			_auto_resolve(player_index, spirit)
 		# Yield a frame so the board reaches its `await encounter_finished` before
 		# we emit it (otherwise the CPU's instant resolve would be missed).
 		await get_tree().process_frame
+		_finish()
+		return
+	# A trainer's spirit (event fights): battle only — no catch, ever.
+	if spirit.get("_no_catch", false):
+		await _run_fight(p, spirit)
 		_finish()
 		return
 	# Human: Fight or Catch?

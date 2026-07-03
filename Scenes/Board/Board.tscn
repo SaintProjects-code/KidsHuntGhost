@@ -503,13 +503,17 @@ layout_mode = 2
 focus_mode = 0
 text = "OK"
 
-[node name="SettingsButton" type="Button" parent="BoardUI/Root"]
-layout_mode = 0
+[node name="TopUI" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 50
+
+[node name="SettingsButton" type="Button" parent="TopUI"]
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 154.0
 offset_bottom = 58.0
 focus_mode = 0
+theme = ExtResource("3_theme")
 text = "Settings"
 
 [node name="UtilRow" type="HBoxContainer" parent="BoardUI/Root"]
@@ -552,4 +556,4 @@ clip_text = true
 [connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/ViewMapButton" to="BoardUI/Root" method="_on_view_map_pressed"]
 [connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/CloseButton" to="BoardUI/Root" method="_on_close_pressed"]
 [connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/QuitButton" to="BoardUI/Root" method="_on_quit_pressed"]
-[connection signal="pressed" from="BoardUI/Root/SettingsButton" to="BoardUI/Root" method="_on_settings_pressed"]
+[connection signal="pressed" from="TopUI/SettingsButton" to="BoardUI/Root" method="_on_settings_pressed"]

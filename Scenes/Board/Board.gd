@@ -12,10 +12,10 @@ const ROW_UP := 1                  # facing away
 const ROW_SIDE := 2                # profile (drawn facing left; flip for right)
 const WALK_COLS := [1, 0, 1, 2]    # step order; column 1 is the standing/idle pose
 const WALK_FPS := 8.0
-const TOKEN_SCALE := 1.8
+const TOKEN_SCALE := 2.4
 # Corners for the players whose turn it ISN'T (top-left, top-right, bottom-left,
 # bottom-right). Big enough that the scaled tokens fan out instead of stacking.
-const TOKEN_OFFSETS := [Vector2(-22, -6), Vector2(22, -6), Vector2(-22, 14), Vector2(22, 14)]
+const TOKEN_OFFSETS := [Vector2(-29, -8), Vector2(29, -8), Vector2(-29, 18), Vector2(29, 18)]
 const ACTIVE_TOKEN_DROP := Vector2(0, 10)   # active player sits a bit low, off the tile name
 const STEP_TIME := 0.28
 const CPU_END_TURN_DELAY := 0.7   # pause after a CPU lands, before its turn ends

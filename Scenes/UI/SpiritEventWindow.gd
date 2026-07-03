@@ -327,9 +327,11 @@ func _apply_mishap() -> String:
 			p.team.remove_at(idx)
 			return "%s gets scared and runs away!" % gone.get("name", "?")
 		"fight":
-			_pending_fight = _spirit
+			_pending_fight = _spirit.duplicate(true)
 			if _is_trainer:
-				return "The trainer sends out a wild %s — battle stations!" % _spirit.get("name", "?")
+				# a TRAINER's spirit: it can be fought but never caught
+				_pending_fight["_no_catch"] = true
+				return "The trainer sends out %s — battle stations!" % _spirit.get("name", "?")
 			return "%s attacks — battle stations!" % _spirit.get("name", "?")
 		"damage":
 			return _damage_lead(p)

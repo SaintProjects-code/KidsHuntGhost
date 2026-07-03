@@ -66,12 +66,19 @@ func _item_use_row(entry: Dictionary) -> Control:
 func _show_targets(entry: Dictionary) -> void:
 	_title.text = "Use %s on…" % entry.get("name", "Item")
 	_clear()
+	# 2 columns × 3 rows so a full 6-spirit team never runs off screen
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	_body.add_child(grid)
 	for mon in GameState.players[_player_index].team:
-		_body.add_child(_target_card(entry, mon))
+		grid.add_child(_target_card(entry, mon))
 	_body.add_child(_button("Back", func(): present_bag(_player_index), 36))
 
 func _target_card(entry: Dictionary, mon: Dictionary) -> Control:
 	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(300, 0)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)

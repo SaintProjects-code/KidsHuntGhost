@@ -8,7 +8,8 @@ const ZOOM_MAX := 3.0
 
 @onready var menu: Panel = $SettingsMenu
 @onready var sound_slider: HSlider = $SettingsMenu/Margin/VBox/SoundRow/SoundSlider
-@onready var settings_button: Button = $SettingsButton
+# lives on the always-on-top TopUI layer so it can be pressed at any time
+@onready var settings_button: Button = get_node("../../TopUI/SettingsButton")
 @onready var action_bar: HBoxContainer = $ActionBar
 @onready var util_row: HBoxContainer = $UtilRow
 @onready var info_label: Label = $InfoLabel

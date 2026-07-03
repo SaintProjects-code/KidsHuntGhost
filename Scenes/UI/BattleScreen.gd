@@ -148,6 +148,10 @@ func _ready() -> void:
 	_continue_btn.add_theme_font_size_override("font_size", 16)
 	_continue_btn.hide()
 	controls.add_child(_continue_btn)
+	# layout is only final once shown — refit every time the window opens
+	visibility_changed.connect(func():
+		if visible:
+			_fit_to_screen())
 	hide()
 
 # One dark column: trainer sprite + type chip header, then the card stack.
@@ -262,7 +266,8 @@ func present(team: Array, opp_team: Array, title: String, player_color: Color = 
 func _fit_to_screen() -> void:
 	panel.scale = Vector2.ONE
 	await get_tree().process_frame
-	if not visible and panel.size.y <= 0.0:
+	await get_tree().process_frame   # second frame: container sort settles
+	if panel.size.y <= 0.0:
 		return
 	var avail: Vector2 = get_viewport_rect().size - Vector2(24, 24)
 	var s: float = minf(1.0, minf(avail.x / maxf(1.0, panel.size.x), avail.y / maxf(1.0, panel.size.y)))
