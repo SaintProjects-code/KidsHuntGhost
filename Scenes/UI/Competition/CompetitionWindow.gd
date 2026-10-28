@@ -21,6 +21,14 @@ const GAMES := {
 		"hint": "MASH your ACTION key to scare the scarecrow away! ATK = scare power, DEF = slower drain."},
 	"wisp_float": {"name": "🎈 Wisp Float", "script": preload("res://Scenes/UI/Competition/WispFloatGame.gd"),
 		"hint": "HOLD your ACTION key to float, grab wisps, dodge bats. SPD = lift, DEF = shrug off bats."},
+	"pumpkin_toss": {"name": "🎃 Pumpkin Toss", "script": preload("res://Scenes/UI/Competition/PumpkinTossGame.gd"),
+		"hint": "Press ACTION when the power meter is high — 3 throws, farthest total wins. ATK = distance, SPD = easier timing."},
+	"boo_reflex": {"name": "👻 Boo Reflex", "script": preload("res://Scenes/UI/Competition/BooReflexGame.gd"),
+		"hint": "Wait for the BOO!, then press ACTION first — too early and you sit out. Best of 3. SPD = sharper reflexes."},
+	"bat_dodge":  {"name": "🦇 Bat Dodge",  "script": preload("res://Scenes/UI/Competition/BatDodgeGame.gd"),
+		"hint": "LEFT / MIDDLE / RIGHT to dodge the swooping bats. Last one flying wins. DEF = an extra heart."},
+	"lantern_memory": {"name": "🏮 Lantern Memory", "script": preload("res://Scenes/UI/Competition/LanternMemoryGame.gd"),
+		"hint": "Watch the lanterns flash, then repeat the pattern with LEFT / MIDDLE / RIGHT. HP = an extra life."},
 }
 const CONTESTS := {
 	"spd":     {"name": "🏃 Haunted Dash",       "label": "Speed"},
@@ -131,6 +139,31 @@ func _build_selection() -> void:
 			_select_chip(i, _chips[i][_best_index(p.team)])
 	_update_next()
 
+# 📱 Phones (see Remote): in the pick step EVERY player picks their own spirit
+# at the same time, and anyone can press Start once all have picked. Other
+# steps use the normal button mirroring.
+func remote_view(idx: int) -> Dictionary:
+	if _phase != 1:
+		# everyone takes part, so any human may move the awards along — even
+		# when the competition started on a CPU's turn
+		if GameState.players[idx].is_cpu or _next.disabled or not _next.is_visible_in_tree():
+			return {"screen": "wait", "title": _title.text, "text": "🏅 Competition!"}
+		return {"screen": "buttons", "title": _title.text, "lines": [],
+			"buttons": [{"label": _next.text.get_slice("  [", 0), "gold": true}], "_actions": [_on_next]}
+	if not _chips.has(idx):
+		return {}
+	var buttons: Array = []
+	var actions: Array = []
+	for chip in _chips[idx]:
+		var s: Dictionary = chip.spirit
+		buttons.append({"label": "%s  ★%.1f%s" % [s.get("name", "?"), rating(_event, s), "  ✓" if _picks.get(idx) == s else ""]})
+		actions.append(func(): _on_chip_picked(chip, idx))
+	if not _next.disabled:
+		buttons.append({"label": "▶ Start!", "gold": true})
+		actions.append(_on_next)
+	return {"screen": "buttons", "title": _title.text, "lines": [_hint.text.get_slice("\n", 0)],
+		"buttons": buttons, "_actions": actions}
+
 func _on_chip_picked(chip, i: int) -> void:
 	if not GameState.players[i].is_cpu and _phase == 1:
 		Sfx.play("pop")
@@ -157,6 +190,10 @@ static func rating(event: String, s: Dictionary) -> float:
 		"ghost_snap": return g.call("spd") + g.call("hp_stat") * 0.6
 		"scare_off":  return g.call("atk") + g.call("def") * 0.6
 		"wisp_float": return g.call("spd") + g.call("def") * 0.5
+		"pumpkin_toss": return g.call("atk") * 1.5 + g.call("spd") * 0.5
+		"boo_reflex": return g.call("spd") * 1.5
+		"bat_dodge":  return g.call("spd") + g.call("def") * 0.8
+		"lantern_memory": return g.call("hp_stat") + g.call("spd") * 0.5
 	return g.call(event) * 2.0 + g.call("stars")   # stat contests
 
 func _best_index(team: Array) -> int:

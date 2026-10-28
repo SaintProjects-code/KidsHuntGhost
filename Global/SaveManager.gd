@@ -7,7 +7,7 @@ extends Node
 ## hands over through `board_state_provider`.
 
 const SAVE_PATH := "user://savegame.dat"
-const VERSION := 2
+const VERSION := 3   # 3: capture jars became Lantern cards
 
 var board_state_provider: Callable = Callable()   # set by Board: returns a Dictionary
 var pending_board_state: Dictionary = {}          # filled by load_game() for the next Board

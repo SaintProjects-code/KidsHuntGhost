@@ -1,5 +1,5 @@
 class_name GameData
-## Static game content: the 8 town gyms, the Haunted Four, Champion Vesper,
+## Static game content: the 8 town Wardens, the Haunted Four, Spirit Lord Vesper,
 ## trainer battles, trainer portraits and the ITEM-tile reward table.
 ## Used as GameData.<thing> — no autoload needed.
 
@@ -10,76 +10,76 @@ class_name GameData
 # ability) or {name, ability, ability2?, stars?}. Badge tier adds stars, so at
 # the cap (tier 3) the "threat" members hit ★3 with two abilities.
 const GYMS := {
-	"A": {"name": "Ashen Gym",   "type": "Fire",     "badge": "cinder", "team": [
+	"A": {"name": "Ashen Warden",   "type": "Fire",     "badge": "cinder", "team": [
 		{"name": "Flickerfoal", "ability": "drought",   "ability2": "blaze",      "stars": 1},  # threat
 		{"name": "Magmawraith", "ability": "fire_bond", "ability2": "flame_body", "stars": 1},  # threat
 		{"name": "Emberpup",    "ability": "sniper"},
 		{"name": "Foxfire",     "ability": "moxie"}]},
-	"B": {"name": "Bayou Gym",   "type": "Water",    "badge": "bayou",  "team": [
+	"B": {"name": "Bayou Warden",   "type": "Water",    "badge": "bayou",  "team": [
 		{"name": "Frostpup",    "ability": "water_bond", "ability2": "reflect",   "stars": 1},  # threat
 		{"name": "Clamshade",   "ability": "multiscale", "ability2": "bulwark",   "stars": 1},  # threat
 		{"name": "Pinchling",   "ability": "sturdy"},
 		{"name": "Quackle",     "ability": "wish"}]},
-	"C": {"name": "Cobweb Gym",  "type": "Grass",    "badge": "cobweb", "team": [
+	"C": {"name": "Cobweb Warden",  "type": "Grass",    "badge": "cobweb", "team": [
 		{"name": "Vinewisp",    "ability": "grass_bond", "ability2": "leech_seed",  "stars": 1},  # threat
 		{"name": "Rootling",    "ability": "spore",      "ability2": "poison_point","stars": 1},  # threat
 		{"name": "Seedlings",   "ability": "healer",     "ability2": "wish",        "stars": 1},  # threat
 		{"name": "Leaflet",     "ability": "overgrow"}]},
-	"D": {"name": "Dusk Gym",    "type": "Electric", "badge": "dusk",   "team": [
+	"D": {"name": "Dusk Warden",    "type": "Electric", "badge": "dusk",   "team": [
 		{"name": "Zapkin",      "ability": "electric_bond","ability2": "static",   "stars": 1},  # threat
 		{"name": "Buzzghast",   "ability": "speed_boost",  "ability2": "berserker","stars": 1},  # threat
 		{"name": "Sparkbolt",   "ability": "thunder_wave"},
 		{"name": "Zaporb",      "ability": "explosion"}]},
-	"E": {"name": "Echo Gym",    "type": "Psychic",  "badge": "echo",   "team": [
+	"E": {"name": "Echo Warden",    "type": "Psychic",  "badge": "echo",   "team": [
 		{"name": "Drowsel",     "ability": "hypnosis",    "ability2": "confuse_ray", "stars": 1},  # threat
 		{"name": "Moonmote",    "ability": "psychic_bond","ability2": "reflect",     "stars": 1},  # threat
 		{"name": "Lullaboo",    "ability": "wish",        "ability2": "helping_hand","stars": 1},  # threat
 		{"name": "Snoozle",     "ability": "encore"}]},
-	"F": {"name": "Foggy Gym",   "type": "Fighting", "badge": "fog",    "team": [
+	"F": {"name": "Foggy Warden",   "type": "Fighting", "badge": "fog",    "team": [
 		{"name": "Brawlboo",    "ability": "intimidate",   "ability2": "counter",  "stars": 1},  # threat
 		{"name": "Pebblewisp",  "ability": "fighting_bond","ability2": "fortress", "stars": 1},  # threat
 		{"name": "Hornling",    "ability": "battle_armor"},
 		{"name": "Kickghast",   "ability": "grit"}]},
-	"G": {"name": "Ghoul Gym",   "type": "Dark",     "badge": "ghoul",  "team": [
+	"G": {"name": "Ghoul Warden",   "type": "Dark",     "badge": "ghoul",  "team": [
 		{"name": "Sludgling",   "ability": "dark_bond", "ability2": "vengeance", "stars": 1},  # threat
 		{"name": "Wispy",       "ability": "taunt",     "ability2": "thief",     "stars": 1},  # threat
 		{"name": "Batling",     "ability": "poison_point"},
 		{"name": "Smogling",    "ability": "destiny_bond"}]},
-	"H": {"name": "Harbor Gym",  "type": "Water",    "badge": "harbor", "team": [
+	"H": {"name": "Harbor Warden",  "type": "Water",    "badge": "harbor", "team": [
 		{"name": "Puddlegeist", "ability": "water_bond", "ability2": "reflect", "stars": 1},  # threat
 		{"name": "Spiralshade", "ability": "multiscale", "ability2": "sturdy",  "stars": 1},  # threat
 		{"name": "Clamshade",   "ability": "bulwark",    "ability2": "reflect", "stars": 1},  # threat
 		{"name": "Frostpup",    "ability": "dynasty"}]},
 }
 
-# ─── The Haunted Four: the Spectral Trail's wardens ───────────────────────────
+# ─── The Haunted Four: the Spectral Trail's phantoms ──────────────────────────
 # Each fields an ★3 ACE plus two more ★3-at-cap threats — all with two abilities.
 const HAUNTED_FOUR := [
-	{"name": "Warden Willow", "portrait": ["will", "agatha-gen1"], "team": [
+	{"name": "Phantom Willow", "portrait": ["will", "agatha-gen1"], "team": [
 		{"name": "Snoozelord",   "ability": "reflect",     "ability2": "wish",        "stars": 3},  # ace
 		{"name": "Trancewraith", "ability": "hypnosis",    "ability2": "confuse_ray", "stars": 1},  # threat
 		{"name": "Lullabanshee", "ability": "psychic_bond","ability2": "helping_hand","stars": 1},  # threat
 		{"name": "Dreamseer",    "ability": "encore"}]},
-	{"name": "Warden Kage",   "portrait": ["koga", "agatha-gen1"], "team": [
+	{"name": "Phantom Kage",  "portrait": ["koga", "agatha-gen1"], "team": [
 		{"name": "Sludgeghast",  "ability": "dark_bond",   "ability2": "vengeance",   "stars": 3},  # ace
 		{"name": "Smogwraith",   "ability": "explosion",   "ability2": "poison_point","stars": 1},  # threat
 		{"name": "Batwraith",    "ability": "poison_point","ability2": "thief",       "stars": 1},  # threat
 		{"name": "Stingspecter", "ability": "screech"}]},
-	{"name": "Warden Brutus", "portrait": ["bruno", "agatha-gen1"], "team": [
+	{"name": "Phantom Brutus", "portrait": ["bruno", "agatha-gen1"], "team": [
 		{"name": "Swirlwrath",   "ability": "intimidate",   "ability2": "counter",     "stars": 3},  # ace
 		{"name": "Brawltitan",   "ability": "fighting_bond","ability2": "grit",        "stars": 1},  # threat
 		{"name": "Gravegolem",   "ability": "fortress",     "ability2": "battle_armor","stars": 1},  # threat
 		{"name": "Skullguard",   "ability": "sturdy"}]},
-	{"name": "Warden Karma",  "portrait": ["karen", "agatha-gen1"], "team": [
+	{"name": "Phantom Karma", "portrait": ["karen", "agatha-gen1"], "team": [
 		{"name": "Hauntking",    "ability": "hypnosis", "ability2": "destiny_bond", "stars": 3},  # ace
 		{"name": "Purrphantom",  "ability": "thief",    "ability2": "moxie",        "stars": 1},  # threat
 		{"name": "Hissperor",    "ability": "taunt",    "ability2": "poison_point", "stars": 1},  # threat
 		{"name": "Mothgeist",    "ability": "spore"}]},
 ]
 
-# ─── Champion Vesper, keeper of the Spectral Peak ─────────────────────────────
+# ─── Spirit Lord Vesper, keeper of the Spectral Peak ──────────────────────────
 const CHAMPION := {
-	"name": "Champion Vesper",
+	"name": "Spirit Lord Vesper",
 	"portrait": ["gary", "blue-gen1", "blue", "acetrainer-gen1"],
 	"team": [
 		{"name": "Dreamseer",    "ability": "psychic_bond","ability2": "hypnosis",   "stars": 3},  # ace
@@ -167,12 +167,30 @@ static func player_trainer(p: PlayerData) -> Array:
 static func gym_trainer(type: String) -> Array:
 	return [GYM_TRAINERS.get(type, ""), "acetrainer", "acetrainer-gen1"]
 
+# ─── Boards ───────────────────────────────────────────────────────────────────
+# The maps the setup screen offers. target = the default points to win
+# (tuned so a game runs ~10–15 rounds on the small boards); start_team =
+# spirits each player starts with (the starter + random stage-1 spirits).
+const MAPS := {
+	1: {"name": "Haunted Valley",   "scene": "res://Scenes/Board/Map1.tscn", "target": 40, "start_team": 1,
+		"blurb": "The full adventure: 8 towns, long roads."},
+	2: {"name": "Crossroads",       "scene": "res://Scenes/Board/Map2.tscn", "target": 30, "start_team": 1,
+		"blurb": "Small and fast — every road meets in the middle. Lots of ⚔ Clash."},
+	3: {"name": "Festival Grounds", "scene": "res://Scenes/Board/Map3.tscn", "target": 40, "start_team": 1,
+		"blurb": "A figure-8 race track packed with 🏅 competitions."},
+	4: {"name": "Spirit Colosseum", "scene": "res://Scenes/Board/Map4.tscn", "target": 25, "start_team": 3,
+		"blurb": "A round battle arena — start with 3 spirits, 3v3 fights everywhere."},
+}
+
+static func map_info(n: int) -> Dictionary:
+	return MAPS.get(n, MAPS[1])
+
 # ─── ITEM tiles ───────────────────────────────────────────────────────────────
-# What an ITEM tile hands out, by weight: mostly a card, sometimes jars/gold.
+# What an ITEM tile hands out, by weight: mostly a card, sometimes Lanterns/gold.
 const ITEM_REWARDS := [
 	{"kind": "card",  "amount": 1, "weight": 60},
 	{"kind": "card",  "amount": 2, "weight": 10},
-	{"kind": "jars",  "amount": 2, "weight": 18},
+	{"kind": "lanterns", "amount": 1, "weight": 18},
 	{"kind": "gold",  "amount": 20, "weight": 12},
 ]
 
@@ -188,13 +206,14 @@ static func random_item_reward() -> Dictionary:
 	return ITEM_REWARDS[0]
 
 # Enemy difficulty tier from the CHALLENGER's badge count. Scaling STOPS after
-# 3 badges: 0–1 → 1 (weakest), 2 → 2, 3+ → 3 (strongest).
+# 4 badges: 0–2 → 1 (weakest), 3 → 2, 4+ → 3 (strongest).
 static func challenge_tier(badges: int) -> int:
-	return clampi(badges, 1, 3)
+	return clampi(badges - 1, 1, 3)
 
 # Tier for the Spectral Trail's wardens and the Champion (see Balance).
 static func trail_tier(badges: int) -> int:
-	return clampi(badges - Balance.TRAIL_BADGE_OFFSET, 1, 3)
+	var offset: int = Balance.TRAIL_BADGE_OFFSET.get(GameState.players.size(), 2)
+	return clampi(badges - offset, 1, 3)
 
 # Build a DESIGNED team from entries that are either a plain name (random
 # ability) or {name, ability, ability2?, stars?}. NPC teams GROW with the tier:

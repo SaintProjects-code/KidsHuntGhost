@@ -14,6 +14,7 @@ var _select: Control
 var _pc: Control
 var _trade: Control
 var _win: Control
+var _last_team: Array = []   # the spirits the player sent into the last NPC battle
 
 func _ready() -> void:
 	layer = 12
@@ -51,6 +52,7 @@ func _on_tile_action(idx: int, kind: StringName) -> void:
 		"ITEM": await _run_item(idx)
 		"COMPETITION": await _run_competition(idx)
 		"WARDEN": await _run_warden_tile(idx)
+		"BATTLE": await _run_battle_tile(idx)
 		var k:
 			if GameData.GYMS.has(k):
 				await _run_city(idx, k)
@@ -73,6 +75,7 @@ func _npc_battle(idx: int, roster: Array, title: String, portrait: Array, kind: 
 	var pick: Dictionary = await BattleSetup.pick_for(_select, idx, vs, roster)
 	if pick.is_empty():
 		return null
+	_last_team = pick["team"]
 	var setup := BattleSetup.vs_npc(idx, pick["team"], pick["cards"], foe_team, title, portrait, kind,
 		CardsData.npc_deck(BattleSetup.BATTLE_CARDS))
 	var won := await BattleSetup.run(_battle, setup, idx)
@@ -111,6 +114,12 @@ func _run_trainer_battle(idx: int) -> void:
 		EventBus.log_entry.emit(idx, "%s beat %s! +%d pts, +%d gold." % [p.player_name, t["name"],
 			pts, int(t.get("gold", 15))], "#ffd24d")
 
+# ⚔ BATTLE tile (the Colosseum): a trainer fight — 3v3 once you have 3 spirits.
+func _run_battle_tile(idx: int) -> void:
+	if GameState.players[idx].living_team().is_empty():
+		return
+	await _run_trainer_battle(idx)
+
 # ─── ITEM ─────────────────────────────────────────────────────────────────────
 func _run_item(idx: int) -> void:
 	var p: PlayerData = GameState.players[idx]
@@ -122,9 +131,10 @@ func _run_item(idx: int) -> void:
 			for n in int(r["amount"]):
 				cards.append(CardsData.random_card())
 			text = "You found %s!" % ("a card" if cards.size() == 1 else "%d cards" % cards.size())
-		"jars":
-			p.inventory.add_jars(&"ghost_jar", int(r["amount"]))
-			text = "You found %d Ghost Jars!" % int(r["amount"])
+		"lanterns":
+			for n in int(r["amount"]):
+				cards.append("spirit_lantern")
+			text = "You found %d Spirit Lanterns!" % int(r["amount"])
 		"gold":
 			p.inventory.gold += int(r["amount"])
 			text = "You found %d gold!" % int(r["amount"])
@@ -189,6 +199,13 @@ func _run_gym(idx: int, city: String) -> void:
 		Sfx.play("win")
 		EventBus.log_entry.emit(idx, "Beat %s! %s, +%d gold." % [gym["name"], GameData.badge_name(gym["badge"]),
 			Balance.GOLD_GYM], "#ffd24d")
+	elif won == false:
+		# a loss still teaches: every spirit that fought grows a little
+		for mon in _last_team:
+			if p.team.has(mon):
+				await SpiritsProgressionSystem.award_stars(idx, mon, Balance.WARDEN_LOSS_STARS)
+		EventBus.log_entry.emit(idx, "%s's spirits learned from the loss: +%s★ each." % [p.player_name,
+			str(Balance.WARDEN_LOSS_STARS)], "#c8b6ff")
 
 # CPU town visit: restock, challenge the gym when ready, head for the trail
 # once it has the badges and a full team.
@@ -201,7 +218,7 @@ func _cpu_city(idx: int, city: String) -> void:
 		EventBus.trail_entered.emit(idx)
 
 # ─── WARDEN tiles on the Spectral Trail ───────────────────────────────────────
-# One random fight: a Haunted Four warden or Champion Vesper. Teams scale with
+# One random fight: one of the Haunted Four or Spirit Lord Vesper. Teams scale with
 # badges beyond the entry requirement (GameData.trail_tier). Two warden wins in a row (or beating the Champion)
 # wins the game; one loss sends you back to Cobweb City (the trail's only exit
 # besides winning — so every warden tile is a real fight).
@@ -209,7 +226,10 @@ func _run_warden_tile(idx: int) -> void:
 	var p: PlayerData = GameState.players[idx]
 	# no skipping: the trail is a dead end, and losing is the way back down
 	var pool: Array = GameData.HAUNTED_FOUR.duplicate()
-	pool.append(GameData.CHAMPION)
+	if not GameState.infinite_points:
+		pool.append(GameData.CHAMPION)
+	elif p.progress.elite_wins >= Balance.ELITE_WINS_TO_WIN:
+		pool = [GameData.CHAMPION]   # No pts: the streak earns the Spirit Lord's fight
 	var foe: Dictionary = pool.pick_random()
 	var champion: bool = foe == GameData.CHAMPION
 	var tier: int = GameData.trail_tier(p.progress.badge_count())
@@ -228,8 +248,10 @@ func _run_warden_tile(idx: int) -> void:
 			GameState.award_points(idx, Balance.PTS_CHAMPION)   # also runs the win check
 		else:
 			p.progress.elite_wins += 1
-			EventBus.log_entry.emit(idx, "%s defeated %s! Warden wins: %d/%d" % [p.player_name, foe["name"],
-				p.progress.elite_wins, Balance.ELITE_WINS_TO_WIN], "#ffd24d")
+			EventBus.log_entry.emit(idx, "%s defeated %s! Haunted Four wins: %d/%d%s" % [p.player_name, foe["name"],
+				p.progress.elite_wins, Balance.ELITE_WINS_TO_WIN,
+				" — Spirit Lord Vesper awaits!" if GameState.infinite_points and p.progress.elite_wins >= Balance.ELITE_WINS_TO_WIN else ""],
+				"#ffd24d")
 			GameState.award_points(idx, Balance.PTS_ELITE_WIN)
 	else:
 		p.progress.elite_wins = 0   # the streak must be unbroken
@@ -252,7 +274,8 @@ func _on_pvp_started(a: int, b: int, mode: String) -> void:
 	EventBus.pvp_finished.emit()
 
 # Both sides pick blind. A REAL clash: damage sticks, and the winner takes
-# points plus up to TWO random cards from the loser's hand.
+# points, gold and a random card from the loser's hand, and its lead gains a
+# star.
 func _pvp_battle(a: int, b: int, real: bool) -> void:
 	var pa: PlayerData = GameState.players[a]
 	var pb: PlayerData = GameState.players[b]
@@ -273,13 +296,20 @@ func _pvp_battle(a: int, b: int, real: bool) -> void:
 		return
 	var wi: int = a if won else b
 	var li: int = b if won else a
+	var gold: int = mini(Balance.GOLD_PVP_TAKE, GameState.players[li].inventory.gold)
+	GameState.players[li].inventory.gold -= gold
+	GameState.players[wi].inventory.gold += gold
+	var lead: Dictionary = GameState.players[wi].lead()
+	if not lead.is_empty():
+		await SpiritsProgressionSystem.award_stars(wi, lead, Balance.PVP_WIN_STARS)
 	GameState.award_points(wi, Balance.PTS_PVP_WIN)
 	var stolen: Array = []
-	for _n in 2:
+	for _n in Balance.PVP_STEAL_CARDS:
 		var key := await CardSystem.steal(li, wi)
 		if key != "":
 			stolen.append(CardsData.card_name(key))
-	EventBus.log_entry.emit(wi, "⚔ %s wins the PvP battle! +%d pts%s" % [_name(wi), Balance.PTS_PVP_WIN,
+	EventBus.log_entry.emit(wi, "⚔ %s wins the PvP battle! +%d pts, +%d gold, lead +%s★%s" % [_name(wi),
+		Balance.PTS_PVP_WIN, gold, str(Balance.PVP_WIN_STARS),
 		"" if stolen.is_empty() else ", takes: " + ", ".join(stolen)], "#ffd24d")
 
 # [pick_a, pick_b] ({team, cards} each) — two humans pick together on one

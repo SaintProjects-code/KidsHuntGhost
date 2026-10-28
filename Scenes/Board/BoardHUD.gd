@@ -10,7 +10,7 @@ extends Control
 
 const PLAYER_PANEL := preload("res://Scenes/Board/PlayerPanel.tscn")
 const CARD_SCALE := 0.72
-const HAND_CARD := Vector2(70, 94)
+const HAND_CARD := Vector2(60, 82)   # 7 fit beside the action bar
 
 var board                        # the Board (set right after it adds us)
 var elapsed: float = 0.0         # play time, saved with the game
@@ -63,7 +63,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	_timer_label.text = "%02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60]
-	# gold, jars, cards, badges and spirits change all over the place — poll a
+	# gold, cards, badges and spirits change all over the place — poll a
 	# cheap snapshot instead of wiring every signal
 	var sig := _player_sig()
 	if sig != _last_sig:
@@ -75,8 +75,8 @@ func _player_sig() -> String:
 	if i < 0 or i >= GameState.players.size():
 		return "-"
 	var p: PlayerData = GameState.players[i]
-	return "%d|%d|%d|%s|%s|%s|%s" % [i, p.progress.points, p.inventory.gold, str(p.progress.badges),
-		str(p.inventory.jars), str(p.inventory.hand), str(p.team.map(func(m): return m.get("name", "")))]
+	return "%d|%d|%d|%s|%s|%s" % [i, p.progress.points, p.inventory.gold, str(p.progress.badges),
+		str(p.inventory.hand), str(p.team.map(func(m): return m.get("name", "")))]
 
 func _on_turn_started(_i: int) -> void:
 	UIManager.close_overlay()
@@ -184,6 +184,9 @@ func _on_card_pressed(i: int, key: String, cv: CardView) -> void:
 	var kind := CardsData.kind_of(key)
 	if kind == "tactic":
 		_nope(cv, "Play tactics in battle!")
+		return
+	if kind == "capture":
+		_nope(cv, "Lanterns are for catching ghosts!")
 		return
 	var target = await _pick_target(i, key)
 	if target == null:

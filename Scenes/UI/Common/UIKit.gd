@@ -134,7 +134,7 @@ static func kind_for(text: String) -> String:
 static func size_for(min_h: int) -> String:
 	return "s" if min_h <= 34 else ("m" if min_h <= 46 else "l")
 
-# Compact button for dense rows (jar pickers, team cards, shop rows).
+# Compact button for dense rows (team cards, shop rows, pickers).
 static func small_button(text: String, cb: Callable, _font_size: int = 14) -> Button:
 	var b := Button.new()
 	b.text = text

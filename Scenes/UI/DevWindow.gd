@@ -23,10 +23,14 @@ func _ready() -> void:
 	left.add_child(_row([
 		_button("+5 pts", func(): GameState.award_points(_idx, 5)),
 		_button("+50 gold", func(): _p().inventory.gold += 50),
-		_button("+3 jars", func(): _p().inventory.add_jars(&"ghost_jar", 3)),
+		_button("+Lantern", func():
+			closed.emit()
+			CardSystem.give(_idx, "spirit_lantern")),
 	]))
 	left.add_child(_row([
-		_button("+1 Soul Lantern", func(): _p().inventory.add_jars(&"soul_lantern", 1)),
+		_button("+Soul Lantern", func():
+			closed.emit()
+			CardSystem.give(_idx, "soul_lantern")),
 		_button("Draw card", func():
 			closed.emit()
 			CardSystem.give_random(_idx)),
@@ -52,7 +56,8 @@ func _ready() -> void:
 	]))
 	right.add_child(_row([
 		_button("Town", func(): _tile(&"CITY")),
-		_button("Warden tile", func(): _tile(&"WARDEN")),
+		_button("Trail tile", func(): _tile(&"WARDEN")),
+		_button("Clash tile", func(): _tile(&"CLASH")),
 	]))
 	# forces which event the next Comp tile runs
 	var comp_row := UIKit.hbox(8)
@@ -68,8 +73,8 @@ func _ready() -> void:
 	right.add_child(comp_row)
 	right.add_child(_title_label("Battle (no rewards)", 18))
 	right.add_child(_row([
-		_button("A warden", func(): _battle(&"WARDEN", _idx, -1)),
-		_button("Champion", func(): _battle(&"CHAMPION", _idx, -1)),
+		_button("Haunted Four", func(): _battle(&"WARDEN", _idx, -1)),
+		_button("Spirit Lord", func(): _battle(&"CHAMPION", _idx, -1)),
 	]))
 	var pvp := UIKit.hbox(8)
 	for i in GameState.players.size():

@@ -1,8 +1,8 @@
 extends Node
-## Autoloaded as `MusicManager`. Plays ONE looping background track at a time:
+## Autoloaded as `MusicManager`. Plays ONE background track at a time, forever:
 ##
 ##   • MENU   — the main menu and the setup screen
-##   • MAP    — the board: rolling, moving, tiles, events, shops, cities
+##   • MAP    — the board: a playlist of 4 songs, one after another, looping
 ##   • BATTLE — team select and the battle screen itself
 ##
 ## Scenes set the "context" track (menu or map) from their _ready. The battle
@@ -12,10 +12,13 @@ extends Node
 
 enum Track { NONE, MENU, MAP, BATTLE }
 
+# Each track is a playlist; when a song ends the next one starts (wrapping
+# around), so every track loops.
 const TRACKS := {
-	Track.MENU: "res://Assets/music/menuMusic.mp3",
-	Track.MAP: "res://Assets/music/MapMusic.mp3",
-	Track.BATTLE: "res://Assets/music/BattleMusic.mp3",
+	Track.MENU: ["res://Assets/music/menuMusic.mp3"],
+	Track.MAP: ["res://Assets/music/MapMusic.mp3", "res://Assets/music/MapMusicP5_1.mp3",
+		"res://Assets/music/MapMusic3.mp3", "res://Assets/music/MapMusicP5_2.mp3"],
+	Track.BATTLE: ["res://Assets/music/BattleMusic.mp3"],
 }
 
 # The windows that own the battle track, by script path (both are built in code
@@ -28,6 +31,7 @@ const BATTLE_WINDOWS := [
 var _player: AudioStreamPlayer
 var _current: Track = Track.NONE
 var _context: Track = Track.NONE   # what plays when no battle window is up
+var _song := {}                    # Track -> index of its current song
 
 func _ready() -> void:
 	# Events and battles hold the tree paused — the music must not pause with it.
@@ -36,6 +40,7 @@ func _ready() -> void:
 	_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	_player.bus = &"Master"   # the settings sliders drive the Master bus
 	add_child(_player)
+	_player.finished.connect(_next_song)
 	UIManager.menu_opened.connect(_on_menu_opened)
 	UIManager.menu_closed.connect(_on_menu_closed)
 
@@ -85,9 +90,20 @@ func _play(track: Track) -> void:
 	if not TRACKS.has(track):
 		_player.stop()
 		return
-	var stream: AudioStream = load(TRACKS[track])
-	# The mp3s import with loop=false; these are background tracks, so loop them.
+	_start_song()
+
+# The current track's current song, from the top.
+func _start_song() -> void:
+	var songs: Array = TRACKS[_current]
+	var stream: AudioStream = load(songs[int(_song.get(_current, 0)) % songs.size()])
+	# never loop a single song: `finished` moves the playlist along instead
 	if stream is AudioStreamMP3:
-		stream.loop = true
+		stream.loop = false
 	_player.stream = stream
 	_player.play()
+
+func _next_song() -> void:
+	if not TRACKS.has(_current):
+		return
+	_song[_current] = (int(_song.get(_current, 0)) + 1) % TRACKS[_current].size()
+	_start_song()

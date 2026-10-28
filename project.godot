@@ -29,6 +29,7 @@ SpiritsProgressionSystem="*res://Systems/SpiritsProgressionSystem.gd"
 BonusReward="*res://Systems/BonusReward.gd"
 CardSystem="*res://Systems/CardSystem.gd"
 MusicManager="*res://Global/MusicManager.gd"
+Remote="*res://Global/Remote.gd"
 
 [display]
 

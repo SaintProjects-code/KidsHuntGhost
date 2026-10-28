@@ -241,6 +241,48 @@ func _card_picker(p: PlayerData, picked: Array) -> Control:
 		row.add_child(UIKit.label("— no tactic cards —", 12))
 	return box
 
+# 📱 Phones (see Remote): each side picks on its own phone — spirits in pick
+# order, then tactic cards, then Start / Cancel.
+func remote_view(idx: int) -> Dictionary:
+	if _player == null or idx < 0 or idx >= GameState.players.size():
+		return {}
+	var me: PlayerData = GameState.players[idx]
+	var side := 0 if me == _player else (1 if _pvp and me == _player_b else -1)
+	if side < 0:
+		return {}
+	var buttons: Array = []
+	var actions: Array = []
+	var team: Array = _team_for(side)
+	var sel: Array = _sel_for(side)
+	for i in team.size():
+		var mon: Dictionary = team[i]
+		var order := sel.find(i)
+		var hp := int(mon.get("current_hp", 0))
+		if hp <= 0:
+			continue
+		buttons.append({"label": "%s%s  ❤%d" % ["%s · " % SLOT_NAMES[order] if order >= 0 else "", mon.get("name", "?"), hp]})
+		actions.append(_on_toggle.bind(i, side))
+	var picked: Array = _cards if side == 0 else _cards_b
+	var tactics: Array = me.inventory.cards_of_kind("tactic")
+	for k in tactics.size():
+		var key: String = tactics[k]
+		var armed: bool = picked.count(key) > tactics.slice(0, k).count(key)
+		buttons.append({"label": "🃏 %s%s" % [CardsData.card_name(key), "  ✓" if armed else ""]})
+		actions.append(func():
+			if armed:
+				picked.erase(key)
+			elif picked.size() < BattleSetup.BATTLE_CARDS:
+				picked.append(key)
+			_refresh())
+	if not _start.disabled:
+		buttons.append({"label": "⚔ " + _start.text.get_slice("  [", 0), "gold": true})
+		actions.append(_on_start)
+	buttons.append({"label": "Cancel"})
+	actions.append(_cancel)
+	return {"screen": "buttons", "title": _title_lbl.text,
+		"lines": ["Pick up to %d spirits (in battle order) and %d tactic cards." % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]],
+		"buttons": buttons, "_actions": actions}
+
 func _on_toggle(i: int, side: int) -> void:
 	if int(_team_for(side)[i].get("current_hp", 0)) <= 0:
 		return

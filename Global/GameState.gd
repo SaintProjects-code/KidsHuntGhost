@@ -5,7 +5,7 @@ var players: Array[PlayerData] = []
 var current_player_index: int = 0
 var turn_count: int = 0
 var win_threshold: int = 40          # tested best: points, wardens and Champion all win often
-var infinite_points: bool = false   # setup setting: points never win — only the trail does
+var infinite_points: bool = false   # setup "No pts": only the Spirit Lord wins (beat 2 Haunted Four in a row to face him)
 var active_map: int = 1
 var winner_index: int = -1          # set once someone wins
 var dev_mode: bool = false          # only for games started from the menu's DEV button
@@ -21,14 +21,16 @@ func award_points(player_index: int, amount: int) -> void:
 	EventBus.points_awarded.emit(player_index, amount)
 	check_win(player_index)
 
-# Win by: points (unless infinite-points mode), beating the Champion, or
-# Balance.ELITE_WINS_TO_WIN Haunted Four wins in a row on the Spectral Trail.
+# Win by: points, beating the Spirit Lord, or Balance.ELITE_WINS_TO_WIN
+# Haunted Four wins in a row on the Spectral Trail. In "No pts" mode only the
+# Spirit Lord wins — the Haunted Four streak just unlocks his fight.
 func check_win(player_index: int) -> void:
 	if winner_index != -1:
 		return
 	var p: PlayerData = players[player_index]
 	var points_win: bool = p.progress.points >= win_threshold and not infinite_points
-	if points_win or p.progress.champion_defeated or p.progress.elite_wins >= Balance.ELITE_WINS_TO_WIN:
+	var trail_win: bool = p.progress.elite_wins >= Balance.ELITE_WINS_TO_WIN and not infinite_points
+	if points_win or trail_win or p.progress.champion_defeated:
 		winner_index = player_index
 		EventBus.game_won.emit(player_index)
 

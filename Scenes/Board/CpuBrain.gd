@@ -35,9 +35,9 @@ static func top_stars(p: PlayerData) -> float:
 static func pick_route(graph: BoardGraph, p: PlayerData, bias: Dictionary, node_name: String,
 		opts: Array, best_points: int) -> int:
 	var need_sp: float = maxf(0.2, (6.0 - float(p.team.size())) / 3.0) \
-		* (1.5 if p.inventory.total_jars() > 0 else 0.4)   # no jars → ghost tiles are risky
+		* (1.5 if p.inventory.lanterns().size() > 0 else 0.8)   # Lanterns make ghost tiles worth it
 	var need_item: float = 1.5 if p.inventory.hand.size() < 2 else 0.6
-	if p.inventory.total_jars() == 0:
+	if p.inventory.lanterns().is_empty():
 		need_item += 0.8
 	var need_badge: float = 2.0 if ready_for_gym(p) else 0.3
 	var need_pts: float = 0.5 + 0.05 * maxf(0.0, float(best_points - p.progress.points))
@@ -51,6 +51,8 @@ static func pick_route(graph: BoardGraph, p: PlayerData, bias: Dictionary, node_
 				"ITEM": s += need_item * float(bias["item"])
 				"EVENT": s += 0.5 * need_pts * float(bias["pts"])
 				"COMPETITION": s += need_pts * float(bias["pts"])
+				"CLASH": s += 0.6 * need_pts * float(bias["pts"])
+				"BATTLE": s += 0.7 * need_pts * float(bias["pts"])
 		var dest := graph.other_end(ri, node_name)
 		if graph.is_city(dest):
 			s += 0.5   # towns heal and restock
@@ -66,10 +68,10 @@ static func pick_route(graph: BoardGraph, p: PlayerData, bias: Dictionary, node_
 	return opts.back()
 
 # Stop in a town when it's useful: an unbeaten gym it's ready for, trail
-# prep, or restocking jars.
+# prep, or restocking Lanterns.
 static func wants_stop(p: PlayerData, city: String) -> bool:
 	var wants_gym := city != "A" and not _has_badge(p, city) and ready_for_gym(p)
-	var needs_shop := p.inventory.total_jars() == 0 and p.inventory.gold >= 10
+	var needs_shop := p.inventory.lanterns().is_empty() and p.inventory.gold >= 10
 	return wants_gym or ready_for_trail(p) or needs_shop
 
 # The town a CPU would like to jump to (fly / Warp Door), or "".

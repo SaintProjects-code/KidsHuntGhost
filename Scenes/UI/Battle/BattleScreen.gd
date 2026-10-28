@@ -34,9 +34,20 @@ var _opp_owner := -1
 var _human := true
 var _opp_human := false
 var _stakes := 0.5
-var _armed := ""          # your card queued for next round
+var _armed := ""          # your card queued (plays before the next attacks)
+var _attacking := false   # this round's attacks have begun (a card now waits for the next round)
+var _played := [false, false]   # [you, them]: a tactic already used this round (one each)
 var _auto_gen := 0        # bumped per battle so an old auto loop stops
 var _opp_armed := ""
+
+# 📱 The players whose phones drive this battle (see Remote): the human side(s).
+func remote_owners() -> Array:
+	var out: Array = []
+	if _human and _hand_owner >= 0:
+		out.append(_hand_owner)
+	if _opp_human and _opp_owner >= 0:
+		out.append(_opp_owner)
+	return out
 
 func present(setup: Dictionary) -> void:
 	var team: Array = setup.get("team", [])
@@ -60,6 +71,8 @@ func present(setup: Dictionary) -> void:
 	_stakes = setup.get("stakes", 0.5)
 	_armed = ""
 	_opp_armed = ""
+	_attacking = false
+	_played = [false, false]
 	var atk_mod: int = setup.get("atk_mod", 0)
 	if atk_mod != 0:
 		for m in _team:
@@ -144,15 +157,46 @@ func _fill_hand(box: HBoxContainer, hand: Array, interactive: bool, mine: bool) 
 		none.modulate = Color(1, 1, 1, 0.5)
 		box.add_child(none)
 
+# Tapping a tactic card USES it as soon as it can:
+#   • between rounds → right now (its effect covers the coming round)
+#   • a round is starting but nobody has attacked yet → just before the attacks
+#   • the attacks already began → at the start of the next round
+# Tapping the waiting card again takes it back. One card per side per round.
 func _arm(key: String, mine: bool) -> void:
 	if _over:
 		return
+	var was: String = _armed if mine else _opp_armed
+	var now := "" if was == key else key
 	if mine:
-		_armed = "" if _armed == key else key
+		_armed = now
 	else:
-		_opp_armed = "" if _opp_armed == key else key
+		_opp_armed = now
 	Sfx.play("card", 1.2)
 	_refresh_hands()
+	if now == "":
+		return
+	var side := 0 if mine else 1
+	if not _busy and not _played[side]:
+		_play_now(mine)
+	elif _attacking or _played[side]:
+		_tactic_banner(CardsData.card(key).get("icon", "🃏"), "%s is ready" % CardsData.card_name(key),
+			"plays at the start of the next round", Color("8fd6ff"))
+	# otherwise the round in progress picks it up just before the attacks
+
+# Between rounds: play the armed card straight away.
+func _play_now(mine: bool) -> void:
+	var key: String = _armed if mine else _opp_armed
+	if key == "":
+		return
+	if mine:
+		_armed = ""
+	else:
+		_opp_armed = ""
+	_busy = true   # the Auto loop waits for the card to finish
+	_played[0 if mine else 1] = true
+	await _play_tactic(key, mine)
+	_refresh_hands()
+	_busy = false
 
 # Keyboard: Space/Enter = Next Round / Continue; 1-5 arm your tactic cards.
 func _unhandled_key_input(ev: InputEvent) -> void:
@@ -176,16 +220,18 @@ func _unhandled_key_input(ev: InputEvent) -> void:
 func _choose_cards() -> Array:
 	var me: Dictionary = _team[_active]
 	var op: Dictionary = _opp[_opp_active]
-	var mine := _armed if _human and not _skipping else ""
-	if not _human:
+	var mine := _armed if _human and not _skipping and not _played[0] else ""
+	if not _human and not _played[0]:
 		mine = CardSystem.pick_tactic(_hand, me, op, DamageCalculator.calculate(op, me),
 			DamageCalculator.calculate(me, op), _stakes)
-	var theirs := _opp_armed if _opp_human and not _skipping else ""
-	if not _opp_human:
+	var theirs := _opp_armed if _opp_human and not _skipping and not _played[1] else ""
+	if not _opp_human and not _played[1]:
 		theirs = CardSystem.pick_tactic(_opp_hand, op, me, DamageCalculator.calculate(me, op),
 			DamageCalculator.calculate(op, me), _stakes)
-	_armed = ""
-	_opp_armed = ""
+	if mine != "":
+		_armed = ""
+	if theirs != "":
+		_opp_armed = ""
 	return [mine, theirs]
 
 func _use_card(hand: Array, source: Array, owner: int, key: String) -> void:
@@ -207,6 +253,10 @@ func _play_tactic(key: String, is_me: bool) -> void:
 		Juice.pop(_card_of(me), 1.12)
 	_logln("[color=#7fe0d0]%s plays %s![/color]" % [
 		(_team_name_lbl.text if is_me else _opp_name_lbl.text), CardsData.card_name(key)])
+	var info := CardsData.card(key)
+	_tactic_banner(String(info.get("icon", "🃏")), "%s used %s!" % [
+		(_team_name_lbl.text if is_me else _opp_name_lbl.text).capitalize(), info.get("name", key)],
+		String(info.get("desc", "")), Color("7be0a0") if is_me else Color("ff9a7a"))
 	match key:
 		"spirit_shield": me["_r_shield"] = true
 		"battle_cry":
@@ -346,8 +396,10 @@ func _round() -> void:
 	# tactic cards come first (Purify can cure before statuses tick)
 	var picks := _choose_cards()
 	if picks[0] != "":
+		_played[0] = true
 		await _play_tactic(picks[0], true)
 	if picks[1] != "":
+		_played[1] = true
 		await _play_tactic(picks[1], false)
 	_refresh_hands()
 	var me: Dictionary = _team[_active]
@@ -358,15 +410,33 @@ func _round() -> void:
 	op_acts = await _trait_tick(op, op_acts) and not op.get("_r_boo", false)
 	if me.get("_r_boo", false):
 		_logln("%s is too scared to move!" % _who(me))
+		_tactic_banner("👻", "Boo!", "%s is too scared to move" % me.get("name", "?"), Color("c8a8ff"))
 	if op.get("_r_boo", false):
 		_logln("%s is too scared to move!" % _who(op))
+		_tactic_banner("👻", "Boo!", "%s is too scared to move" % op.get("name", "?"), Color("c8a8ff"))
 	# round-start abilities fire "at the same time" → faster spirit first
 	var me_first := _goes_first(me, op)
+	if me.get("_r_haste", false) != op.get("_r_haste", false):
+		_tactic_banner("⚡", "Haste!", "%s moves first this round" % (me if me_first else op).get("name", "?"), Color("ffd24d"))
 	for actor in ([me, op] if me_first else [op, me]):
 		for slot in 2:
 			await _round_start_abilities(actor, op if actor == me else me, slot)
 	await _bench_round_abilities(_team, _active)
 	await _bench_round_abilities(_opp, _opp_active)
+	# last call: a card tapped while the round was starting plays now, before
+	# anyone attacks (no await between this check and _attacking = true)
+	for side in 2:
+		var late: String = _armed if side == 0 else _opp_armed
+		if late != "" and not _played[side] and not _skipping:
+			if side == 0:
+				_armed = ""
+			else:
+				_opp_armed = ""
+			_played[side] = true
+			await _play_tactic(late, side == 0)
+	me = _team[_active]   # a Switcheroo may have changed the leads
+	op = _opp[_opp_active]
+	_attacking = true
 	if me_first:
 		await _attack_turn(me, op, true, me_acts)
 		await _attack_turn(op, me, false, op_acts)
@@ -391,6 +461,8 @@ func _round() -> void:
 	if not _alive(op):
 		await _vengeance(_opp, me)
 	_clear_round_flags()
+	_attacking = false
+	_played = [false, false]
 	# independent checks: Destiny Bond / Explosion can drop both at once
 	if not _alive(op):
 		await _faint(op, false)
@@ -417,6 +489,7 @@ func _attack_turn(att: Dictionary, def_: Dictionary, is_me: bool, acts: bool) ->
 	await _attack_or_move(att, def_, is_me)
 	if att.get("_r_fury", false) and _alive(att) and _alive(def_):
 		_logln("💢 Fury! %s strikes again!" % _who(att))
+		_tactic_banner("💢", "Fury!", "%s strikes again" % att.get("name", "?"), Color("ff7a5a"))
 		await _strike(att, def_, is_me)
 
 func _side_hp(side: Array) -> int:

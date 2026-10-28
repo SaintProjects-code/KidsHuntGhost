@@ -1,0 +1,16 @@
+{
+  "name": "kids-hunt-ghost-server",
+  "version": "1.0.0",
+  "description": "Phone-controller relay for Kids Hunt Ghost: the game (host) and phones meet in a room by code.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "8.18.0"
+  }
+}

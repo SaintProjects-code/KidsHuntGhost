@@ -1,5 +1,5 @@
 extends MenuWindow
-## Spend gold on capture jars and a rotating rack of cards (rerolled each
+## Spend gold on Lanterns (catching cards) and a rotating rack of cards (rerolled each
 ## visit), or pay to scrub a trait off a spirit. present(player_index);
 ## emits closed(). cpu_shop(idx) is the CPU's shopping list (no window).
 
@@ -42,10 +42,10 @@ func _refresh() -> void:
 	var inv := _inv()
 	_gold_lbl.text = "🪙 %d gold   ·   🃏 %d/%d cards" % [inv.gold, inv.hand.size(), Balance.HAND_SIZE]
 	UIKit.clear(_list)
-	for jar in [&"ghost_jar", &"silver_jar", &"golden_jar"]:
-		var d: Dictionary = CatchSystem.JARS[jar]
-		_list.add_child(_row("%s  (+%d to catch)  — %dg   · own %d" % [d["name"], d["bonus"], d["cost"], inv.jar_count(jar)],
-			int(d["cost"]), _buy_jar.bind(jar)))
+	for key in ["spirit_lantern", "grand_lantern"]:
+		var d: Dictionary = CardsData.card(key)
+		_list.add_child(_row("%s %s  (%s)  — %dg   · own %d" % [d["icon"], d["name"], d["desc"], d["cost"],
+			inv.hand.count(key)], int(d["cost"]), _buy_card.bind(key)))
 	var team: Array = GameState.players[_player_index].team
 	if team.any(func(m): return not m.get("traits", []).is_empty()):
 		_list.add_child(_heading("— Trait Removal —"))
@@ -91,11 +91,6 @@ func _pay(cost: int) -> bool:
 	Sfx.play("coin")
 	return true
 
-func _buy_jar(jar: StringName) -> void:
-	if _pay(int(CatchSystem.JARS[jar]["cost"])):
-		_inv().add_jars(jar, 1)
-	_refresh()
-
 func _buy_card(key: String) -> void:
 	if _pay(int(CardsData.card(key)["cost"])):
 		_offers.erase(key)   # one of each per visit
@@ -111,18 +106,19 @@ func _remove_trait(mon: Dictionary, key: String) -> void:
 		mon["name"], EventsData.trait_of(key)["name"], TRAIT_REMOVAL_COST], "#7fe0d0")
 	_refresh()
 
-# CPU shopping list: keep 3 jars, then buy one useful card if it can afford it.
+# CPU shopping list: keep 4 Lanterns (stage-3 ghosts need 3+), then buy one
+# useful card if it can afford it.
 func cpu_shop(idx: int) -> void:
 	var inv: PlayerData.Inventory = GameState.players[idx].inventory
 	var bought: Array = []
-	while inv.total_jars() < 3 and inv.gold >= 10:
+	while inv.lanterns().size() < 4 and inv.gold >= 10 and not inv.hand_full():
 		inv.gold -= 10
-		inv.add_jars(&"ghost_jar", 1)
-		bought.append("Ghost Jar")
-	if inv.gold >= 60 and inv.jar_count(&"silver_jar") == 0:
+		inv.hand.append("spirit_lantern")
+		bought.append("Spirit Lantern")
+	if inv.gold >= 60 and not inv.hand.has("grand_lantern") and not inv.hand_full():
 		inv.gold -= 25
-		inv.add_jars(&"silver_jar", 1)
-		bought.append("Silver Jar")
+		inv.hand.append("grand_lantern")
+		bought.append("Grand Lantern")
 	if not inv.hand_full() and inv.gold >= 40:
 		var key: String = ["ecto_patch", "spirit_shield", "glow_tonic", "battle_cry", "wake_bell"].pick_random()
 		inv.gold -= int(CardsData.card(key)["cost"])

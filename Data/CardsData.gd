@@ -2,6 +2,7 @@ class_name CardsData
 ## Every card in the game. Players hold up to Balance.HAND_SIZE in their hand.
 ##
 ## kind:
+##   capture — Lanterns: spent when you roll to catch a wild ghost (more dice)
 ##   field  — played on the board during your turn (heals, dice, lures…)
 ##   tactic — played in battle, one per round (shields, haste, fury…)
 ##   charm  — attached to a spirit; it stays on that spirit (battle effects
@@ -10,6 +11,13 @@ class_name CardsData
 ## weight: how often ITEM tiles / events draw it.  value: CPU trade/discard worth.
 
 const CARDS := {
+	# ── capture ──────────────────────────────────────────────────────────────
+	"spirit_lantern":{"name": "Spirit Lantern", "kind": "capture", "icon": "🏮", "cost": 10, "weight": 14, "value": 2, "dice": 1,
+		"desc": "Catching: roll +1 die"},
+	"grand_lantern": {"name": "Grand Lantern",  "kind": "capture", "icon": "🏮", "cost": 25, "weight": 5, "value": 4, "dice": 2,
+		"desc": "Catching: roll +2 dice"},
+	"soul_lantern":  {"name": "Soul Lantern",   "kind": "capture", "icon": "✨", "cost": 0,  "weight": 1, "value": 9, "dice": 0,
+		"desc": "Catching: a sure catch, no roll"},
 	# ── field ────────────────────────────────────────────────────────────────
 	"glow_tonic":    {"name": "Glow Tonic",     "kind": "field", "icon": "🧪", "cost": 15, "weight": 10, "value": 3, "target": "spirit",
 		"desc": "Heal one spirit 50 HP"},
@@ -35,8 +43,6 @@ const CARDS := {
 		"desc": "Steal a random card from another player"},
 	"lucky_coin":    {"name": "Lucky Coin",     "kind": "field", "icon": "🪙", "cost": 0,  "weight": 5, "value": 3, "target": "",
 		"desc": "Cash it in for 25 gold"},
-	"jar_pack":      {"name": "Jar Pack",       "kind": "field", "icon": "🫙", "cost": 0,  "weight": 6, "value": 3, "target": "",
-		"desc": "+2 Ghost Jars"},
 	# ── tactic ───────────────────────────────────────────────────────────────
 	"spirit_shield": {"name": "Spirit Shield",  "kind": "tactic", "icon": "🛡", "cost": 20, "weight": 6, "value": 4,
 		"desc": "Your lead takes half damage this round"},
@@ -88,6 +94,7 @@ const CARDS := {
 }
 
 const KIND_COLORS := {
+	"capture": Color("2b8c9a"),
 	"field":  Color("3d8b5a"),
 	"tactic": Color("b0473f"),
 	"charm":  Color("6a4fc4"),
@@ -122,9 +129,10 @@ static func random_card(kind: String = "") -> String:
 			return k
 	return pool.back()
 
-# Cards the shop can stock (free cash-in cards aren't for sale).
+# Cards for the shop's rotating rack (Lanterns have their own shelf; free
+# cash-in cards aren't for sale).
 static func shop_pool() -> Array:
-	return CARDS.keys().filter(func(k): return int(CARDS[k]["cost"]) > 0)
+	return CARDS.keys().filter(func(k): return int(CARDS[k]["cost"]) > 0 and CARDS[k]["kind"] != "capture")
 
 # A short battle deck for gym leaders / the Haunted Four / the Champion.
 static func npc_deck(count: int) -> Array:

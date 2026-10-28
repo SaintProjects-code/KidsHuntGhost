@@ -6,6 +6,7 @@ class_name MenuWindow
 
 var panel: PanelContainer
 var _dim: ColorRect
+var _center: CenterContainer
 
 func _init_window(w: float, h: float = 0.0) -> VBoxContainer:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE   # the root never eats clicks
@@ -20,6 +21,7 @@ func _init_window(w: float, h: float = 0.0) -> VBoxContainer:
 	add_child(_dim)
 
 	var center := CenterContainer.new()
+	_center = center
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# The centering layer never catches clicks itself — empty space around the
 	# panel falls through to the dim below (and, on click-through windows, all
@@ -30,6 +32,9 @@ func _init_window(w: float, h: float = 0.0) -> VBoxContainer:
 	panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(w, h)
 	center.add_child(panel)
+	# a panel taller/wider than the screen shrinks to fit instead of being cut off
+	panel.resized.connect(_fit_panel)
+	resized.connect(_fit_panel)
 
 	var margin := MarginContainer.new()
 	for s in ["left", "top", "right", "bottom"]:
@@ -40,6 +45,26 @@ func _init_window(w: float, h: float = 0.0) -> VBoxContainer:
 	vb.add_theme_constant_override("separation", 10)
 	margin.add_child(vb)
 	return vb
+
+const FIT_MARGIN := 0.96   # keep a sliver of screen around a shrunk panel
+
+# Containers reset their children's scale on every layout pass, so the
+# centering layer (a plain child of this root) is what gets scaled, around the
+# screen centre.
+func _fit_panel() -> void:
+	var avail: Vector2 = size if size.x > 0.0 else get_viewport_rect().size
+	if panel.size.x <= 0.0 or panel.size.y <= 0.0 or avail.x <= 0.0:
+		return
+	var k: float = minf(1.0, minf(avail.x * FIT_MARGIN / panel.size.x, avail.y * FIT_MARGIN / panel.size.y))
+	# an oversized panel stretches the centering layer downward past the
+	# screen, so recentre it on the screen before scaling
+	var extra := Vector2(maxf(0.0, panel.size.x - avail.x), maxf(0.0, panel.size.y - avail.y)) * 0.5
+	_center.offset_left = -extra.x
+	_center.offset_right = extra.x
+	_center.offset_top = -extra.y
+	_center.offset_bottom = extra.y
+	_center.pivot_offset = avail * 0.5 + extra
+	_center.scale = Vector2(k, k)
 
 # Let clicks in the DIMMED area fall through to whatever's behind this window
 # (used by the tile-flow windows so the board's action buttons — rendered on a

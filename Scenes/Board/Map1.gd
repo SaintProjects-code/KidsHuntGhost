@@ -77,14 +77,15 @@ var NAMES := {
 # SPACE_TYPE_NAMES below). The list runs from the "from" node toward the "to"
 # node. Any space with no type listed falls back to DEFAULT_SPACE_TYPE.
 # Every route carries 1 EVENT and 1 COMPETITION tile (plus its ghost/ITEM tiles;
-# the long J5→E scenic road keeps a 2nd EVENT).
+# the long J5→E scenic road keeps a 2nd EVENT). Six ⚔ CLASH tiles are spread
+# over the busy roads: land on one and challenge another player.
 var ROUTES := [
 	{ "from": "A", "to": "J1", "corners": [], "spaces": 4,
 		"types": [&"WISP", &"EVENT", &"WISP", &"ITEM"] },
 	{ "from": "B", "to": "J3", "corners": [], "spaces": 4,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP"] },
 	{ "from": "C", "to": "H", "corners": [], "spaces": 6,
-		"types": [&"GHOST", &"EVENT", &"ITEM", &"GHOST", &"GHOST", &"GHOST"] },
+		"types": [&"GHOST", &"EVENT", &"ITEM", &"GHOST", &"CLASH", &"GHOST"] },
 	{ "from": "C", "to": "J5", "corners": [], "spaces": 2,
 		"types": [&"EVENT", &"COMPETITION"] },
 	{ "from": "E", "to": "D", "corners": [Vector2i(46, 66),Vector2i(46, 35)], "spaces": 5,
@@ -92,7 +93,7 @@ var ROUTES := [
 	{ "from": "H", "to": "J8", "corners": [], "spaces": 4,
 		"types": [&"GHOST", &"EVENT", &"GHOST", &"ITEM"] },
 	{ "from": "D", "to": "J6", "corners": [], "spaces": 6,
-		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"GHOST", &"ITEM", &"GHOST"] },
+		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"CLASH", &"ITEM", &"GHOST"] },
 	{ "from": "D", "to": "F", "corners": [Vector2i(91, 36),Vector2i(91, 25),Vector2i(104, 25)], "spaces": 6,
 		"types": [&"PHANTOM", &"EVENT", &"ITEM", &"GHOST", &"PHANTOM", &"PHANTOM"] },
 
@@ -100,21 +101,21 @@ var ROUTES := [
 	# Parallel roads share both endpoints, so each is named after one of its two
 	# junctions ("name_of") to keep the fork choices distinct and meaningful.
 	{ "from": "J1", "to": "J2", "corners": [Vector2i(7, 43),Vector2i(7, 21)], "spaces": 5, "name_of": "J1",
-		"types": [&"EVENT", &"WISP", &"WISP", &"ITEM", &"WISP"] },
+		"types": [&"EVENT", &"WISP", &"CLASH", &"ITEM", &"WISP"] },
 	{ "from": "J1", "to": "J2", "corners": [], "spaces": 4, "name_of": "J2",
 		"types": [&"EVENT", &"WISP", &"EVENT", &"EVENT"] },
 	{ "from": "J2", "to": "B", "corners": [], "spaces": 5,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"ITEM", &"WISP"] },
 
 	{ "from": "J3", "to": "J4", "corners": [Vector2i(28, -21),Vector2i(61, -22)], "spaces": 5, "name_of": "J3",
-		"types": [&"WISP", &"EVENT", &"WISP", &"ITEM", &"WISP"] },
+		"types": [&"WISP", &"EVENT", &"CLASH", &"ITEM", &"WISP"] },
 	{ "from": "J3", "to": "J4", "corners": [], "spaces": 5, "name_of": "J4",
 		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 	{ "from": "J4", "to": "C", "corners": [], "spaces": 5,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 
 	{ "from": "J5", "to": "E", "corners": [Vector2i(42, -1),Vector2i(42, 10),Vector2i(30, 10)], "spaces": 10,
-		"types": [&"EVENT", &"GHOST", &"COMPETITION", &"ITEM", &"GHOST", &"GHOST", &"EVENT", &"GHOST", &"GHOST", &"GHOST"] },
+		"types": [&"EVENT", &"GHOST", &"COMPETITION", &"ITEM", &"GHOST", &"CLASH", &"EVENT", &"GHOST", &"GHOST", &"GHOST"] },
 	{ "from": "J5", "to": "D", "corners": [Vector2i(85, 12),Vector2i(65, 13)], "spaces": 6,
 		"types": [&"GHOST", &"COMPETITION", &"ITEM", &"EVENT", &"GHOST", &"GHOST"] },
 
@@ -126,14 +127,14 @@ var ROUTES := [
 		"types": [&"PHANTOM", &"EVENT", &"PHANTOM", &"ITEM", &"PHANTOM"] },
 
 	{ "from": "J8", "to": "J9", "corners": [], "spaces": 6, "name_of": "J8",
-		"types": [&"GHOST", &"GHOST", &"ITEM", &"EVENT", &"GHOST", &"PHANTOM"] },
+		"types": [&"GHOST", &"CLASH", &"ITEM", &"EVENT", &"GHOST", &"PHANTOM"] },
 	{ "from": "J8", "to": "J9", "corners": [Vector2i(132, 7),Vector2i(132, 54)], "spaces": 6, "name_of": "J9",
 		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"ITEM", &"PHANTOM", &"PHANTOM"] },
 	{ "from": "J9", "to": "G", "corners": [], "spaces": 5,
 		"types": [&"PHANTOM", &"EVENT", &"EVENT", &"ITEM", &"PHANTOM"] },
 
 	# The Spectral Trail: a dead-end climb. Each WARDEN tile is a fight against
-	# one of the Haunted Four (or Champion Vesper).
+	# one of the Haunted Four (or Spirit Lord Vesper).
 	{ "from": "VEnter", "to": "VEnd", "corners": [], "spaces": 7,
 		"types": [&"ITEM", &"WARDEN", &"ITEM",&"WARDEN",&"ITEM",&"WARDEN",&"WARDEN"] },
 
@@ -166,7 +167,9 @@ const SPACE_TYPE_NAMES := {
 	&"EVENT":       "Event",
 	&"ITEM":        "Item",
 	&"COMPETITION": "Comp",
-	&"WARDEN":      "Warden",
+	&"WARDEN":      "Trail",
+	&"CLASH":       "Clash",
+	&"BATTLE":      "Battle",
 }
 
 const GHOST_TILES := [&"WISP", &"GHOST", &"PHANTOM"]
@@ -195,6 +198,8 @@ const SPACE_TYPE_COLORS := {
 	&"ITEM":        Color("f08a2e"),
 	&"COMPETITION": Color("8e8e93"),
 	&"WARDEN":      Color("7b5cd6"),
+	&"CLASH":       Color("e64ad8"),
+	&"BATTLE":      Color("d9480f"),
 }
 
 # Used when a space has no type listed in its route's "types".

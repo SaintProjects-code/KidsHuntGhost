@@ -20,20 +20,11 @@ class Progress:
 
 class Inventory:
 	var gold: int = Balance.GOLD_START
-	var jars := {&"ghost_jar": Balance.START_JARS}   # capture tool -> count
 	var hand: Array = []                             # card keys, max Balance.HAND_SIZE
 
-	func jar_count(jar: StringName) -> int:
-		return int(jars.get(jar, 0))
-
-	func total_jars() -> int:
-		var n := 0
-		for c in jars.values():
-			n += int(c)
-		return n
-
-	func add_jars(jar: StringName, n: int) -> void:
-		jars[jar] = jar_count(jar) + n
+	# Lantern (capture) cards in the hand.
+	func lanterns() -> Array:
+		return cards_of_kind("capture")
 
 	func hand_full() -> bool:
 		return hand.size() >= Balance.HAND_SIZE
@@ -49,6 +40,7 @@ var trainer_key: String = ""    # trainer sprite key (e.g. "alain")
 var color: Color = Color.WHITE  # token tint
 var is_cpu: bool = false
 var pvp_tag: bool = false       # earned by reaching Cobweb City (C): unlocks PvP clashes
+var remote_id: String = ""      # 📱 the phone playing this seat ("" = keyboard / CPU), see Remote
 var team: Array = []
 var pc: Array = []              # the Spirit Box: spirits beyond the team of 6
 var progress := Progress.new()
@@ -75,9 +67,9 @@ func to_dict() -> Dictionary:
 		"pvp_tag": pvp_tag, "team": team.duplicate(true), "pc": pc.duplicate(true),
 		"badges": progress.badges.duplicate(), "elite_wins": progress.elite_wins,
 		"champion": progress.champion_defeated, "points": progress.points,
-		"gold": inventory.gold, "jars": inventory.jars.duplicate(), "hand": inventory.hand.duplicate(),
+		"gold": inventory.gold, "hand": inventory.hand.duplicate(),
 		"battle_mod": next_battle_mod, "roll_bonus": roll_bonus, "extra_die": extra_die,
-		"lure": lure, "salt": salt,
+		"lure": lure, "salt": salt, "remote_id": remote_id,
 	}
 
 static func from_dict(d: Dictionary) -> PlayerData:
@@ -87,6 +79,7 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.color = d.get("color", Color.WHITE)
 	p.is_cpu = d.get("cpu", false)
 	p.pvp_tag = d.get("pvp_tag", false)
+	p.remote_id = d.get("remote_id", "")
 	p.team = d.get("team", [])
 	p.pc = d.get("pc", [])
 	for k in d.get("badges", {}):
@@ -96,7 +89,6 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.progress.champion_defeated = d.get("champion", false)
 	p.progress.points = d.get("points", 0)
 	p.inventory.gold = d.get("gold", 0)
-	p.inventory.jars = d.get("jars", {})
 	p.inventory.hand = d.get("hand", [])
 	p.next_battle_mod = d.get("battle_mod", 0)
 	p.roll_bonus = d.get("roll_bonus", 0)

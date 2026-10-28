@@ -394,6 +394,46 @@ func _float_on(mon: Dictionary, text: String, color: Color) -> void:
 		return
 	Juice.float_text(c.get_parent(), Vector2(CARD_SIZE.x * 0.5, 30), text, color, 24)
 
+# A tactic card banner: slides in over the battle when a card is played and
+# again when its effect kicks in ("🛡 Spirit Shield! — Wispy takes half
+# damage"), then fades. A newer banner replaces the old one.
+var _banner: Control
+
+func _tactic_banner(icon: String, headline: String, sub: String, color: Color) -> void:
+	if _quiet():
+		return
+	if is_instance_valid(_banner):
+		_banner.queue_free()
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.04, 0.14, 0.94), 16, 3, color, Vector2(22, 12)))
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := UIKit.hbox(14)
+	box.add_child(row)
+	row.add_child(UIKit.label(icon, 40))
+	var text := UIKit.vbox(2)
+	row.add_child(text)
+	text.add_child(UIKit.label(headline, 24, color))
+	if sub != "":
+		text.add_child(UIKit.label(sub, 15))
+	add_child(box)
+	_banner = box
+	var vp := get_viewport_rect().size
+	box.reset_size()
+	var size_now := box.get_combined_minimum_size()
+	box.size = size_now
+	box.pivot_offset = size_now * 0.5
+	box.position = Vector2((vp.x - size_now.x) * 0.5, vp.y * 0.30 - size_now.y * 0.5)
+	box.scale = Vector2(0.6, 0.6)
+	box.modulate.a = 0.0
+	var tw := box.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(box, "scale", Vector2.ONE, 0.18 / _speed).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 1.0, 0.12 / _speed)
+	tw.chain().tween_interval(1.1 / _speed)
+	tw.chain().tween_property(box, "modulate:a", 0.0, 0.3 / _speed)
+	tw.chain().tween_callback(box.queue_free)
+	Sfx.play("card", 0.9)
+
 # Every battle action plays one at a time: log line + animation, then a beat.
 func _beat(time: float = 0.5) -> void:
 	_refresh()

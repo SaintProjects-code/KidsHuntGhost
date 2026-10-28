@@ -10,7 +10,7 @@ signal dice_rolled(result: int, faces: Array)
 signal space_landed(player_index: int, space_type: StringName)
 
 # Capture
-signal catch_attempted(player_index: int, spirit: Dictionary, jar: StringName)
+signal catch_attempted(player_index: int, spirit: Dictionary, lanterns: Array)
 signal catch_succeeded(player_index: int, spirit: Dictionary)
 signal catch_failed(player_index: int, spirit: Dictionary)
 

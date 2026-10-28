@@ -24,7 +24,7 @@ func present(player_index: int, city: String) -> void:
 	UIKit.clear(_buttons)
 	var options: Array = []
 	if not p.progress.badges.get(gym.get("badge", ""), false):
-		options.append(["⚔ Challenge Gym (%s)" % gym.get("type", ""), "gym"])
+		options.append(["⚔ Challenge the Warden (%s)" % gym.get("type", ""), "gym"])
 	else:
 		var got := UIKit.label("✓ %s earned" % GameData.badge_name(gym["badge"]), 18, UIKit.GOOD)
 		got.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

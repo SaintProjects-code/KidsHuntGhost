@@ -27,7 +27,7 @@ class_name EventsData
 ##       fight  true (battle it after)     battle_mod +1 / -1 (next battle ATK)
 ##       star   true (lead gains a star)   trait    a TRAIT_DATA key
 ##       card   "random"/"field"/"tactic"/"charm" or a card key
-##       jars   N Ghost Jars               lose_card true (a random hand card)
+##       lanterns N Spirit Lanterns (−1 = lose one)   lose_card true (a random hand card)
 ##       lose_spirit true (a random non-lead runs off)
 ##       next   {desc, options} — the story continues (push-your-luck!)
 ##
@@ -187,7 +187,7 @@ const EVENTS := [
 				"win":  {"text": "{spirit} flees! A star falls from the offering bowl into {lead}'s paws.", "star": true},
 				"lose": {"text": "{spirit} grins wide — battle!", "fight": true} },
 			{ "label": "🧂 Draw a salt circle", "stat": "", "need_card": "salt_circle",
-				"win":  {"text": "The salt glows. {spirit} bows and leaves you its offering.", "card": "random", "jars": 1} },
+				"win":  {"text": "The salt glows. {spirit} bows and leaves you its offering.", "card": "random", "lanterns": 1} },
 			{ "label": "💨 Back away slowly", "stat": "",
 				"win":  {"text": "You leave the shrine in peace. Nothing follows. Probably."} },
 		],
@@ -348,7 +348,7 @@ const EVENTS := [
 		"desc": "Paper lanterns bob over the town square. Ghost kids are dancing, and there's a raffle booth!",
 		"options": [
 			{ "label": "🏮 Help light the lanterns", "stat": "hp_stat", "power": 3, "type_bonus": {"Fire": 3},
-				"win":  {"text": "The square glows! The organisers give you a pack of jars.", "jars": 2, "battle_mod": 1},
+				"win":  {"text": "The square glows! The organisers give you two Spirit Lanterns.", "lanterns": 2, "battle_mod": 1},
 				"lose": {"text": "You singe {lead}'s whiskers. Everyone pretends not to notice.", "damage": 10} },
 			{ "label": "💃 Enter the dance-off", "stat": "spd", "power": 4, "type_bonus": {"Electric": 2},
 				"win":  {"text": "{lead} wins the dance-off! First prize!", "gold": 25, "card": "tactic"},
@@ -386,7 +386,7 @@ const EVENTS := [
 				"lose": {"text": "{lead} hides under a log until morning.", "damage": 10} },
 			{ "label": "🍡 Share a snack", "stat": "hp_stat", "power": 3,
 				"win":  {"text": "{spirit} loves your snack and follows you home!", "join": true},
-				"lose": {"text": "It eats ALL the snacks. And your jar.", "jars": -1} },
+				"lose": {"text": "It eats ALL the snacks. And nibbles a lantern.", "lanterns": -1} },
 		],
 	},
 	{

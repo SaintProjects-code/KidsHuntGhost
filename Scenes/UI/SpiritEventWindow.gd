@@ -274,10 +274,11 @@ func _apply_outcome(out: Dictionary) -> String:
 		parts.append("%+d gold." % g)
 		if g > 0:
 			Sfx.play("coin")
-	if out.has("jars"):
-		var n: int = maxi(int(out["jars"]), -p.inventory.jar_count(&"ghost_jar"))
-		p.inventory.add_jars(&"ghost_jar", n)
-		parts.append("%+d Ghost Jar%s." % [n, "" if absi(n) == 1 else "s"])
+	if out.has("lanterns") and int(out["lanterns"]) < 0:
+		var lanterns: Array = p.inventory.lanterns()
+		if not lanterns.is_empty():
+			CardSystem.remove(_idx, lanterns[0])
+			parts.append("You lose a %s!" % CardsData.card_name(lanterns[0]))
 	if out.has("damage"):
 		lead["current_hp"] = maxi(0, int(lead.get("current_hp", 0)) - int(out["damage"]))
 		parts.append("%s takes %d damage!%s" % [lead["name"], out["damage"], " It fainted!" if int(lead["current_hp"]) <= 0 else ""])
@@ -318,6 +319,9 @@ func _apply_outcome(out: Dictionary) -> String:
 			_pending_fight["_no_catch"] = true   # a trainer's spirit: no catching
 	var msg := " ".join(parts)
 	# cards and stars may pop their own windows (hand full / bonus reward)
+	for n in maxi(0, int(out.get("lanterns", 0))):
+		msg += " You get a Spirit Lantern!"
+		await CardSystem.give(_idx, "spirit_lantern")
 	if out.has("card"):
 		var kind := String(out["card"])
 		var key := CardsData.random_card(kind if kind in ["field", "tactic", "charm"] else "") \

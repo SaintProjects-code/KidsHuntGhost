@@ -65,7 +65,7 @@ func _on_continue_pressed() -> void:
 	else:
 		Sfx.play("error")
 
-# DEV shortcut: skips setup — 3 players with full teams, plenty of jars, gold
+# DEV shortcut: skips setup — 3 players with full teams, Lanterns, gold
 # and cards, and dev_mode on (the only thing that shows the in-game DEV button).
 func _on_dev_pressed() -> void:
 	GameState.reset()
@@ -80,8 +80,8 @@ func _on_dev_pressed() -> void:
 			p.team.append(SpiritsData.random_spirit(1))
 		for i in 2:
 			p.team.append(SpiritsData.random_spirit(2))
-		p.inventory.add_jars(&"ghost_jar", 5)
 		p.inventory.gold = 200
-		p.inventory.hand = ["ecto_patch", "spirit_shield", "glow_tonic", "warp_door", "boo"]
+		p.inventory.hand = ["spirit_lantern", "spirit_lantern", "grand_lantern", "ecto_patch", "spirit_shield",
+			"glow_tonic", "boo"]
 		GameState.players.append(p)
 	get_tree().change_scene_to_file("res://Scenes/Board/Board.tscn")

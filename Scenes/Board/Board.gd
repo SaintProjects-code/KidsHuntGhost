@@ -21,7 +21,7 @@ const START_NODE := "A"
 const RESCUE_NODE := "C"              # whiteouts and lost trail fights end up here
 const FOLLOW_LERP := 6.0
 
-@onready var map = $Map1
+@onready var map = _load_map()
 @onready var camera: Camera2D = $Camera2D
 @onready var roll_button: Button = $BoardUI/Root/ActionBar/RollButton
 @onready var end_turn_button: Button = $BoardUI/Root/ActionBar/EndTurnButton
@@ -96,8 +96,8 @@ func _exit_tree() -> void:
 func _style_board_buttons() -> void:
 	var bar := roll_button.get_parent()
 	var specs := [
-		[roll_button, "🎲 Roll", "gold", 150], [end_turn_button, "End Turn", "primary", 150],
-		[bar.get_node("TeamButton"), "👥 Team", "secondary", 110], [bar.get_node("MapButton"), "🗺 Map", "secondary", 100],
+		[roll_button, "🎲 Roll", "gold", 128], [end_turn_button, "End Turn", "primary", 128],
+		[bar.get_node("TeamButton"), "👥 Team", "secondary", 100], [bar.get_node("MapButton"), "🗺 Map", "secondary", 90],
 	]
 	for sp in specs:
 		var b: Button = sp[0]
@@ -117,10 +117,30 @@ func _style_board_buttons() -> void:
 	UIKit.style_button(settings, "secondary", "s")
 	UIKit.style_button(event_ok, "primary", "m")
 
+# The board picked in setup (Map1 is in the scene; the others swap in).
+func _load_map() -> Node2D:
+	var base: Node2D = $Map1
+	var info: Dictionary = GameData.map_info(GameState.active_map)
+	if info["scene"] == base.scene_file_path:
+		return base
+	var m: Node2D = load(info["scene"]).instantiate()
+	add_child(m)
+	move_child(m, base.get_index())
+	remove_child(base)
+	base.queue_free()
+	return m
+
 func _deal_starting_cards() -> void:
+	# some boards start everyone with a few spirits (3v3 from turn one)
+	var start_team: int = int(GameData.map_info(GameState.active_map).get("start_team", 1))
+	for p in GameState.players:
+		while p.team.size() < start_team:
+			p.team.append(SpiritsData.random_spirit(1))
 	for i in GameState.players.size():
 		var hand: Array = GameState.players[i].inventory.hand
 		if hand.is_empty():
+			for n in Balance.START_LANTERNS:
+				hand.append("spirit_lantern")
 			hand.append(CardsData.random_card("tactic"))
 			for n in Balance.START_CARDS - 1:
 				hand.append(CardsData.random_card("field"))
@@ -320,7 +340,7 @@ func _on_dice_rolled(total: int, faces: Array) -> void:
 func _build_fly_button() -> void:
 	fly_button = Button.new()
 	fly_button.text = "✈ Fly"
-	fly_button.custom_minimum_size = Vector2(110, 54)
+	fly_button.custom_minimum_size = Vector2(96, 54)
 	UIKit.style_button(fly_button, "gold", "l")
 	fly_button.pressed.connect(_on_fly_pressed)
 	fly_button.hide()
@@ -650,6 +670,39 @@ func _check_pvp_land(i: int) -> void:
 			await EventBus.pvp_finished
 			return
 
+# ⚔ CLASH tile: challenge any player who isn't on the Spectral Trail (no tag
+# needed). Humans pick a rival (or pass); CPUs go for the points leader. With
+# no rival around, you draw a card instead.
+func _run_clash(i: int) -> void:
+	var p: PlayerData = GameState.players[i]
+	if p.living_team().is_empty():
+		return
+	var rivals: Array = []
+	for j in GameState.players.size():
+		if j != i and not _on_trail(j) and not GameState.players[j].living_team().is_empty():
+			rivals.append(j)
+	if rivals.is_empty():
+		await _show_flash("⚔ No rivals to challenge — you find a card instead!", 1.2)
+		await CardSystem.give_random(i)
+		return
+	var j: int
+	if p.is_cpu:
+		rivals.sort_custom(func(a, b): return GameState.players[a].progress.points > GameState.players[b].progress.points)
+		j = rivals[0]
+	else:
+		_set_idle(i)
+		var labels: Array = rivals.map(func(k): return "⚔ %s  (%d pts)" % [GameState.players[k].player_name,
+			GameState.players[k].progress.points])
+		labels.append("👋 Pass")
+		var pick: int = await _show_choice("⚔ Clash! Win: +%d pts, +%d gold, 1 of their cards" % [
+			Balance.PTS_PVP_WIN, Balance.GOLD_PVP_TAKE], labels)
+		if pick >= rivals.size():
+			return
+		j = rivals[pick]
+	await _show_flash("%s challenges %s — PvP battle!" % [p.player_name, GameState.players[j].player_name], 1.2)
+	EventBus.pvp_started.emit(i, j, "battle")
+	await EventBus.pvp_finished
+
 # ---------------- tiles ----------------
 
 func _resolve_space(i: int) -> void:
@@ -667,6 +720,8 @@ func _apply_tile(i: int, type: StringName) -> void:
 		return
 	if map.GHOST_TILES.has(type):
 		await _start_encounter(i, type)
+	elif type == &"CLASH":
+		await _run_clash(i)
 	else:
 		EventBus.tile_action.emit(i, type)
 		await EventBus.tile_resolved

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1b1236">
+<title>Kids Hunt Ghost</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="join" class="screen">
+  <h1>👻 Kids Hunt Ghost</h1>
+  <p class="sub">Join the game on the TV</p>
+  <label>Room code<input id="code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="ABCD"></label>
+  <label>Your name<input id="name" maxlength="14" autocomplete="nickname" placeholder="Ivy"></label>
+  <button id="joinBtn" class="big gold">Join!</button>
+  <p id="joinErr" class="err"></p>
+</main>
+
+<main id="play" class="screen hidden">
+  <header id="me">
+    <span id="meName">…</span>
+    <span id="meStats"></span>
+  </header>
+  <section id="view"></section>
+  <footer id="status"></footer>
+</main>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

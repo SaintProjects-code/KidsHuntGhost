@@ -6,7 +6,7 @@ class_name Balance
 # static var (not const) so test runs can try other values.
 static var PTS_CATCH := 1
 static var PTS_GYM := 3
-static var PTS_PVP_WIN := 4
+static var PTS_PVP_WIN := 3
 static var PTS_ELITE_WIN := 5
 static var PTS_CHAMPION := 10
 static var PTS_TRAINER_MULT := 1        # × each trainer's listed points
@@ -18,30 +18,29 @@ const ELITE_WINS_TO_WIN := 2
 const GOLD_START := 10
 const GOLD_CATCH := 10
 const GOLD_GYM := 25
+const GOLD_PVP_TAKE := 15               # the PvP winner takes this much from the loser
 
-# ── Wild ghosts: Spook Duel, then capture ─────────────────────────────────────
-# A wild ghost is never fought. First your lead stares it down: lead power +
-# 🎲d6 vs the ghost's power + 🎲d6 (ties to you; power = rounded average of
-# ATK/DEF/SPD + stars, ±1 for type advantage). Lose and it runs away. Win and
-# you get CATCH_THROWS throws: roll d100 + bonuses ≥ the target.
-# Target by stage (legendaries: LEGEND_TARGET). Plain Ghost Jar, no badges,
-# duel won: 90% / 75% / 60%.
-const CATCH_TARGET := {1: 26, 2: 41, 3: 56}
-const LEGEND_TARGET := 80
-const CATCH_BADGE_BONUS := 2            # per badge…
-const CATCH_BADGE_CAP := 3              # …counting at most this many badges
-const DUEL_BONUS := 15                  # the ghost is spooked (you won the duel)
-const CATCH_LURE_BONUS := 10            # a Spooky Lure drew it in
-const CATCH_FAIL_PENALTY := 15          # target rises after a missed throw
-const CATCH_THROWS := 2                 # throws per encounter, then it flees
+# ── Catching wild ghosts: a dice roll ────────────────────────────────────────
+# Roll 1 free die + 1 die per Spirit Lantern (+2 per Grand Lantern) and add
+# them up; catch the ghost if the total reaches its target. A Soul Lantern is a
+# sure catch. Two tries per ghost — the target rises after a miss — then it
+# flees. Lantern cards are spent on the roll, hit or miss.
+# Stronger ghosts are out of reach of the free die alone: stage 2 needs 2+
+# dice, stage 3 needs 3+, legendaries 3+ (and really 4–5) — so Lanterns
+# matter more and more as the hunt moves to Phantom tiles.
+const CATCH_TARGET := {1: 6, 2: 9, 3: 13}   # by spirit stage
+const LEGEND_TARGET := 15
+const CATCH_LURE_BONUS := 2             # a Spooky Lure drew it in: +2 to the roll
+const CATCH_FAIL_PENALTY := 2           # target rises after a miss
+const CATCH_THROWS := 2                 # tries per ghost, then it flees
+const START_LANTERNS := 2               # Spirit Lanterns dealt to every player
 # Catching levels your lead up: ½ star (a full star for stage 2+ ghosts).
 const CATCH_LEAD_STARS := 0.5
 const CATCH_LEAD_STARS_STRONG := 1.0
 
 # ── Cards ─────────────────────────────────────────────────────────────────────
-const HAND_SIZE := 5
+const HAND_SIZE := 7
 const START_CARDS := 2                  # dealt to every player at setup
-const START_JARS := 5
 const SHOP_CARD_OFFERS := 4
 
 # ── Board ─────────────────────────────────────────────────────────────────────
@@ -51,11 +50,16 @@ const TEAM_MAX := 6
 const BATTLE_PICK_MAX := 3              # 3v3 battles
 
 # ── Spectral Trail ────────────────────────────────────────────────────────────
-# Wardens scale with how far PAST the entry requirement you are: entering with
-# 3 badges meets their tier-1 teams, 5+ badges their full strength.
-const TRAIL_BADGE_OFFSET := 2
+# The Haunted Four scale with how far PAST the entry requirement you are:
+# entering with 3 badges meets their tier-1 teams, 5+ badges their full
+# strength. With fewer players everyone collects more badges before reaching
+# the trail, so small games get a bigger offset (weaker phantoms).
+const TRAIL_BADGE_OFFSET := {1: 3, 2: 3, 3: 2, 4: 2}   # by player count
 
 # ── Battles ───────────────────────────────────────────────────────────────────
 const MAX_KO_STARS := 2.0               # per spirit per battle
+const WARDEN_LOSS_STARS := 0.5          # each spirit that fought a town Warden and lost
+const PVP_WIN_STARS := 1.0              # the PvP winner's lead
+const PVP_STEAL_CARDS := 1              # cards the PvP winner takes from the loser
 const FATIGUE_START := 15
 const MAX_ROUNDS := 60

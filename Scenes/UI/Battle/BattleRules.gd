@@ -312,7 +312,10 @@ func _entry_ability(m: Dictionary, mine: Array, theirs: Array, their_idx: int, a
 func _apply_status(target: Dictionary, kind: String, rounds: int, inflictor: Dictionary = {}) -> void:
 	if not inflictor.is_empty() and inflictor.get("_taunted", false):
 		return   # taunted spirits can't inflict status
-	if target.get("_status_immune", false) or target.get("_r_immune", false):
+	if target.get("_r_immune", false):
+		_tactic_banner("✨", "Purify!", "%s shrugs off the %s" % [target.get("name", "?"), kind], Color("7be0a0"))
+		return
+	if target.get("_status_immune", false):
 		return
 	if _has(target, "veteran") and float(target.get("stars", 0)) >= 1.0:
 		return
@@ -542,6 +545,7 @@ func _strike(att: Dictionary, def_: Dictionary, attacker_is_me: bool, mult: floa
 		_anim_shake(att)
 		_float_on(att, "-%d" % back, UIKit.BAD)
 		_logln("🪞 The Mirror Veil bounces %d back at %s!" % [back, _who(att)])
+		_tactic_banner("🪞", "Mirror Veil!", "%d damage bounced back" % back, Color("8fd6ff"))
 		await _beat(0.35)
 	if hp_after <= 0:
 		await _survive_lethal(def_)
@@ -588,12 +592,14 @@ func _log_reductions(def_: Dictionary) -> void:
 	if def_.get("_r_shield", false) and not def_.get("_r_shield_logged", false):
 		def_["_r_shield_logged"] = true
 		_logln("🛡 The Spirit Shield halves the blow!")
+		_tactic_banner("🛡", "Spirit Shield!", "%s takes half damage" % def_.get("name", "?"), Color("8fd6ff"))
 
 # Lucky Scarf / Sturdy / Anger Point / Hold On! keep a spirit at 1 HP.
 func _survive_lethal(def_: Dictionary) -> void:
 	if def_.get("_r_hold", false):
 		def_["current_hp"] = 1
 		_logln("✊ %s holds on!" % _who(def_))
+		_tactic_banner("✊", "Hold On!", "%s survives with 1 HP" % def_.get("name", "?"), Color("ffd24d"))
 		await _beat(0.4)
 	elif _charm(def_) == "lucky_scarf" and not def_.get("_sash_used", false):
 		def_["_sash_used"] = true

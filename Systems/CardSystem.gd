@@ -126,9 +126,6 @@ func play_field(idx: int, key: String, target = null) -> String:
 			p.inventory.gold += 25
 			msg = "+25 gold!"
 			Sfx.play("coin")
-		"jar_pack":
-			p.inventory.add_jars(&"ghost_jar", 2)
-			msg = "+2 Ghost Jars!"
 		_:
 			if CardsData.kind_of(key) == "charm":
 				msg = attach_charm(idx, target, key)
@@ -201,10 +198,8 @@ func _cpu_target(p: PlayerData, idx: int, key: String, wanted_city: String):
 			return p.lead() if not p.team.is_empty() else null
 		"lucky_coin":
 			return true if p.inventory.gold < 30 else null
-		"jar_pack":
-			return true if p.inventory.total_jars() < 3 else null
 		"spooky_lure":
-			return true if p.team.size() < Balance.TEAM_MAX and p.inventory.total_jars() > 0 and not p.lure else null
+			return true if p.team.size() < Balance.TEAM_MAX and not p.inventory.lanterns().is_empty() and not p.lure else null
 		"salt_circle":
 			return true if p.team.size() >= Balance.TEAM_MAX and not p.salt else null
 		"loaded_die", "twin_dice":

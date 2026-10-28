@@ -1,9 +1,8 @@
 extends CanvasLayer
-## Runs wild-ghost encounters. A wild ghost is HUNTED, never fought: the hunt
-## window (CatchWindow) runs the Spook Duel and the throws. Only spirits that
-## pick a fight in an event get a real battle (then, unless they belong to a
-## trainer, a hunt with the duel already won). Listens for
-## EventBus.wild_encounter_started and emits encounter_finished when done.
+## Runs wild-ghost encounters. A wild ghost is never fought: the catch window
+## runs the Lantern dice roll. Only spirits that pick a fight in an event get a
+## real battle (then, unless they belong to a trainer, a catch roll).
+## Listens for EventBus.wild_encounter_started; emits encounter_finished.
 
 var _hunt: Control
 var _select: Control
