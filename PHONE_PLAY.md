@@ -17,32 +17,47 @@ The server only passes messages along; the game itself runs on the TV computer.
 
 ## 1. Play at home (nothing to install)
 
-The game has its own little phone server built in. Everyone just needs to be
-on the **same Wi-Fi** as the computer running the game.
+The game has its own little phone server built in. The computer and the
+phones just need to be on the **same network** — your Wi-Fi, or a phone
+hotspot (see *No Wi-Fi?* below). No internet is needed.
 
-1. Run the game → **New Game** → press **📱 Phones**. A room starts right away
-   and the panel shows a big **4-letter room code** and an address like
-   `http://192.168.1.20:8080/?code=KLNN`.
-2. On each phone, open that address in the browser (Chrome / Safari). The code
-   is already filled in — type your name → **Join!**
-3. Each phone takes a player card (it fills in the name). Phones can flip
-   through trainers with **◀ Change trainer ▶**. Add CPUs on the computer if you like.
-4. Press **▶ Start Game** on the computer. The room code stays in the top-left
-   corner of the board, so a phone that drops out can rejoin.
+1. Run the game → **New Game** → **📱 Phones**.
+2. **Server IP** is already filled in with this computer's IP (the line under
+   it lists all of them). Press **Connect**. A **room code** appears, plus the
+   address for phones, e.g. `http://192.168.1.20:8080`.
+3. On each phone, open that address in the browser — type it exactly,
+   starting with `http://` (not https). Type the **room code** and your name →
+   **Join!** Everyone in the room is listed on the TV and on every phone.
+4. Each phone takes a player card. Phones can flip through trainers with
+   **◀ Change trainer ▶**. Add CPUs on the computer if you like.
+5. Press **▶ Start Game**. The room code stays in the top-left corner of the
+   board, so a phone that drops out can rejoin.
 
-**Phone says "can't reach this page"?**
-- The first time, Windows asks whether Godot may use the network: tick
-  **Private networks** and Allow. Missed it? Windows Security → Firewall →
-  "Allow an app through firewall" → tick *Private* for Godot.
-- Your Wi-Fi must be set to **Private** on the PC (Settings → Network → Wi-Fi →
-  your network → Network profile type: Private). On "Public" Windows blocks phones.
-- Phones must be on the same Wi-Fi, not mobile data and not a *guest* network.
-- The panel lists other addresses under "Won't load? Try:" — PCs with WSL,
-  Hyper-V, VirtualBox or a VPN have extra network adapters.
-- Test on the PC itself: open the same address in the PC's browser. If that
-  works but phones don't, it's the firewall or the Wi-Fi settings above.
-- You don't need `npm start` for home play. (If something else holds port
-  8080 the game uses 8090, 8180… instead — the panel shows the right one.)
+**Phone says "can't reach this page"?** Watch the panel — it tells you whether
+any phone reached the computer yet.
+- *"No phone has reached this computer yet"* → Windows is blocking it. Press
+  **🛡 Allow phones through Windows Firewall** (Windows asks for permission),
+  then reload the page on the phone. Also check the phone is on the same
+  network (not mobile data, not a *guest* Wi-Fi).
+- *"A phone tried https://"* → retype the address starting with `http://`.
+- Still nothing? Try the other addresses listed under "This computer:" (PCs
+  with WSL, Hyper-V, VirtualBox or a VPN have extra network adapters).
+- You don't need `npm start` for home play.
+
+### No Wi-Fi? Use a phone hotspot
+
+1. On one phone, turn on **Hotspot / Personal Hotspot**.
+2. Connect the **computer** and **every other phone** to that hotspot.
+3. In the game, the Server IP fills in with the computer's hotspot address
+   (often `192.168.43.x`, `172.20.10.x` or `10.x`) → **Connect** → play as above.
+   The phone running the hotspot can play too: it opens the same address.
+
+The game traffic stays on the hotspot, so it doesn't use mobile data. (A
+Windows PC can also make its own hotspot: Settings → Network → **Mobile
+hotspot**; its address is then `192.168.137.1`.)
+
+Or play **over the internet** with everyone on mobile data: put the Node server
+on a website (section 3) and type its address in Server IP.
 
 What a phone does during the game:
 - **Your turn:** the buttons on the TV's current window are copied to your phone
@@ -157,8 +172,8 @@ sudo ufw allow 'Nginx Full'                       # if the firewall is on
 
 ### Play over the internet
 
-In the game: **📱 Phones** → server `wss://ghost.yourdomain.com/ws` (or
-`wss://your-app.onrender.com/ws`) → **Start room**. Phones open
+In the game: **📱 Phones** → Server IP `ghost.yourdomain.com` (or
+`your-app.onrender.com`) → **Connect**. Phones open
 `https://ghost.yourdomain.com`, type the code, and play.
 
 ### Updating the server later

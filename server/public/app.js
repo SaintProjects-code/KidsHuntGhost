@@ -4,12 +4,11 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const saved = JSON.parse(localStorage.getItem("khg") || "{}");
-  const qs = new URLSearchParams(location.search);
-  $("code").value = (qs.get("code") || saved.code || "").toUpperCase();
+  // the room code is typed in (it's never in the address)
   $("name").value = saved.name || "";
 
   let ws = null, me = { id: saved.id || null, code: saved.code || null, name: saved.name || "" };
-  let rev = 0, retry = 0, joined = false, wantJoin = false;
+  let rev = 0, retry = 0, joined = false, wantJoin = false, autoJoin = false;
 
   function save() {
     try { localStorage.setItem("khg", JSON.stringify(me)); } catch (e) { /* private mode */ }
@@ -40,7 +39,9 @@
         status(`Room ${m.code}`);
       } else if (m.t === "error") {
         wantJoin = false;
-        $("joinErr").textContent = m.text;
+        // a silent rejoin of an old room just falls back to the join form
+        $("joinErr").textContent = autoJoin ? "" : m.text;
+        autoJoin = false;
         ws.close();
       } else if (m.t === "host_gone") {
         render({ screen: "wait", text: "The game disconnected — waiting for it to come back…" });
@@ -66,11 +67,16 @@
     save();
     $("joinErr").textContent = "";
     wantJoin = true;
-    if (ws) ws.close(); else connect();
+    autoJoin = false;
+    // reuse an open connection; otherwise (never opened / closed after a wrong code) open one
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: "join", code: me.code, name: me.name, id: me.id }));
+    else if (ws && ws.readyState === 0) { /* still opening: onopen sends the join */ }
+    else connect();
   };
   // came back to the page mid-game: rejoin the same seat straight away
-  if (me.code && me.id && me.name && qs.get("code") === null) {
+  if (me.code && me.id && me.name) {
     wantJoin = true;
+    autoJoin = true;
     connect();
   }
 

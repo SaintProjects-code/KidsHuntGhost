@@ -1,10 +1,10 @@
 extends Node
 ## Autoloaded as `Remote`. 📱 Phone play, Jackbox style: this game is the HOST.
-## Two ways to host a room (phones join it with a 4-letter ROOM CODE):
-##   • start_local() — "this computer": the game runs its own little phone
-##     server (LocalServer) — phones on the same Wi-Fi open the address shown
-##   • start(url)    — an online relay server (server/server.js on a website),
-##     for playing over the internet
+## connect_to(address) hosts a room (phones join it with a 4-letter ROOM CODE):
+##   • this computer's IP → start_local(ip): the game runs its own little phone
+##     server (LocalServer); phones on the same network open http://ip:port
+##   • a website / ws(s):// address → start(url): an online relay server
+##     (server/server.js), for playing over the internet
 ##
 ## Each phone is tied to one player (PlayerData.remote_id). Several times a
 ## second the host builds every phone's VIEW and sends it when it changed:
@@ -38,6 +38,10 @@ var lobby_view: Callable = Callable()   # set by the setup screen: (id) -> view 
 var _ws: WebSocketPeer
 var _local: LocalServer          # set while hosting on this computer
 var _local_error := ""
+var _local_ip := ""              # the address the host typed for this computer
+var _connect_t := 0.0            # seconds spent trying to reach the relay
+var _connect_error := ""         # why the relay can't be reached ("" = fine so far)
+const CONNECT_TIMEOUT := 8.0
 var _want := false               # stay connected (reconnect on drops)
 var _was_open := false
 var _retry_t := 0.0
@@ -72,6 +76,8 @@ func has_phone(idx: int) -> bool:
 func status_text() -> String:
 	if _local_error != "":
 		return _local_error
+	if _connect_error != "":
+		return _connect_error
 	if _local:
 		return "room %s" % code
 	if _ws == null:
@@ -81,9 +87,36 @@ func status_text() -> String:
 		WebSocketPeer.STATE_OPEN: return "room %s" % code if code != "" else "joining…"
 	return "reconnecting…" if _want else "off"
 
+# The Connect button: decide from the address what kind of room to host.
+#   ""/localhost/one of this computer's IPs → host here
+#   another bare IP → an error naming this computer's real IPs
+#   anything else → an online relay (bare domains get wss://<domain>/ws)
+func connect_to(address: String) -> void:
+	var a := address.strip_edges().trim_suffix("/")
+	var mine := LocalServer.lan_ips()
+	var host := a.trim_prefix("http://").get_slice("/", 0).get_slice(":", 0)
+	if a == "" or host in ["localhost", "127.0.0.1"] or mine.has(host):
+		start_local(host if mine.has(host) else "")
+		return
+	if host.is_valid_ip_address() and not a.begins_with("ws"):
+		stop()
+		_local_error = "%s isn't this computer. Use one of: %s" % [host, ", ".join(mine) if not mine.is_empty() else "(no network found)"]
+		room_changed.emit("")
+		return
+	if a.begins_with("https://"):
+		a = "wss://" + a.trim_prefix("https://")
+	elif a.begins_with("http://"):
+		a = "ws://" + a.trim_prefix("http://")
+	elif not a.begins_with("ws"):
+		a = "wss://" + a
+	if not a.ends_with("/ws"):
+		a += "/ws"
+	start(a)
+
 # Host on this computer: the game serves the phone page itself.
-func start_local() -> void:
+func start_local(ip := "") -> void:
 	stop()
+	_local_ip = ip
 	_local = LocalServer.new(_on_server)
 	if not _local.start():
 		_local_error = _local.error
@@ -103,6 +136,8 @@ func start(server_url: String) -> void:
 func stop() -> void:
 	_want = false
 	_local_error = ""
+	_connect_error = ""
+	_connect_t = 0.0
 	if _local:
 		_local.stop()
 		_local = null
@@ -118,8 +153,10 @@ func stop() -> void:
 # computer's home-network address when hosting locally).
 func phone_url() -> String:
 	if _local:
+		if _local_ip != "":
+			return "http://%s:%d" % [_local_ip, _local.http_port]
 		var urls := LocalServer.lan_urls(_local.http_port)
-		return urls[0] if not urls.is_empty() else "(no Wi-Fi network found)"
+		return urls[0] if not urls.is_empty() else "(no network found)"
 	var u := url.replace("wss://", "https://").replace("ws://", "http://").trim_suffix("/ws")
 	# a relay on this computer: phones can't open "localhost", give them our LAN address
 	for host in ["localhost", "127.0.0.1"]:
@@ -133,7 +170,13 @@ func phone_url() -> String:
 func other_urls() -> Array:
 	if not _local:
 		return []
-	return LocalServer.lan_urls(_local.http_port).slice(1)
+	return LocalServer.lan_urls(_local.http_port).filter(func(u): return u != phone_url())
+
+# Diagnostics for the TV: did any phone's browser reach us yet?
+func local_stats() -> Dictionary:
+	if not _local:
+		return {}
+	return {"loads": _local.page_loads, "visitor": _local.last_visitor, "https": _local.https_tries}
 
 func _open() -> void:
 	_ws = WebSocketPeer.new()
@@ -153,7 +196,13 @@ func _process(delta: float) -> void:
 		return
 	_ws.poll()
 	var st := _ws.get_ready_state()
+	if st != WebSocketPeer.STATE_OPEN and not _was_open and code == "":
+		_connect_t += delta
+		if _connect_t > CONNECT_TIMEOUT and _connect_error == "":
+			_connect_error = "Can't reach %s — is the server running? (Home play: type this computer's IP instead.)" % url
+			room_changed.emit("")
 	if st == WebSocketPeer.STATE_OPEN:
+		_connect_error = ""
 		if not _was_open:
 			_was_open = true
 			_raw({"t": "host", "code": code})   # reclaim our room after a drop

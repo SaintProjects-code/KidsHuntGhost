@@ -233,17 +233,34 @@ func _build_phones_panel() -> void:
 
 	_phones_panel = PanelContainer.new()
 	_phones_panel.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NIGHT, 0.97), 14, 2, UIKit.GOLD, Vector2(18, 14)))
-	_phones_panel.position = Vector2(226, 40)
+	_phones_panel.position = Vector2(226, 30)
 	_phones_panel.custom_minimum_size = Vector2(700, 0)
 	add_child(_phones_panel)
-	var col := UIKit.vbox(10)
+	var col := UIKit.vbox(8)
 	_phones_panel.add_child(col)
 	col.add_child(UIKit.label("📱 Play with phones", 24, UIKit.GOLD))
-	var local := Button.new()
-	local.text = "📶 Restart room on this computer  (phones on the same Wi-Fi)"
-	UIKit.style_button(local, "gold", "l")
-	local.pressed.connect(func(): Remote.start_local())
-	col.add_child(local)
+	# 1. the address: this computer's IP (home play) or a website (internet play)
+	var row := UIKit.hbox(8)
+	col.add_child(row)
+	row.add_child(UIKit.label("Server IP:", 16))
+	_url_field = LineEdit.new()
+	var ips := LocalServer.lan_ips()
+	_url_field.text = ips[0] if not ips.is_empty() else ""
+	_url_field.placeholder_text = "this computer's IP, e.g. 192.168.1.20"
+	_url_field.custom_minimum_size = Vector2(330, 36)
+	_url_field.tooltip_text = "Home play: this computer's IP.\nInternet play: your server's address, e.g. ghost.yourdomain.com"
+	_url_field.text_submitted.connect(func(t): Remote.connect_to(t))
+	row.add_child(_url_field)
+	var connect_btn := Button.new()
+	connect_btn.text = "Connect"
+	UIKit.style_button(connect_btn, "gold", "m")
+	connect_btn.pressed.connect(func(): Remote.connect_to(_url_field.text))
+	row.add_child(connect_btn)
+	row.add_child(UIKit.small_button("Stop", func(): Remote.stop()))
+	var ip_hint := UIKit.wrap_label("This computer: %s" % ("  ·  ".join(ips) if not ips.is_empty() else "no network found — connect to Wi-Fi or a hotspot"), 13, 660)
+	ip_hint.modulate = Color(1, 1, 1, 0.7)
+	col.add_child(ip_hint)
+	# 2. the room: code, the address phones open, who joined
 	_phone_status = UIKit.label("", 40, UIKit.GOLD)
 	_phone_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_phone_status)
@@ -251,30 +268,35 @@ func _build_phones_panel() -> void:
 	col.add_child(_phone_steps)
 	_phone_list = UIKit.wrap_label("", 16, 660)
 	col.add_child(_phone_list)
-	var row := UIKit.hbox(8)
-	col.add_child(row)
-	row.add_child(UIKit.label("Online server:", 13))
-	_url_field = LineEdit.new()
-	_url_field.text = Remote.url
-	_url_field.custom_minimum_size = Vector2(300, 32)
-	_url_field.tooltip_text = "For playing over the internet: your server's address, e.g. wss://yourdomain.com/ws"
-	row.add_child(_url_field)
-	row.add_child(UIKit.small_button("Connect", func(): Remote.start(_url_field.text)))
-	row.add_child(UIKit.small_button("Stop", func(): Remote.stop()))
+	var bottom := UIKit.hbox(8)
+	col.add_child(bottom)
+	if OS.get_name() == "Windows":
+		var fw := Button.new()
+		fw.text = "🛡 Allow phones through Windows Firewall"
+		fw.tooltip_text = "Adds a firewall rule for the game's phone ports (Windows asks for permission)."
+		UIKit.style_button(fw, "secondary", "m")
+		fw.pressed.connect(_open_firewall)
+		bottom.add_child(fw)
 	var done := Button.new()
 	done.text = "Done"
 	UIKit.style_button(done, "primary", "m")
 	done.pressed.connect(func(): _phones_panel.hide())
-	col.add_child(done)
+	bottom.add_child(done)
 	_phones_panel.hide()
-	open_btn.pressed.connect(func():
-		_phones_panel.visible = not _phones_panel.visible
-		if _phones_panel.visible and Remote.status_text() == "off":
-			Remote.start_local())   # opening the panel hosts a room straight away
+	open_btn.pressed.connect(func(): _phones_panel.visible = not _phones_panel.visible)
 	Remote.room_changed.connect(func(_c): _refresh_phones())
 	Remote.phones_changed.connect(_on_phones_changed)
 	Remote.lobby_view = _phone_lobby_view
 	_on_phones_changed()
+
+# One firewall rule (all profiles) for every port pair the game may use. It
+# runs netsh through an elevated prompt, so Windows asks the player first.
+func _open_firewall() -> void:
+	var ports: Array = LocalServer.PORTS.map(func(p): return "%d-%d" % [p, p + 1])
+	var rule := "name=KidsHuntGhostPhones dir=in action=allow protocol=TCP localport=%s profile=any" % ",".join(ports)
+	var cmd := "/c netsh advfirewall firewall delete rule name=KidsHuntGhostPhones & netsh advfirewall firewall add rule " + rule
+	OS.create_process("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command",
+		"Start-Process cmd -Verb RunAs -WindowStyle Hidden -ArgumentList '%s'" % cmd])
 
 func _process(_delta: float) -> void:
 	_refresh_phones()   # cheap: a few labels
@@ -286,16 +308,24 @@ func _refresh_phones() -> void:
 	_phone_chip.text = ("Room %s · %d phone%s" % [Remote.code, online, "" if online == 1 else "s"]) if Remote.code != "" else ""
 	if Remote.code != "":
 		_phone_status.text = "Room code:  %s" % Remote.code
-		_phone_steps.text = "1.  On each phone's browser open:   %s/?code=%s\n2.  Type your name, then tap Join!  (code: %s)" % [
-			Remote.phone_url(), Remote.code, Remote.code]
+		_phone_steps.text = "1.  On each phone's browser open:   %s\n2.  Type the room code  %s  and your name, then tap Join!" % [
+			Remote.phone_url(), Remote.code]
 		if Remote.is_local():
-			var others: Array = Remote.other_urls()
-			if not others.is_empty():
-				_phone_steps.text += "\nWon't load? Try:  " + "   ".join(others)
-			_phone_steps.text += "\nPhones must be on this Wi-Fi (not guest Wi-Fi). If Windows asks, ALLOW Godot on private networks."
+			var st: Dictionary = Remote.local_stats()
+			if int(st["https"]) > 0:
+				_phone_steps.text += "\n⚠ A phone tried https:// — type the address starting with  http://"
+			if int(st["loads"]) == 0:
+				_phone_steps.text += "\nNo phone has reached this computer yet. Same Wi-Fi? Firewall allowed (🛡 below)?"
+				var others: Array = Remote.other_urls()
+				if not others.is_empty():
+					_phone_steps.text += "\nOr try:  " + "   ".join(others)
+			else:
+				_phone_steps.text += "\n✅ The phone page has opened %d time%s (last from %s)." % [
+					st["loads"], "" if int(st["loads"]) == 1 else "s", st["visitor"]]
 	else:
-		_phone_status.text = "" if Remote.status_text() == "off" else "Phones: %s" % Remote.status_text()
-		_phone_steps.text = "Press the gold button, then follow the steps that appear here."
+		var status := Remote.status_text()
+		_phone_status.text = ""
+		_phone_steps.text = "Type this computer's IP above (already filled in) and press Connect." if status == "off" else status
 	var lines: Array = []
 	for id in Remote.phones:
 		var card := _card_of(id)
@@ -304,7 +334,8 @@ func _refresh_phones() -> void:
 			var trainer: Dictionary = TRAINERS[int(card.get_meta("trainer_idx", 0))]
 			where = "Player %d · %s" % [card.get_index() + 1, trainer["name"]]
 		lines.append("%s  %s  →  %s" % ["🟢" if Remote.phones[id]["online"] else "⚪ (left)", Remote.phones[id]["name"], where])
-	_phone_list.text = "Connected:\n" + "\n".join(lines) if not lines.is_empty() else ""
+	_phone_list.text = ("In this room (%d):\n" % lines.size() + "\n".join(lines)) if not lines.is_empty() else \
+		("In this room: nobody yet" if Remote.code != "" else "")
 	_update_phone_tags()
 
 # A "📱 Ivy's phone" line on every card a phone controls.
@@ -365,14 +396,20 @@ func _card_of(id: String) -> Node:
 			return card
 	return null
 
+# "Room KLNN: 🟢 Ivy · 🟢 Max · ⚪ Sam" for the phones' lobby screen.
+func _room_roster() -> String:
+	var names: Array = Remote.phones.keys().map(func(id): return ("🟢 " if Remote.phones[id]["online"] else "⚪ ") + String(Remote.phones[id]["name"]))
+	return "Room %s (%d): %s" % [Remote.code, names.size(), "  ·  ".join(names)]
+
 # What a phone shows before the game starts (Remote calls this).
 func _phone_lobby_view(id: String) -> Dictionary:
 	var card := _card_of(id)
 	if card == null:
-		return {"screen": "wait", "text": "The game is full (4 players) — you can watch!", "me": {"name": Remote.phones[id]["name"]}}
+		return {"screen": "wait", "text": "The game is full (4 players) — you can watch!\n" + _room_roster(), "me": {"name": Remote.phones[id]["name"]}}
 	var trainer: Dictionary = TRAINERS[int(card.get_meta("trainer_idx", 0))]
 	return {"screen": "buttons", "title": "You're Player %d!" % (card.get_index() + 1),
-		"lines": ["Trainer: %s  ·  starter: %s" % [trainer["name"], trainer["starter"]], "Wait for the host to press ▶ Start Game."],
+		"lines": ["Trainer: %s  ·  starter: %s" % [trainer["name"], trainer["starter"]], "Wait for the host to press ▶ Start Game.",
+			_room_roster()],
 		"buttons": [{"label": "◀ Change trainer ▶"}],
 		"_actions": [func(): _on_character_pressed(card)],
 		"me": {"name": Remote.phones[id]["name"], "color": "#" + Color(trainer["color"]).to_html(false)}}

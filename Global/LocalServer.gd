@@ -18,6 +18,9 @@ const LETTERS := "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 var code := ""
 var http_port := 0
+var page_loads := 0              # times a browser loaded the phone page (shown on the TV)
+var last_visitor := ""           # IP of the last browser that reached us
+var https_tries := 0             # browsers that tried https:// — we only speak http
 var error := ""                  # why it couldn't start ("" = running)
 var _on_message: Callable        # (Dictionary) -> void, the Remote side
 var _http := TCPServer.new()
@@ -116,8 +119,18 @@ func _poll_http(delta: float) -> void:
 		var n := peer.get_available_bytes()
 		if n > 0:
 			r["buf"].append_array(peer.get_data(n)[1])
-		var head: String = r["buf"].get_string_from_utf8()
-		if head.contains("\r\n\r\n"):
+		var buf: PackedByteArray = r["buf"]
+		if buf.size() > 0 and (buf[0] == 0x16 or buf[0] >= 0x80):
+			# not HTTP: 0x16 starts a TLS hello (the browser tried https://).
+			# Hang up at once so it falls back to http:// instead of waiting.
+			if buf[0] == 0x16:
+				https_tries += 1
+			peer.disconnect_from_host()
+			_requests.erase(r)
+			continue
+		# a request line + headers are plain ASCII (never parse them as UTF-8)
+		var head: String = buf.get_string_from_ascii()
+		if head.contains("\r\n\r\n") or buf.size() > 16384:
 			_respond(peer, head.get_slice(" ", 1))
 			_requests.erase(r)
 		elif r["t"] > 5.0 or peer.get_status() != StreamPeerTCP.STATUS_CONNECTED:
@@ -126,6 +139,9 @@ func _poll_http(delta: float) -> void:
 
 func _respond(peer: StreamPeerTCP, path: String) -> void:
 	path = path.get_slice("?", 0)
+	if path == "/":
+		page_loads += 1
+		last_visitor = peer.get_connected_host()
 	var body := PackedByteArray()
 	var type := "text/plain"
 	var status := "200 OK"
