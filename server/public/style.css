@@ -26,8 +26,25 @@ button.big { font-size: 22px; min-height: 64px; }
 #view { flex: 1; display: flex; flex-direction: column; gap: 10px; }
 .title { font-size: 21px; font-weight: 700; color: var(--gold); text-align: center; }
 .line { color: var(--muted); font-size: 15px; text-align: center; white-space: pre-wrap; }
-.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.btns button.wide { grid-column: 1 / -1; }
+.btns { display: flex; flex-direction: column; gap: 10px; }
+.btns button { display: flex; align-items: center; gap: 10px; text-align: left; }
+.btns .txt { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.btns .lbl { font-weight: 600; }
+.desc { font-size: 14px; color: var(--muted); font-weight: 400; }
+.hint { font-size: 13px; color: var(--gold); }
+button.card { border-color: #c97a5a; background: #3b2440; }
+button.card.picked { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(255, 210, 77, 0.35); }
+button.off { opacity: 0.45; filter: grayscale(0.8); }
+button.off.picked { opacity: 0.8; }
+.thumb { width: 48px; height: 48px; image-rendering: pixelated; flex: none; background: rgba(0,0,0,0.25); border-radius: 10px; }
+.hero { width: 128px; height: 128px; image-rendering: pixelated; align-self: center; background: rgba(0,0,0,0.25); border-radius: 18px; }
+.item { background: var(--panel); border-radius: 12px; padding: 10px 12px; }
+.item .head { font-weight: 700; }
+.dpad { display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-areas: ". up ." "left . right" ". down ." "zin zin zout"; gap: 10px; }
+.dpad button { font-size: 30px; min-height: 72px; justify-content: center; }
+.dpad .h-up { grid-area: up; } .dpad .h-down { grid-area: down; } .dpad .h-left { grid-area: left; } .dpad .h-right { grid-area: right; }
+.dpad .h-zoom_in { grid-area: zin; font-size: 18px; } .dpad .h-zoom_out { grid-area: zout; font-size: 18px; }
+.dpad button.down { filter: brightness(1.5); }
 .wait { margin: auto; text-align: center; color: var(--muted); font-size: 20px; }
 .wait .ghost { font-size: 64px; display: block; animation: bob 1.6s ease-in-out infinite; }
 @keyframes bob { 50% { transform: translateY(-10px); } }

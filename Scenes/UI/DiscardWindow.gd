@@ -6,6 +6,7 @@ signal chose(key: String)
 
 var _title: Label
 var _row: HBoxContainer
+var remote_owner := -1           # 📱 the player whose hand this is (Remote mirrors it to their phone)
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -20,6 +21,7 @@ func _ready() -> void:
 
 func present(p: PlayerData, options: Array) -> void:
 	_title.text = "%s — hand full!" % p.player_name
+	remote_owner = GameState.players.find(p)
 	UIKit.clear(_row)
 	for i in options.size():
 		var key: String = options[i]

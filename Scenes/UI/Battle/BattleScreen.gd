@@ -609,7 +609,8 @@ func remote_view(idx: int) -> Dictionary:
 	var armed: String = _armed if mine else _opp_armed
 	if not _over:
 		for key in hand:
-			buttons.append({"label": "🃏 %s%s" % [CardsData.card_name(key), "  ✓ next" if armed == key else ""]})
+			buttons.append({"label": "%s%s" % [CardsData.card_name(key), "  ✓ next" if armed == key else ""],
+				"desc": String(CardsData.card(key).get("desc", "")), "card": true})
 			actions.append(_arm.bind(key, mine))
 	for b in [_continue_btn, _next_btn, _auto_btn, _speed_btn, _skip_btn]:
 		if b.is_visible_in_tree() and not b.disabled:
@@ -619,7 +620,7 @@ func remote_view(idx: int) -> Dictionary:
 		"🟢 You: " + _lead_line(_team if mine else _opp, _active if mine else _opp_active),
 		"🔴 Foe: " + _lead_line(_opp if mine else _team, _opp_active if mine else _active)]
 	if not _over:
-		lines.append("Tap a card: it plays at the start of the next round (one per round)." if not hand.is_empty()
+		lines.append("Tap a card to read it, tap again to play it next round (one per round)." if not hand.is_empty()
 			else "No tactic cards in this battle.")
 	else:
 		lines.append("🏆 You won!" if _won == mine else "💀 You lost…")

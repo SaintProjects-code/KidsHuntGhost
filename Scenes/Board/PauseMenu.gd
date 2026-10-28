@@ -20,6 +20,7 @@ const ZOOM_MAX := 3.0
 var _view_mode: bool = false
 var _saved_pos: Vector2 = Vector2.ZERO
 var _saved_zoom: Vector2 = Vector2.ONE
+var _phone_held := {}            # 📱 arrows held on the current player's phone (see Remote)
 
 func _ready() -> void:
 	for pair in [["ViewMapButton", "🗺 View Map", "secondary"], ["CloseButton", "Back to Game", "primary"],
@@ -89,10 +90,29 @@ func _update_zoom_label() -> void:
 func _on_back_pressed() -> void:
 	_exit_view()
 
+# 📱 Phone hooks (Remote): is View Map open, leave it, hold/release a direction.
+func in_view_mode() -> bool:
+	return _view_mode
+
+func exit_view() -> void:
+	_exit_view()
+
+func phone_hold(key: String, down: bool) -> void:
+	if not key in ["up", "down", "left", "right", "zoom_in", "zoom_out"]:
+		return
+	if down:
+		_phone_held[key] = true
+	else:
+		_phone_held.erase(key)
+
+func phone_release() -> void:
+	_phone_held.clear()
+
 func _exit_view() -> void:
 	if not _view_mode:
 		return
 	_view_mode = false
+	_phone_held.clear()
 	var cam: Camera2D = get_viewport().get_camera_2d()
 	if cam != null:
 		cam.position = _saved_pos
@@ -132,6 +152,8 @@ func _process(delta: float) -> void:
 		dir.y -= 1.0
 	if Input.is_action_pressed("ui_down") or _held(KEY_DOWN) or _held(KEY_S):
 		dir.y += 1.0
+	dir += Vector2(float(_phone_held.has("right")) - float(_phone_held.has("left")),
+		float(_phone_held.has("down")) - float(_phone_held.has("up")))
 	if dir != Vector2.ZERO:
 		# divide by zoom so panning feels the same speed at any zoom level
 		cam.position += dir.normalized() * PAN_SPEED * delta / cam.zoom.x
@@ -144,6 +166,7 @@ func _process(delta: float) -> void:
 		zdir -= 1.0
 	if _held(KEY_E) or _held(KEY_EQUAL):
 		zdir += 1.0
+	zdir += float(_phone_held.has("zoom_in")) - float(_phone_held.has("zoom_out"))
 	if zdir != 0.0:
 		var z: float = clampf(cam.zoom.x * (1.0 + zdir * 1.2 * delta), ZOOM_MIN, ZOOM_MAX)
 		cam.zoom = Vector2(z, z)

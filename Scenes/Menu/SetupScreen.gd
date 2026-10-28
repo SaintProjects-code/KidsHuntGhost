@@ -365,15 +365,20 @@ func _on_phones_changed() -> void:
 	for id in Remote.phones:
 		var card := _card_of(id)
 		if card == null:
-			for c in player_cards.get_children():
+			# Player 1 is the keyboard player at the TV: a phone takes another free
+			# human seat, else a new seat, and Player 1 only as a last resort
+			var free: Array = player_cards.get_children().filter(func(c):
 				var cpu := c.find_child("CPUButton", true, false) as Button
-				if not c.has_meta("remote_id") and not (cpu and cpu.button_pressed):
-					card = c
-					break
-			if card == null and player_cards.get_child_count() < MAX_PLAYERS:
+				return not c.has_meta("remote_id") and not (cpu and cpu.button_pressed))
+			var others: Array = free.filter(func(c): return c.get_index() > 0)
+			if not others.is_empty():
+				card = others[0]
+			elif player_cards.get_child_count() < MAX_PLAYERS:
 				_add_card()
 				_relabel()
 				card = player_cards.get_child(player_cards.get_child_count() - 1)
+			elif not free.is_empty():
+				card = free[0]
 			if card == null:
 				continue
 			card.set_meta("remote_id", id)

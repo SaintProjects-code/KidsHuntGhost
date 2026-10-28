@@ -1,13 +1,15 @@
 extends MenuWindow
-## Spend gold on Lanterns (catching cards) and a rotating rack of cards (rerolled each
-## visit), or pay to scrub a trait off a spirit. present(player_index);
-## emits closed(). cpu_shop(idx) is the CPU's shopping list (no window).
+## Spend gold on cards — Lanterns (catching cards) on the top shelf, a rotating
+## rack of special cards (rerolled each visit) below — or pay to scrub a trait
+## off a spirit. Everything for sale is shown as a card with its price.
+## present(player_index); emits closed(). cpu_shop(idx) is the CPU's list.
 
 signal closed()
 
 const TRAIT_REMOVAL_COST := 10
 
 var _gold_lbl: Label
+var _lanterns: HBoxContainer
 var _list: VBoxContainer
 var _rack: HBoxContainer
 var _player_index := -1
@@ -19,12 +21,16 @@ func _ready() -> void:
 	_gold_lbl = UIKit.label("", 18, UIKit.GOLD)
 	_gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_gold_lbl)
-	_list = UIKit.vbox(6)
-	col.add_child(_list)
-	col.add_child(_heading("— Cards (they go to your hand) —"))
+	col.add_child(_heading("— 🏮 Lanterns (catching cards) —"))
+	_lanterns = UIKit.hbox(10)
+	_lanterns.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(_lanterns)
+	col.add_child(_heading("— ✨ Special cards (this visit only) —"))
 	_rack = UIKit.hbox(8)
 	_rack.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_rack)
+	_list = UIKit.vbox(6)
+	col.add_child(_list)
 	col.add_child(_button("Done", func(): closed.emit()))
 	hide()
 
@@ -41,11 +47,10 @@ func _inv() -> PlayerData.Inventory:
 func _refresh() -> void:
 	var inv := _inv()
 	_gold_lbl.text = "🪙 %d gold   ·   🃏 %d/%d cards" % [inv.gold, inv.hand.size(), Balance.HAND_SIZE]
-	UIKit.clear(_list)
+	UIKit.clear(_lanterns)
 	for key in ["spirit_lantern", "grand_lantern"]:
-		var d: Dictionary = CardsData.card(key)
-		_list.add_child(_row("%s %s  (%s)  — %dg   · own %d" % [d["icon"], d["name"], d["desc"], d["cost"],
-			inv.hand.count(key)], int(d["cost"]), _buy_card.bind(key)))
+		_lanterns.add_child(_for_sale(key, "own %d" % inv.hand.count(key), false))
+	UIKit.clear(_list)
 	var team: Array = GameState.players[_player_index].team
 	if team.any(func(m): return not m.get("traits", []).is_empty()):
 		_list.add_child(_heading("— Trait Removal —"))
@@ -57,15 +62,24 @@ func _refresh() -> void:
 					_remove_trait.bind(m, String(key))))
 	UIKit.clear(_rack)
 	for key in _offers:
-		var col := UIKit.vbox(2)
-		var cv := CardView.new(key, Vector2(96, 128))
-		cv.disabled = inv.gold < int(CardsData.card(key)["cost"])
-		cv.pressed.connect(_buy_card.bind(key))
-		col.add_child(cv)
-		var price := UIKit.label("%dg" % int(CardsData.card(key)["cost"]), 14, UIKit.GOLD)
-		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		col.add_child(price)
-		_rack.add_child(col)
+		_rack.add_child(_for_sale(key, "", true))
+	if _offers.is_empty():
+		_rack.add_child(UIKit.label("— sold out —", 13))
+
+# A card on the shelf: the card, its price and a note. `once` = one per visit.
+func _for_sale(key: String, note: String, once: bool) -> Control:
+	var cost := int(CardsData.card(key)["cost"])
+	var col := UIKit.vbox(2)
+	var cv := CardView.new(key, Vector2(96, 128))
+	cv.disabled = _inv().gold < cost
+	cv.set_meta("price", cost)   # 📱 the phone shows "— 10g" on the card
+	cv.set_meta("off_reason", "Not enough gold")
+	cv.pressed.connect(_buy_card.bind(key, once))
+	col.add_child(cv)
+	var price := UIKit.label("%dg%s" % [cost, ("  · " + note) if note != "" else ""], 14, UIKit.GOLD)
+	price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(price)
+	return col
 
 func _heading(text: String) -> Label:
 	var head := UIKit.label(text, 14)
@@ -78,7 +92,7 @@ func _row(text: String, cost: int, cb: Callable) -> Control:
 	var lbl := UIKit.label(text, 15)
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(lbl)
-	var buy := UIKit.small_button("Buy", cb)
+	var buy := UIKit.small_button("Remove", cb)
 	buy.disabled = _inv().gold < cost
 	row.add_child(buy)
 	return row
@@ -91,9 +105,10 @@ func _pay(cost: int) -> bool:
 	Sfx.play("coin")
 	return true
 
-func _buy_card(key: String) -> void:
+func _buy_card(key: String, once := true) -> void:
 	if _pay(int(CardsData.card(key)["cost"])):
-		_offers.erase(key)   # one of each per visit
+		if once:
+			_offers.erase(key)   # one of each special per visit; Lanterns restock
 		await CardSystem.give(_player_index, key)
 	_refresh()
 

@@ -61,16 +61,23 @@ on a website (section 3) and type its address in Server IP.
 
 What a phone does during the game:
 - **Your turn:** the buttons on the TV's current window are copied to your phone
-  (Roll, card plays, fork choices, the catch roll, shop, Warden challenge, events…).
-  Your cards show face-down on the TV — only your phone shows what they are.
+  (card plays, fork choices, the catch roll, shop, Warden challenge, events…),
+  with **Roll / End Turn at the bottom**. Your cards show face-down on the TV —
+  only your phone shows what they are.
+- **Cards on the phone:** tap a card to read what it does, tap it again to use it.
+  Greyed-out cards can't be used right now (tap one to see why).
+- **🗺 Map:** press Map and your phone becomes arrows (hold to look around) plus
+  zoom and *Back to the game*.
+- **Seats:** a phone takes Player 2, 3 or 4 — Player 1 stays the keyboard player
+  at the TV (unless all four seats are phones).
 - **Your battles:** pick your team and cards on the phone; during the fight
   tap a tactic card (or charm) to play it next round. In a ⚔ player battle
   each phone picks its own side and the TV hides both hands.
 - **Someone else's battle:** 🗳 vote on who wins during the first 2 rounds.
   Guess right → +1 card (or ★ on a spirit if your hand is full).
 - **Someone else's turn:** 🃏 *My hand* — look at your cards and play healing /
-  dice / lure / salt / coin cards; 👻 *My team* — see stats and change your lead
-  or order.
+  dice / lure / salt / coin cards; 👻 *My team* — pictures, stats, each move and
+  ability with what it does, and change your lead or order.
 - **Competitions:** everyone picks their spirit on their own phone, then the phone
   becomes a **gamepad** (ACTION + ◀ ● ▶) for the minigame.
 

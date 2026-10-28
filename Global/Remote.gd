@@ -29,6 +29,11 @@ const DEFAULT_URL := "ws://localhost:8080/ws"
 const VIEW_INTERVAL := 0.15
 # board chrome a phone never needs
 const SKIP_BUTTONS := ["SettingsButton", "DevButton", "LogButton"]
+# always at the bottom of the phone screen, where a thumb finds them
+const BOTTOM_BUTTONS := ["RollButton", "EndTurnButton"]
+# View Map mode: phone arrows → held directions (PauseMenu.phone_hold)
+const MAP_HOLDS := [{"k": "up", "label": "▲"}, {"k": "left", "label": "◀"}, {"k": "right", "label": "▶"},
+	{"k": "down", "label": "▼"}, {"k": "zoom_in", "label": "＋ Zoom in"}, {"k": "zoom_out", "label": "－ Zoom out"}]
 
 var url := DEFAULT_URL
 var code := ""                   # room code, "" until the server gives one
@@ -51,6 +56,7 @@ var _actions := {}               # id -> Array of Callables behind the last view
 var _rev := {}                   # id -> view revision
 var _held := {}                  # id -> {pad key: true} currently held (released on drop)
 var _page := {}                  # id -> idle-menu page {"p": "main"|"hand"|"card"|"team"|"mon", "key", "i"}
+var _img_cache := {}             # "name@px" -> data: URL of a spirit sprite
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # windows pause the board; phones must keep working
@@ -277,6 +283,10 @@ func _on_phone(id: String, data) -> void:
 			phone_pressed.emit(id, i)
 	elif data.has("pad"):
 		_pad(id, LocalServer.text(data["pad"]), data.get("down") == true)
+	elif data.has("hold"):
+		var pm := _pause_menu()
+		if pm and player_of(id) == GameState.current_player_index:
+			pm.phone_hold(LocalServer.text(data["hold"]), data.get("down") == true)
 
 # A minigame button: press/release that player's shared-keyboard key.
 func _pad(id: String, action: String, down: bool) -> void:
@@ -301,6 +311,9 @@ func _pad(id: String, action: String, down: bool) -> void:
 func _release_all(id: String) -> void:
 	for action in _held.get(id, {}).keys():
 		_pad(id, action, false)
+	var pm := _pause_menu()
+	if pm and player_of(id) == GameState.current_player_index:
+		pm.phone_release()
 
 func player_of(id: String) -> int:
 	for i in GameState.players.size():
@@ -350,6 +363,11 @@ func _game_view(scene: Node, idx: int) -> Dictionary:
 			if lane["idx"] == idx and lane["human"]:
 				return {"screen": "pad", "title": "🎮 " + String(game.how_to).left(60), "action": "ACTION"}
 		return {"screen": "wait", "text": "Watch the minigame!"}
+	var pm := _pause_menu()
+	if pm and pm.in_view_mode() and idx == GameState.current_player_index:
+		return {"screen": "dpad", "title": "🗺 Map", "lines": ["Hold an arrow to look around the board."],
+			"holds": MAP_HOLDS, "buttons": [{"label": "◀ Back to the game", "gold": true}],
+			"_actions": [func(): pm.exit_view()]}
 	var win := _top_window()
 	if win != null:
 		if win.has_method("remote_view"):
@@ -408,36 +426,95 @@ func _owner_of(win: Node) -> int:
 		return GameState.players.find(pl)
 	return GameState.current_player_index
 
-# Every visible, enabled button under `root`, as phone buttons, plus the
-# window's title and text lines.
+# Every visible button under `root`, as phone buttons, plus the window's title
+# and text lines. A label in the same ROW as a button becomes that button's
+# description (shown under it on the phone) instead of a loose line. Cards
+# carry their effect text; cards that can't be used come along greyed out.
 func _mirror(root: Node, _idx: int, with_text := true) -> Dictionary:
 	var buttons: Array = []
 	var actions: Array = []
+	var bottom: Array = []   # [entry, action]: Roll / End Turn go last
 	var lines: Array = []
 	var title := ""
-	for n in _find_all(root, func(x): return (x is BaseButton or x is Label) and x.is_visible_in_tree()):
+	var nodes := _find_all(root, func(x): return (x is BaseButton or x is Label) and x.is_visible_in_tree())
+	var desc_of := {}
+	var used := {}
+	for n in nodes:
+		# a card's own price/note label sits beside it in its little column
+		var own_box: bool = n is CardView and n.get_parent().get_children().filter(func(c): return c is BaseButton).size() == 1
+		if n is BaseButton and (own_box or (not (n is CardView) and n.get_parent() is HBoxContainer)):
+			var parts: Array = []
+			for sib in n.get_parent().get_children():
+				if sib is Label and sib.is_visible_in_tree() and String(sib.text).strip_edges() != "":
+					parts.append(String(sib.text).strip_edges())
+					used[sib] = true
+			if not parts.is_empty():
+				desc_of[n] = " · ".join(parts)
+	for n in nodes:
 		if n is Label:
-			if not with_text:
+			if not with_text or used.has(n):
 				continue
 			var s := String(n.text).strip_edges()
 			if s == "" or n.get_parent() is BaseButton:
 				continue
 			if title == "":
-				title = s.left(80)
-			elif lines.size() < 6:
-				lines.append(s.left(220))
+				title = s.left(300)
+			elif lines.size() < 10:
+				lines.append(s.left(400))
 			continue
 		var b := n as BaseButton
-		if b.disabled or SKIP_BUTTONS.has(String(b.name)):
+		if SKIP_BUTTONS.has(String(b.name)):
 			continue
-		var label := _label_of(b)
-		if label == "":
+		var entry := _entry_of(b, root)
+		if entry.is_empty() or (b.disabled and not entry.has("off")):
 			continue
-		buttons.append({"label": label, "gold": "Roll" in label or "Catch" in label})
-		actions.append(press_action(b))
+		if desc_of.has(b):
+			entry["desc"] = (String(entry["desc"]) + " · " if entry.has("desc") else "") + String(desc_of[b])
+		if BOTTOM_BUTTONS.has(String(b.name)):
+			bottom.append([entry, press_action(b)])
+		else:
+			buttons.append(entry)
+			actions.append(press_action(b))
+	for pair in bottom:
+		buttons.append(pair[0])
+		actions.append(pair[1])
 	if buttons.is_empty():
 		return {"screen": "wait", "title": title, "lines": lines, "text": "…"}
 	return {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
+
+# One phone button for a real button. Cards: name (+ price), effect text,
+# "card": true (the phone shows the text on the first tap, uses it on the
+# second) and "off" with a reason when it can't be used here.
+func _entry_of(b: BaseButton, root: Node) -> Dictionary:
+	if b is CardView:
+		var key := String(b.key)
+		if key == "":
+			return {}
+		var c := CardsData.card(key)
+		var label := CardsData.card_name(key)
+		if b.has_meta("price"):
+			label += "  — %dg" % int(b.get_meta("price"))
+		if b.armed:
+			label += "  ✓"
+		var e := {"label": label, "desc": String(c.get("desc", "")), "card": true}
+		var off := ""
+		if b.disabled:
+			off = String(b.get_meta("off_reason", "Can't use this right now"))
+		elif root.name == "Board":
+			match String(c.get("kind", "")):
+				"tactic": off = "Play this in a battle"
+				"capture": off = "Use it when catching a ghost"
+		if off != "":
+			e["off"] = off
+		return e
+	var s := _label_of(b)
+	if s == "":
+		return {}
+	var e := {"label": s, "gold": "Roll" in s or "Catch" in s or s.begins_with("End Turn")}
+	var tip := String(b.tooltip_text).strip_edges()
+	if tip != "" and not tip.begins_with(s):
+		e["desc"] = tip.left(300)
+	return e
 
 func _label_of(b: BaseButton) -> String:
 	if b is CardView:
@@ -448,7 +525,7 @@ func _label_of(b: BaseButton) -> String:
 		s = String(b.tooltip_text).get_slice("\n", 0).strip_edges()
 	if b.toggle_mode:
 		s += "  ✓" if b.button_pressed else ""
-	return s.left(40)
+	return s.left(120)
 
 func press_action(b: BaseButton) -> Callable:
 	return func():
@@ -471,38 +548,48 @@ func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
 	var actions: Array = []
 	var lines: Array = []
 	var title := ""
+	var top_img := ""
 	match String(page["p"]):
 		"hand":
 			title = "🃏 Your hand  %d/%d" % [p.inventory.hand.size(), Balance.HAND_SIZE]
+			lines.append("Tap a card to read it, tap it again to play it.")
 			for key in p.inventory.hand:
 				var c := CardsData.card(key)
-				lines.append("%s — %s" % [CardsData.card_name(key), c.get("desc", "")])
-			var seen := {}
-			for key in p.inventory.hand:
-				if key in CardsData.OFF_TURN and not seen.has(key) and idx != GameState.current_player_index:
-					seen[key] = true
-					buttons.append({"label": "▶ Play " + CardsData.card_name(key), "gold": true})
-					actions.append(_play_off_turn.bind(idx, key))
+				var e := {"label": CardsData.card_name(key), "desc": String(c.get("desc", "")), "card": true}
+				var off := ""
+				match String(c.get("kind", "")):
+					"tactic": off = "Play this in a battle"
+					"capture": off = "Use it when catching a ghost"
+					_:
+						if idx == GameState.current_player_index:
+							off = "Play it from your turn screen"
+						elif not key in CardsData.OFF_TURN:
+							off = "Only on your own turn"
+				if off != "":
+					e["off"] = off
+				buttons.append(e)
+				actions.append(_play_off_turn.bind(idx, key))
 			if p.inventory.hand.is_empty():
-				lines.append("No cards yet.")
-			elif buttons.is_empty():
-				lines.append("Tactic cards are for battles; Lanterns for catching; the rest wait for your turn.")
+				lines = ["No cards yet."]
 		"card":
 			var key: String = page["key"]
 			title = "%s — on which spirit?" % CardsData.card_name(key)
+			lines.append(String(CardsData.card(key).get("desc", "")))
 			for i in p.team.size():
 				var m: Dictionary = p.team[i]
 				if CardSystem.can_target(key, m):
-					buttons.append({"label": "%s  ❤ %d/%d" % [m["name"], int(m["current_hp"]), int(m["hp"])], "gold": true})
+					buttons.append({"label": "%s  ❤ %d/%d" % [m["name"], int(m["current_hp"]), int(m["hp"])], "gold": true,
+						"img": sprite_url(m, 40)})
 					actions.append(_play_off_turn.bind(idx, key, m))
 			if buttons.is_empty():
 				lines.append("No spirit needs this right now.")
 		"team":
 			title = "👻 Your team (top = lead)"
+			lines.append("Tap a spirit for its stats, move and abilities, or to change the order.")
 			for i in p.team.size():
 				var m: Dictionary = p.team[i]
 				buttons.append({"label": "%d. %s %s  ❤ %d/%d" % [i + 1, m["name"], SpiritsData.star_text(m.get("stars", 0)),
-					int(m["current_hp"]), int(m["hp"])]})
+					int(m["current_hp"]), int(m["hp"])], "desc": _spirit_desc(m), "img": sprite_url(m, 48)})
 				actions.append(_go(id, {"p": "mon", "i": i}))
 			if not p.pc.is_empty():
 				lines.append("Spirit Box: %d more spirit%s" % [p.pc.size(), "" if p.pc.size() == 1 else "s"])
@@ -513,10 +600,16 @@ func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
 				return _idle_view(idx, extra)
 			var m: Dictionary = p.team[i]
 			title = "%s  %s%s" % [m["name"], SpiritsData.star_text(m.get("stars", 0)), "  (lead)" if i == 0 else ""]
-			lines = ["❤ HP %d/%d   ATK %d  DEF %d  SPD %d" % [int(m["current_hp"]), int(m["hp"]), int(m.get("atk", 0)),
-					int(m.get("def", 0)), int(m.get("spd", 0))],
-				"Type: %s   Stage %d" % [SpiritsData.type_text(m), int(m.get("stage", 1))],
-				"✦ Move: %s" % SpiritsData.move_of(SpiritsData.move_key(m))["name"]]
+			var mv := SpiritsData.move_of(SpiritsData.move_key(m))
+			# each heading with its own description right under it
+			lines = [{"t": "❤ HP %d/%d   ATK %d · DEF %d · SPD %d" % [int(m["current_hp"]), int(m["hp"]), int(m.get("atk", 0)),
+					int(m.get("def", 0)), int(m.get("spd", 0))], "d": "Type: %s · Stage %d" % [SpiritsData.type_text(m), int(m.get("stage", 1))]},
+				{"t": "✦ Move: %s" % mv.get("name", "?"), "d": String(mv.get("desc", ""))}]
+			for ab_key in [m.get("ability", ""), m.get("ability2", "")]:
+				if String(ab_key) != "":
+					var ab := SpiritsData.ability_of(String(ab_key))
+					lines.append({"t": "◆ Ability: %s" % ab.get("name", ab_key), "d": String(ab.get("desc", ""))})
+			top_img = sprite_url(m, 112)
 			if i > 0:
 				buttons.append({"label": "⭐ Make lead", "gold": true})
 				actions.append(_move_mon.bind(idx, i, -i, id))
@@ -541,12 +634,15 @@ func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
 		actions.append(_go(id, {"p": "team"} if page["p"] == "mon" else ({"p": "hand"} if page["p"] == "card" else {"p": "main"})))
 		if not extra.is_empty():
 			lines.push_front("🗳 " + String(extra.get("title", "")).trim_prefix("🗳 "))
-	return {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
+	var view := {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
+	if top_img != "":
+		view["img"] = top_img
+	return view
 
 func _play_off_turn(idx: int, key: String, target = null) -> void:
 	var p: PlayerData = GameState.players[idx]
 	var id := p.remote_id
-	if not p.inventory.hand.has(key) or idx == GameState.current_player_index:
+	if not p.inventory.hand.has(key) or idx == GameState.current_player_index or not key in CardsData.OFF_TURN:
 		return
 	var kind := String(CardsData.card(key).get("target", ""))
 	if target == null and kind in ["spirit", "fainted"]:
@@ -569,6 +665,38 @@ func _move_mon(idx: int, i: int, dir: int, id: String) -> void:
 	team.insert(j, m)
 	_page[id] = {"p": "mon", "i": j}
 	EventBus.log_entry.emit(idx, "%s's lead is now %s." % [GameState.players[idx].player_name, team[0]["name"]], "#a9b0c4")
+
+# The board's pause / View Map overlay (null off the board).
+func _pause_menu() -> Node:
+	var scene := get_tree().current_scene
+	if scene == null or scene.name != "Board":
+		return null
+	return _find(scene, func(n): return n.has_method("phone_hold"))
+
+# A spirit's sprite as a small PNG data: URL, so phones can show it whether
+# they're on this computer's server or an online relay. "" if unavailable.
+func sprite_url(s: Dictionary, px := 56) -> String:
+	var name := String(s.get("name", ""))
+	var key := "%s@%d" % [name, px]
+	if _img_cache.has(key):
+		return _img_cache[key]
+	var url := ""
+	var tex = SpiritsData.sprite_tex(name, "front")
+	if tex is AtlasTexture and tex.atlas != null:
+		var img: Image = tex.atlas.get_image()
+		if img != null and not img.is_empty():
+			if img.is_compressed():
+				img.decompress()
+			img = img.get_region(Rect2i(tex.region))
+			var k := float(px) / float(maxi(1, maxi(img.get_width(), img.get_height())))
+			img.resize(maxi(1, int(img.get_width() * k)), maxi(1, int(img.get_height() * k)), Image.INTERPOLATE_NEAREST)
+			url = "data:image/png;base64," + Marshalls.raw_to_base64(img.save_png_to_buffer())
+	_img_cache[key] = url
+	return url
+
+func _spirit_desc(m: Dictionary) -> String:
+	return "ATK %d · DEF %d · SPD %d · ✦ %s" % [int(m.get("atk", 0)), int(m.get("def", 0)), int(m.get("spd", 0)),
+		SpiritsData.move_of(SpiritsData.move_key(m))["name"]]
 
 # Helpers: depth-first search of the scene tree.
 func _find(root: Node, pred: Callable) -> Node:

@@ -260,14 +260,17 @@ func remote_view(idx: int) -> Dictionary:
 		var hp := int(mon.get("current_hp", 0))
 		if hp <= 0:
 			continue
-		buttons.append({"label": "%s%s  ❤%d" % ["%s · " % SLOT_NAMES[order] if order >= 0 else "", mon.get("name", "?"), hp]})
+		buttons.append({"label": "%s%s  ❤%d" % ["%s · " % SLOT_NAMES[order] if order >= 0 else "", mon.get("name", "?"), hp],
+			"desc": "ATK %d · DEF %d · SPD %d" % [int(mon.get("atk", 0)), int(mon.get("def", 0)), int(mon.get("spd", 0))],
+			"img": Remote.sprite_url(mon, 40)})
 		actions.append(_on_toggle.bind(i, side))
 	var picked: Array = _cards if side == 0 else _cards_b
 	var tactics: Array = me.inventory.cards_of_kind("tactic")
 	for k in tactics.size():
 		var key: String = tactics[k]
 		var armed: bool = picked.count(key) > tactics.slice(0, k).count(key)
-		buttons.append({"label": "🃏 %s%s" % [CardsData.card_name(key), "  ✓" if armed else ""]})
+		buttons.append({"label": "🃏 %s%s" % [CardsData.card_name(key), "  ✓" if armed else ""],
+			"desc": String(CardsData.card(key).get("desc", ""))})
 		actions.append(func():
 			if armed:
 				picked.erase(key)

@@ -96,49 +96,92 @@
       .filter(Boolean).join("   ");
   }
 
+  // a card picked once shows its text; picking it again uses it
+  let picked = null;
+
+  function holdButton(label, cls, send) {
+    const b = el("button", cls, label);
+    const down = (e) => { e.preventDefault(); b.classList.add("down"); send(true); };
+    const up = (e) => { e.preventDefault(); if (b.classList.contains("down")) { b.classList.remove("down"); send(false); } };
+    b.addEventListener("touchstart", down, { passive: false });
+    b.addEventListener("touchend", up, { passive: false });
+    b.addEventListener("touchcancel", up, { passive: false });
+    b.addEventListener("mousedown", down);
+    b.addEventListener("mouseup", up);
+    b.addEventListener("mouseleave", up);
+    return b;
+  }
+
+  // label + optional sprite + description under it, inside one button
+  function fillButton(btn, b, extra) {
+    if (b.img) { const im = el("img", "thumb"); im.src = b.img; im.alt = ""; btn.append(im); }
+    const txt = el("span", "txt");
+    txt.append(el("span", "lbl", b.label));
+    if (b.desc && (!b.card || extra)) txt.append(el("span", "desc", b.desc));
+    if (extra) txt.append(el("span", "hint", extra));
+    btn.append(txt);
+  }
+
   function render(v) {
+    if (v.rev !== rev) picked = null;   // a new screen forgets the picked card
     rev = v.rev || 0;
     renderMe(v.me);
     const box = $("view");
     box.replaceChildren();
     if (v.title) box.append(el("div", "title", v.title));
-    for (const line of v.lines || []) box.append(el("div", "line", line));
-    if (v.screen === "buttons") {
-      const grid = el("div", "btns");
+    if (v.img) { const im = el("img", "hero"); im.src = v.img; im.alt = ""; box.append(im); }
+    for (const line of v.lines || []) {
+      if (line && typeof line === "object") {
+        const item = el("div", "item");
+        item.append(el("div", "head", line.t || ""));
+        if (line.d) item.append(el("div", "desc", line.d));
+        box.append(item);
+      } else box.append(el("div", "line", line));
+    }
+    const press = (i, grid) => {
+      sendMsg({ press: i, rev });
+      grid.querySelectorAll("button").forEach((x) => (x.disabled = true));   // wait for the next view
+      if (navigator.vibrate) navigator.vibrate(15);
+    };
+    if (v.screen === "buttons" || v.screen === "dpad") {
+      if (v.screen === "dpad") {
+        const pad = el("div", "dpad");
+        for (const h of v.holds || []) {
+          const b = holdButton(h.label, "h-" + h.k, (down) => sendMsg({ hold: h.k, down }));
+          pad.append(b);
+        }
+        box.append(pad);
+      }
+      const list = el("div", "btns");
       (v.buttons || []).forEach((b, i) => {
-        const btn = el("button", (b.gold ? "gold " : "") + ((v.buttons.length % 2 && i === v.buttons.length - 1) || b.label.length > 22 ? "wide" : ""), b.label);
-        btn.onclick = () => {
-          sendMsg({ press: i, rev });
-          grid.querySelectorAll("button").forEach((x) => (x.disabled = true));   // wait for the next view
-          if (navigator.vibrate) navigator.vibrate(15);
-        };
-        grid.append(btn);
+        const cls = [b.gold ? "gold" : "", b.card ? "card" : "", b.off ? "off" : "", b.img ? "withimg" : ""].join(" ");
+        const btn = el("button", cls);
+        const isPicked = b.card && picked === b.label + "#" + i;
+        if (b.card) {
+          fillButton(btn, b, isPicked ? (b.off ? "🚫 " + b.off : "👆 Tap again to use it") : "");
+          if (isPicked) btn.classList.add("picked");
+          btn.onclick = () => {
+            if (isPicked && !b.off) { press(i, list); return; }
+            picked = isPicked ? null : b.label + "#" + i;   // first tap (or tap off) = read it
+            render(v);
+          };
+        } else {
+          fillButton(btn, b, "");
+          btn.onclick = () => press(i, list);
+        }
+        list.append(btn);
       });
-      box.append(grid);
+      box.append(list);
     } else if (v.screen === "pad") {
       const pad = el("div", "pad");
       for (const [k, label] of [["action", v.action || "ACTION"], ["left", "◀"], ["middle", "●"], ["right", "▶"]]) {
-        const b = el("button", k === "action" ? "action" : "", label);
-        const down = (e) => { e.preventDefault(); b.classList.add("down"); sendMsg({ pad: k, down: true }); };
-        const up = (e) => { e.preventDefault(); b.classList.remove("down"); sendMsg({ pad: k, down: false }); };
-        b.addEventListener("touchstart", down, { passive: false });
-        b.addEventListener("touchend", up, { passive: false });
-        b.addEventListener("touchcancel", up, { passive: false });
-        b.addEventListener("mousedown", down);
-        b.addEventListener("mouseup", up);
-        b.addEventListener("mouseleave", (e) => b.classList.contains("down") && up(e));
-        pad.append(b);
+        pad.append(holdButton(label, k === "action" ? "action" : "", (down) => sendMsg({ pad: k, down })));
       }
       box.append(pad);
     } else {
       const w = el("div", "wait");
       w.append(el("span", "ghost", "👻"), document.createTextNode(v.text || "Waiting…"));
       box.append(w);
-    }
-    if (v.me && v.me.cards && v.me.cards.length) {
-      const cards = el("div", "cards");
-      for (const c of v.me.cards) cards.append(el("span", "", c));
-      box.append(cards);
     }
   }
 })();

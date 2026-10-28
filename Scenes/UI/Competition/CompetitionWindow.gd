@@ -35,6 +35,7 @@ const CONTESTS := {
 	"atk":     {"name": "💪 Coffin Lift",        "label": "Attack"},
 	"def":     {"name": "🛡 Spooky Stare-Down",  "label": "Defense"},
 	"hp_stat": {"name": "🌟 Midnight Marathon",  "label": "HP Tier"},
+	"beauty":  {"name": "✨ Moonlight Pageant",  "label": "Charm"},
 }
 const MEDALS := ["🥇", "🥈", "🥉"]
 const CONTEST_CHANCE := 0.3   # how often the event is a quick stat contest
@@ -105,6 +106,8 @@ func _build_selection() -> void:
 	_title.text = "🏅 %s — pick your spirit!" % event_name(_event)
 	_hint.text = GAMES[_event]["hint"] if _is_game() else \
 		"Judged on %s ×2, plus stars and a die roll!" % CONTESTS[_event]["label"]
+	if _event == "beauty":
+		_hint.text = "Three judges each love one stat — a well-rounded spirit shines! Plus stars and a die roll."
 	if _is_game():
 		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your area)"
 	_next.text = "Start!  [Space]"
@@ -124,11 +127,14 @@ func _build_selection() -> void:
 		row.add_child(right)
 		var slot := Controls.slot_of(i)
 		right.add_child(UIKit.label(p.player_name + ("  (P%d keys)" % (slot + 1) if not p.is_cpu and slot >= 0 and _is_game() else ""), 16, p.color))
-		var chips_row := UIKit.hbox(8)
+		var chips_row := GridContainer.new()   # 2 rows × 3: a team of 6 stays compact
+		chips_row.columns = 3
+		chips_row.add_theme_constant_override("h_separation", 8)
+		chips_row.add_theme_constant_override("v_separation", 4)
 		right.add_child(chips_row)
 		_chips[i] = []
 		for s in p.team:
-			var chip := CompChips.SpiritChip.new(s, "★%.1f" % rating(_event, s))
+			var chip := CompChips.SpiritChip.new(s, star_text(fit_stars(_event, s)))
 			chip.picked.connect(func(c): _on_chip_picked(c, i))
 			chips_row.add_child(chip)
 			_chips[i].append(chip)
@@ -156,12 +162,14 @@ func remote_view(idx: int) -> Dictionary:
 	var actions: Array = []
 	for chip in _chips[idx]:
 		var s: Dictionary = chip.spirit
-		buttons.append({"label": "%s  ★%.1f%s" % [s.get("name", "?"), rating(_event, s), "  ✓" if _picks.get(idx) == s else ""]})
+		buttons.append({"label": "%s  %s%s" % [s.get("name", "?"), star_text(fit_stars(_event, s)), "  ✓" if _picks.get(idx) == s else ""],
+			"desc": "ATK %d · DEF %d · SPD %d · HP %d" % [int(s.get("atk", 0)), int(s.get("def", 0)), int(s.get("spd", 0)), int(s.get("hp_stat", 0))],
+			"img": Remote.sprite_url(s)})
 		actions.append(func(): _on_chip_picked(chip, idx))
 	if not _next.disabled:
 		buttons.append({"label": "▶ Start!", "gold": true})
 		actions.append(_on_next)
-	return {"screen": "buttons", "title": _title.text, "lines": [_hint.text.get_slice("\n", 0)],
+	return {"screen": "buttons", "title": _title.text, "lines": [_hint.text.get_slice("\n", 0), "★★★ = a great pick for this event, ★ = a poor one."],
 		"buttons": buttons, "_actions": actions}
 
 func _on_chip_picked(chip, i: int) -> void:
@@ -194,7 +202,29 @@ static func rating(event: String, s: Dictionary) -> float:
 		"boo_reflex": return g.call("spd") * 1.5
 		"bat_dodge":  return g.call("spd") + g.call("def") * 0.8
 		"lantern_memory": return g.call("hp_stat") + g.call("spd") * 0.5
+		"beauty":     return (g.call("atk") + g.call("def") + g.call("spd") + g.call("hp_stat")) * 0.75 + g.call("stars")
 	return g.call(event) * 2.0 + g.call("stars")   # stat contests
+
+# The rating as 1–3 stars: where it falls between the weakest and strongest
+# spirit possible for this event (every stat tier 1…6, 0…3 stars).
+static func fit_stars(event: String, s: Dictionary) -> int:
+	var lo := INF
+	var hi := -INF
+	for mask in 32:   # every corner of the stat box
+		var probe := {}
+		var k := 0
+		for stat in ["atk", "def", "spd", "hp_stat"]:
+			probe[stat] = 6 if mask & (1 << k) else 1
+			k += 1
+		probe["stars"] = 3 if mask & 16 else 0
+		var r := rating(event, probe)
+		lo = minf(lo, r)
+		hi = maxf(hi, r)
+	var f := (rating(event, s) - lo) / maxf(0.001, hi - lo)
+	return 3 if f >= 0.6 else (2 if f >= 0.3 else 1)
+
+static func star_text(n: int) -> String:
+	return "★".repeat(n) + "☆".repeat(3 - n)
 
 func _best_index(team: Array) -> int:
 	var best := 0
