@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(command -v godot)",
+      "Bash(command -v Godot)",
+      "Read(//c/Program Files/**)",
+      "Bash(file Male_Spritesheet.png)",
+      "Bash(python -c \"from PIL import Image; im=Image.open\\('Male_Spritesheet.png'\\); print\\('size', im.size\\)\")",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.Drawing; $i=[System.Drawing.Image]::FromFile\\(\\(Resolve-Path '\\\\''Male_Spritesheet.png'\\\\''\\)\\); Write-Output \"$\\($i.Width\\)x$\\($i.Height\\)\"')",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

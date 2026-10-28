@@ -1,0 +1,560 @@
+[gd_scene load_steps=16 format=3 uid="uid://0aq0bv3i0j3w"]
+
+[ext_resource type="Script" path="res://Scenes/Board/Board.gd" id="1_board"]
+[ext_resource type="PackedScene" uid="uid://cboardmap0001" path="res://Scenes/Board/Map1.tscn" id="2_map"]
+[ext_resource type="Theme" uid="uid://cmenutheme01" path="res://Scenes/Menu/MenuTheme.tres" id="3_theme"]
+[ext_resource type="Script" path="res://Scenes/Board/PauseMenu.gd" id="4_pause"]
+
+[sub_resource type="StyleBoxFlat" id="circ_normal"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.541176, 0.435294, 0.964706, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.345098, 0.247059, 0.737255, 1)
+corner_radius_top_left = 999
+corner_radius_top_right = 999
+corner_radius_bottom_right = 999
+corner_radius_bottom_left = 999
+shadow_color = Color(0, 0, 0, 0.290196)
+shadow_size = 6
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="circ_hover"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.65098, 0.564706, 1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.435294, 0.337255, 0.847059, 1)
+corner_radius_top_left = 999
+corner_radius_top_right = 999
+corner_radius_bottom_right = 999
+corner_radius_bottom_left = 999
+shadow_color = Color(0, 0, 0, 0.301961)
+shadow_size = 8
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="circ_pressed"]
+content_margin_left = 6.0
+content_margin_top = 8.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.435294, 0.337255, 0.847059, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.305882, 0.215686, 0.658824, 1)
+corner_radius_top_left = 999
+corner_radius_top_right = 999
+corner_radius_bottom_right = 999
+corner_radius_bottom_left = 999
+
+[sub_resource type="StyleBoxFlat" id="circ_disabled"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.396078, 0.388235, 0.470588, 1)
+corner_radius_top_left = 999
+corner_radius_top_right = 999
+corner_radius_bottom_right = 999
+corner_radius_bottom_left = 999
+
+[sub_resource type="StyleBoxFlat" id="circ_focus"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.541176, 0.435294, 0.964706, 0)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.847059, 0.419608, 1)
+corner_radius_top_left = 999
+corner_radius_top_right = 999
+corner_radius_bottom_right = 999
+corner_radius_bottom_left = 999
+
+[sub_resource type="StyleBoxFlat" id="menu_bg"]
+bg_color = Color(0.105882, 0.086275, 0.196078, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.541176, 0.435294, 0.964706, 0.701961)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+shadow_color = Color(0, 0, 0, 0.501961)
+shadow_size = 16
+
+[sub_resource type="StyleBoxFlat" id="sq_normal"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.541176, 0.435294, 0.964706, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.345098, 0.247059, 0.737255, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.290196)
+shadow_size = 6
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="sq_hover"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.65098, 0.564706, 1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 4
+border_color = Color(0.435294, 0.337255, 0.847059, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0, 0, 0, 0.301961)
+shadow_size = 8
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxFlat" id="sq_pressed"]
+content_margin_left = 6.0
+content_margin_top = 8.0
+content_margin_right = 6.0
+content_margin_bottom = 4.0
+bg_color = Color(0.435294, 0.337255, 0.847059, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.305882, 0.215686, 0.658824, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="sq_disabled"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.396078, 0.388235, 0.470588, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="sq_focus"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.541176, 0.435294, 0.964706, 0)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.847059, 0.419608, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="Board" type="Node2D"]
+script = ExtResource("1_board")
+
+[node name="Map1" parent="." instance=ExtResource("2_map")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+process_mode = 3
+position = Vector2(745, 420)
+zoom = Vector2(1.5, 1.5)
+
+[node name="BoardUI" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="BoardUI"]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("3_theme")
+script = ExtResource("4_pause")
+
+[node name="InfoLabel" type="Label" parent="BoardUI/Root"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -240.0
+offset_top = 16.0
+offset_right = 240.0
+offset_bottom = 54.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 28
+text = "Roll the dice!"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ActionBar" type="HBoxContainer" parent="BoardUI/Root"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -104.0
+offset_right = 628.0
+offset_bottom = -20.0
+grow_vertical = 0
+theme_override_constants/separation = 14
+
+[node name="BagButton" type="Button" parent="BoardUI/Root/ActionBar"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("circ_normal")
+theme_override_styles/hover = SubResource("circ_hover")
+theme_override_styles/pressed = SubResource("circ_pressed")
+theme_override_styles/disabled = SubResource("circ_disabled")
+theme_override_styles/focus = SubResource("circ_focus")
+text = "BAG"
+clip_text = true
+
+[node name="PkmnButton" type="Button" parent="BoardUI/Root/ActionBar"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("circ_normal")
+theme_override_styles/hover = SubResource("circ_hover")
+theme_override_styles/pressed = SubResource("circ_pressed")
+theme_override_styles/disabled = SubResource("circ_disabled")
+theme_override_styles/focus = SubResource("circ_focus")
+text = "SP"
+clip_text = true
+
+[node name="MapButton" type="Button" parent="BoardUI/Root/ActionBar"]
+custom_minimum_size = Vector2(84, 84)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("circ_normal")
+theme_override_styles/hover = SubResource("circ_hover")
+theme_override_styles/pressed = SubResource("circ_pressed")
+theme_override_styles/disabled = SubResource("circ_disabled")
+theme_override_styles/focus = SubResource("circ_focus")
+text = "MAP"
+clip_text = true
+
+[node name="RollButton" type="Button" parent="BoardUI/Root/ActionBar"]
+custom_minimum_size = Vector2(160, 84)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("circ_normal")
+theme_override_styles/hover = SubResource("circ_hover")
+theme_override_styles/pressed = SubResource("circ_pressed")
+theme_override_styles/disabled = SubResource("circ_disabled")
+theme_override_styles/focus = SubResource("circ_focus")
+text = "Roll Dice"
+
+[node name="EndTurnButton" type="Button" parent="BoardUI/Root/ActionBar"]
+custom_minimum_size = Vector2(160, 84)
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 0
+theme_override_styles/normal = SubResource("circ_normal")
+theme_override_styles/hover = SubResource("circ_hover")
+theme_override_styles/pressed = SubResource("circ_pressed")
+theme_override_styles/disabled = SubResource("circ_disabled")
+theme_override_styles/focus = SubResource("circ_focus")
+disabled = true
+text = "End Turn"
+
+[node name="BackButton" type="Button" parent="BoardUI/Root"]
+visible = false
+layout_mode = 0
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 154.0
+offset_bottom = 58.0
+focus_mode = 0
+text = "← Back"
+
+[node name="ZoomLabel" type="Label" parent="BoardUI/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 56.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 26
+text = "Zoom: 100%"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="ViewHint" type="Label" parent="BoardUI/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -360.0
+offset_top = -46.0
+offset_right = 360.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_font_sizes/font_size = 22
+text = "Arrow keys / WASD: move    •    Q / E: zoom    •    Esc or Back: return"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SettingsMenu" type="Panel" parent="BoardUI/Root"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -160.0
+offset_right = 180.0
+offset_bottom = 234.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("menu_bg")
+
+[node name="Margin" type="MarginContainer" parent="BoardUI/Root/SettingsMenu"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="BoardUI/Root/SettingsMenu/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="Label" parent="BoardUI/Root/SettingsMenu/Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.847059, 0.419608, 1)
+theme_override_font_sizes/font_size = 30
+text = "Paused"
+horizontal_alignment = 1
+
+[node name="SoundRow" type="HBoxContainer" parent="BoardUI/Root/SettingsMenu/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SoundLabel" type="Label" parent="BoardUI/Root/SettingsMenu/Margin/VBox/SoundRow"]
+custom_minimum_size = Vector2(90, 0)
+layout_mode = 2
+text = "Sound"
+vertical_alignment = 1
+
+[node name="SoundSlider" type="HSlider" parent="BoardUI/Root/SettingsMenu/Margin/VBox/SoundRow"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+focus_mode = 0
+
+[node name="ViewMapButton" type="Button" parent="BoardUI/Root/SettingsMenu/Margin/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+focus_mode = 0
+text = "View Map"
+
+[node name="CloseButton" type="Button" parent="BoardUI/Root/SettingsMenu/Margin/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+focus_mode = 0
+text = "Close"
+
+[node name="QuitButton" type="Button" parent="BoardUI/Root/SettingsMenu/Margin/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+focus_mode = 0
+text = "Quit Game"
+
+[node name="ChoicePanel" type="Panel" parent="BoardUI/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -90.0
+offset_right = 260.0
+offset_bottom = 90.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("menu_bg")
+
+[node name="VBox" type="VBoxContainer" parent="BoardUI/Root/ChoicePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="BoardUI/Root/ChoicePanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.847059, 0.419608, 1)
+theme_override_font_sizes/font_size = 28
+text = "Which way?"
+horizontal_alignment = 1
+
+[node name="Buttons" type="HBoxContainer" parent="BoardUI/Root/ChoicePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="EventPanel" type="Panel" parent="BoardUI/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -110.0
+offset_right = 260.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("menu_bg")
+
+[node name="VBox" type="VBoxContainer" parent="BoardUI/Root/EventPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="BoardUI/Root/EventPanel/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "You landed on"
+horizontal_alignment = 1
+
+[node name="Body" type="Label" parent="BoardUI/Root/EventPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.847059, 0.419608, 1)
+theme_override_font_sizes/font_size = 36
+text = "Wild Spirit"
+horizontal_alignment = 1
+
+[node name="OkButton" type="Button" parent="BoardUI/Root/EventPanel/VBox"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+focus_mode = 0
+text = "OK"
+
+[node name="UtilRow" type="HBoxContainer" parent="BoardUI/Root"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 88.0
+offset_right = 142.0
+offset_bottom = 144.0
+theme_override_constants/separation = 14
+
+[node name="LogButton" type="Button" parent="BoardUI/Root/UtilRow"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("sq_normal")
+theme_override_styles/hover = SubResource("sq_hover")
+theme_override_styles/pressed = SubResource("sq_pressed")
+theme_override_styles/disabled = SubResource("sq_disabled")
+theme_override_styles/focus = SubResource("sq_focus")
+text = "LOG"
+clip_text = true
+
+[node name="DevButton" type="Button" parent="BoardUI/Root/UtilRow"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("sq_normal")
+theme_override_styles/hover = SubResource("sq_hover")
+theme_override_styles/pressed = SubResource("sq_pressed")
+theme_override_styles/disabled = SubResource("sq_disabled")
+theme_override_styles/focus = SubResource("sq_focus")
+text = "DEV"
+clip_text = true
+
+[node name="TopUI" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 50
+
+[node name="SettingsButton" type="Button" parent="TopUI"]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 154.0
+offset_bottom = 58.0
+focus_mode = 0
+theme = ExtResource("3_theme")
+text = "Settings"
+
+[connection signal="pressed" from="BoardUI/Root/ActionBar/RollButton" to="." method="_on_roll_pressed"]
+[connection signal="pressed" from="BoardUI/Root/ActionBar/EndTurnButton" to="." method="_on_end_turn_pressed"]
+[connection signal="pressed" from="BoardUI/Root/BackButton" to="BoardUI/Root" method="_on_back_pressed"]
+[connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/ViewMapButton" to="BoardUI/Root" method="_on_view_map_pressed"]
+[connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/CloseButton" to="BoardUI/Root" method="_on_close_pressed"]
+[connection signal="pressed" from="BoardUI/Root/SettingsMenu/Margin/VBox/QuitButton" to="BoardUI/Root" method="_on_quit_pressed"]
+[connection signal="pressed" from="TopUI/SettingsButton" to="BoardUI/Root" method="_on_settings_pressed"]

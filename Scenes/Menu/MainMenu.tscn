@@ -1,0 +1,139 @@
+[gd_scene load_steps=5 format=3 uid="uid://dq88aegamj4j"]
+
+[ext_resource type="Script" path="res://Scenes/Menu/MainMenu.gd" id="1_mn001"]
+[ext_resource type="Theme" uid="uid://cmenutheme01" path="res://Scenes/Menu/MenuTheme.tres" id="2_theme"]
+
+[sub_resource type="Gradient" id="Gradient_bg"]
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(0.101961, 0.078431, 0.215686, 1, 0.176471, 0.121569, 0.34902, 1, 0.262745, 0.156863, 0.411765, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bg"]
+gradient = SubResource("Gradient_bg")
+width = 1152
+height = 648
+fill_from = Vector2(0.2, 0)
+fill_to = Vector2(0.8, 1)
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_mn001")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture2D_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 0
+offset_left = 263.0
+offset_top = 86.0
+offset_right = 845.0
+offset_bottom = 184.0
+theme_override_colors/font_color = Color(1, 0.847059, 0.419608, 1)
+theme_override_colors/font_outline_color = Color(0.0784314, 0.0588235, 0.176471, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 60
+text = "Kids Hunt Ghost"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="."]
+layout_mode = 0
+offset_left = 254.0
+offset_top = 190.0
+offset_right = 836.0
+offset_bottom = 224.0
+theme_override_colors/font_color = Color(0.788235, 0.733333, 1, 0.784314)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 22
+text = "A Spooky Spirit Adventure"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MainMenuButton" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 353.0
+offset_top = 238.0
+offset_right = 733.0
+offset_bottom = 411.0
+theme_override_constants/separation = 14
+
+[node name="AdventureMode" type="Button" parent="MainMenuButton"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Adventure Mode"
+
+[node name="Multiplayer" type="Button" parent="MainMenuButton"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Multiplayer"
+
+[node name="Setting" type="Button" parent="MainMenuButton"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Settings"
+
+[node name="MultiplayerMenuButton" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 356.0
+offset_top = 239.0
+offset_right = 676.0
+offset_bottom = 363.0
+theme_override_constants/separation = 14
+
+[node name="Online" type="Button" parent="MultiplayerMenuButton"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Online"
+
+[node name="Local" type="Button" parent="MultiplayerMenuButton"]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Local"
+
+[node name="StartingScreenButton" type="VBoxContainer" parent="."]
+layout_mode = 0
+offset_left = 386.0
+offset_top = 426.0
+offset_right = 706.0
+offset_bottom = 482.0
+
+[node name="StartGamebutton" type="Button" parent="StartingScreenButton"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+text = "Start"
+
+[node name="DevButton" type="Button" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -72.0
+offset_right = 116.0
+offset_bottom = -16.0
+grow_vertical = 0
+focus_mode = 0
+theme_override_font_sizes/font_size = 18
+text = "DEV"
+
+[connection signal="pressed" from="MainMenuButton/AdventureMode" to="." method="_on_adventure_mode_pressed"]
+[connection signal="pressed" from="MainMenuButton/Multiplayer" to="." method="_on_multiplayer_pressed"]
+[connection signal="pressed" from="MainMenuButton/Setting" to="." method="_on_setting_pressed"]
+[connection signal="pressed" from="MultiplayerMenuButton/Online" to="." method="_on_online_pressed"]
+[connection signal="pressed" from="MultiplayerMenuButton/Local" to="." method="_on_local_pressed"]
+[connection signal="pressed" from="StartingScreenButton/StartGamebutton" to="." method="_on_start_game_pressed"]
+[connection signal="pressed" from="DevButton" to="." method="_on_dev_pressed"]
