@@ -112,32 +112,42 @@ func result_text() -> String:
 	return "🎈 %s grabs %d wisps!" % [best["name"], best["score"]]
 
 func _draw_game() -> void:
-	var font := ThemeDB.fallback_font
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
 		var f := _field(i)
 		var h := f.y - f.x
-		draw_rect(Rect2(0, i * LANE_H + 2, size.x, LANE_H - 4), Color(0.05, 0.06, 0.16))
-		for k in 6:   # distant twinkles
-			var sx := fposmod(k * 137.0 - t * 30.0, size.x)
-			draw_circle(Vector2(sx, f.x + fmod(k * 37.0, h)), 1.3, Color(1, 1, 1, 0.35))
+		var card := Rect2(4, i * LANE_H + 3, size.x - 8, LANE_H - 6)
+		lane_card(lane, card, Color("070a24"), Color("1c1450"))
+		for k in 10:   # drifting stars
+			var sx := fposmod(k * 137.0 - t * (20 + k * 2), size.x - 20) + 10
+			draw_circle(Vector2(sx, f.x + fmod(k * 37.0, h)), 1.2, Color(1, 1, 1, 0.3 + 0.3 * sin(t * 4 + k)))
+		draw_line(Vector2(8, f.y + 4), Vector2(size.x - 8, f.y + 4), Color(0.5, 0.6, 1.0, 0.15), 1.0)
 		for it in lane["items"]:
 			var p := Vector2(it["x"], f.x + it["y"] * h)
 			if it["bat"]:
 				var flap := sin(t * 18.0 + it["x"]) * 6.0
-				draw_colored_polygon(PackedVector2Array([p, p + Vector2(-16, -6 + flap), p + Vector2(-6, 4)]), Color(0.25, 0.1, 0.3))
-				draw_colored_polygon(PackedVector2Array([p, p + Vector2(16, -6 + flap), p + Vector2(6, 4)]), Color(0.25, 0.1, 0.3))
-				draw_circle(p, 6, Color(0.3, 0.12, 0.35))
-				draw_circle(p + Vector2(-2, -1), 1.3, Color(1, 0.3, 0.3))
-				draw_circle(p + Vector2(2, -1), 1.3, Color(1, 0.3, 0.3))
+				var wing := Color(0.32, 0.12, 0.42)
+				draw_colored_polygon(PackedVector2Array([p, p + Vector2(-18, -7 + flap), p + Vector2(-10, 1), p + Vector2(-6, 5)]), wing)
+				draw_colored_polygon(PackedVector2Array([p, p + Vector2(18, -7 + flap), p + Vector2(10, 1), p + Vector2(6, 5)]), wing)
+				draw_circle(p, 6, Color(0.38, 0.16, 0.48))
+				glow(p, 4, Color(1, 0.2, 0.3, 0.5), 3)
+				draw_circle(p + Vector2(-2, -1), 1.4, Color(1, 0.4, 0.4))
+				draw_circle(p + Vector2(2, -1), 1.4, Color(1, 0.4, 0.4))
 			else:
-				var glow := 0.6 + 0.4 * sin(t * 6.0 + it["x"] * 0.05)
-				draw_circle(p, 10, Color(0.5, 1, 0.9, 0.2 * glow))
-				draw_circle(p, 6, Color(0.7, 1, 0.95, 0.9))
+				var pulse := 0.6 + 0.4 * sin(t * 6.0 + it["x"] * 0.05)
+				for k in 3:   # little comet tail
+					draw_circle(p + Vector2(8 + k * 7, 0), 4.0 - k, Color(0.5, 1, 0.9, 0.18 - k * 0.05))
+				glow(p, 9, Color(0.4, 1.0, 0.85, pulse), 6)
+				draw_circle(p, 5, Color(0.85, 1, 0.97))
 		for fx in lane["fx"]:
 			draw_circle(fx["p"], 2.5, Color(fx["c"], fx["life"] * 2.5))
-		var tint := Color(1, 1, 1, 0.4 + 0.6 * float(int(t * 12) % 2)) if lane["stun"] > 0.0 else Color.WHITE
-		draw_spirit(lane, Vector2(X, f.x + lane["y"] * h), R, tint)
-		lane_label(lane, i, "HOLD to float   ✨ %d" % lane["score"], LANE_H)
+		var me := Vector2(X, f.x + lane["y"] * h)
+		for k in 4:   # float trail
+			draw_circle(me - Vector2(8 + k * 8, -lane["vy"] * 0.02 * k), R * (0.7 - k * 0.14), Color(lane["color"], 0.12))
+		var stunned: bool = lane["stun"] > 0.0
+		var tint := Color(1, 1, 1, 0.35 + 0.65 * float(int(t * 12) % 2)) if stunned else Color.WHITE
+		draw_spirit(lane, me, R, tint)
+		nameplate(lane, Vector2(12, i * LANE_H + 8), "✨ %d   HOLD to float" % lane["score"])
 	if running:
-		draw_string(font, Vector2(size.x - 120, 20), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.75))
+		rrect(Rect2(size.x - 104, 8, 92, 22), Color(0.05, 0.04, 0.12, 0.7), 11)
+		text(Vector2(size.x - 104, 24), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)

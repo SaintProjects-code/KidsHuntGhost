@@ -64,22 +64,17 @@ func _human(idx: int) -> bool:
 func _name(idx: int) -> String:
 	return GameState.players[idx].player_name
 
-# Let a human pick a battle team (enemy lineup shown alongside); CPUs auto-pick.
-func _pick_team(idx: int, vs_text: String, opp_team: Array) -> Array:
-	if not _human(idx):
-		return BattleSetup.cpu_team(idx, opp_team)
-	if GameState.players[idx].team.is_empty():
-		return []
-	_select.present(GameState.players[idx], vs_text, opp_team)
-	UIManager.open(_select)
-	return await _select.chosen
-
-# Fight an NPC team end to end. Returns true on a win, null if backed out.
-func _npc_battle(idx: int, foe_team: Array, title: String, portrait: Array, kind: String, deck_size: int):
-	var team: Array = await _pick_team(idx, "vs %s!" % title, foe_team)
-	if team.is_empty():
+# Fight an NPC team end to end. Both sides pick BLIND from the other's full
+# roster: you see their 4 and bring 3 (+2 tactic cards); they counter-pick 3
+# against your whole living team. Returns true on a win, null if backed out.
+func _npc_battle(idx: int, roster: Array, title: String, portrait: Array, kind: String):
+	var foe_team := BattleSetup.counter_pick(roster, GameState.players[idx].living_team())
+	var vs := "vs %s!" % title + ("  (brings %d of these)" % Balance.BATTLE_PICK_MAX if roster.size() > Balance.BATTLE_PICK_MAX else "")
+	var pick: Dictionary = await BattleSetup.pick_for(_select, idx, vs, roster)
+	if pick.is_empty():
 		return null
-	var setup := BattleSetup.vs_npc(idx, team, foe_team, title, portrait, kind, CardsData.npc_deck(deck_size))
+	var setup := BattleSetup.vs_npc(idx, pick["team"], pick["cards"], foe_team, title, portrait, kind,
+		CardsData.npc_deck(BattleSetup.BATTLE_CARDS))
 	var won := await BattleSetup.run(_battle, setup, idx)
 	EventBus.log_entry.emit(idx, "%s %s the battle: %s" % [_name(idx), "won" if won else "lost", title],
 		"#9fff9f" if won else "#ff9f9f")
@@ -108,8 +103,7 @@ func _run_trainer_battle(idx: int) -> void:
 	var entries: Array = t.get("team", [])
 	var size: int = GameData.trainer_team_size(p.pvp_tag, entries.size())
 	var foe_team: Array = GameData.build_team(entries.slice(0, size), tier)
-	var won = await _npc_battle(idx, foe_team, String(t["name"]), t.get("portrait", ["acetrainer"]), "trainer",
-		1 if p.pvp_tag else 0)
+	var won = await _npc_battle(idx, foe_team, String(t["name"]), t.get("portrait", ["acetrainer"]), "trainer")
 	if won == true:
 		p.inventory.gold += int(t.get("gold", 15))
 		GameState.award_points(idx, int(t.get("pts", 1)))
@@ -185,8 +179,7 @@ func _run_gym(idx: int, city: String) -> void:
 	var gym: Dictionary = GameData.gym_for_city(city)
 	var tier: int = GameData.challenge_tier(p.progress.badge_count())
 	var gym_team: Array = GameData.build_team(gym.get("team", []), tier)
-	var won = await _npc_battle(idx, gym_team, String(gym["name"]), GameData.gym_trainer(gym.get("type", "")),
-		"gym", tier - 1)
+	var won = await _npc_battle(idx, gym_team, String(gym["name"]), GameData.gym_trainer(gym.get("type", "")), "gym")
 	if won == true:
 		p.progress.badges[gym["badge"]] = true
 		EventBus.badge_earned.emit(idx, gym["name"])
@@ -221,7 +214,7 @@ func _run_warden_tile(idx: int) -> void:
 	var tier: int = GameData.trail_tier(p.progress.badge_count())
 	var foe_team: Array = GameData.build_team(foe["team"], tier)
 	var won = await _npc_battle(idx, foe_team, String(foe["name"]), foe.get("portrait", []) + ["acetrainer"],
-		"champion" if champion else "warden", GameData.CHAMPION_DECK if champion else GameData.WARDEN_DECK)
+		"champion" if champion else "warden")
 	if won == null:
 		# backing out = retreating down the trail (the streak resets)
 		p.progress.elite_wins = 0
@@ -264,15 +257,16 @@ func _pvp_battle(a: int, b: int, real: bool) -> void:
 	var pb: PlayerData = GameState.players[b]
 	if pa.living_team().is_empty() or pb.living_team().is_empty():
 		return
-	var teams := await _pvp_teams(a, b)
-	if teams.is_empty():
+	var picks := await _pvp_picks(a, b)
+	if picks.is_empty():
 		return
+	if not real:   # dev fight: copies, and no cards are used up
+		for pk in picks:
+			pk["team"] = pk["team"].map(func(m): return m.duplicate(true))
+	var setup := BattleSetup.pvp(a, b, picks[0], picks[1])
 	if not real:
-		teams = [teams[0].map(func(m): return m.duplicate(true)), teams[1].map(func(m): return m.duplicate(true))]
-	var setup := BattleSetup.pvp(a, b, teams[0], teams[1])
-	if not real:
-		setup["hand"] = pa.inventory.hand.duplicate()
-		setup["opp_hand"] = pb.inventory.hand.duplicate()
+		setup["hand_source"] = []
+		setup["opp_source"] = []
 	var won := await BattleSetup.run(_battle, setup, a)
 	if not real:
 		return
@@ -287,16 +281,17 @@ func _pvp_battle(a: int, b: int, real: bool) -> void:
 	EventBus.log_entry.emit(wi, "⚔ %s wins the PvP battle! +%d pts%s" % [_name(wi), Balance.PTS_PVP_WIN,
 		"" if stolen.is_empty() else ", takes: " + ", ".join(stolen)], "#ffd24d")
 
-# [team_a, team_b] — two humans pick together on one screen; otherwise each
-# side picks (humans) or auto-picks (CPUs). [] if someone backs out.
-func _pvp_teams(a: int, b: int) -> Array:
+# [pick_a, pick_b] ({team, cards} each) — two humans pick together on one
+# screen; otherwise each side picks (humans) or auto-picks (CPUs) against the
+# other's full living team. [] if someone backs out.
+func _pvp_picks(a: int, b: int) -> Array:
 	if _human(a) and _human(b):
 		_select.present_pvp(GameState.players[a], GameState.players[b])
 		UIManager.open(_select)
 		return await _select.chosen_pvp
-	var team_a: Array = await _pick_team(a, "⚔ PvP vs %s — pick your team" % _name(b), [])
-	var team_b: Array = await _pick_team(b, "⚔ PvP vs %s — pick your team" % _name(a), [])
-	return [] if team_a.is_empty() or team_b.is_empty() else [team_a, team_b]
+	var pick_a: Dictionary = await BattleSetup.pick_for(_select, a, "⚔ PvP vs %s" % _name(b), GameState.players[b].living_team())
+	var pick_b: Dictionary = await BattleSetup.pick_for(_select, b, "⚔ PvP vs %s" % _name(a), GameState.players[a].living_team())
+	return [] if pick_a.is_empty() or pick_b.is_empty() else [pick_a, pick_b]
 
 # ─── DEV battles (no rewards; teams are copies) ───────────────────────────────
 
@@ -305,13 +300,14 @@ func _on_dev_battle_requested(kind: StringName, a: int, b: int) -> void:
 	match String(kind):
 		"WARDEN", "CHAMPION":
 			var foe: Dictionary = GameData.CHAMPION if kind == &"CHAMPION" else GameData.HAUNTED_FOUR.pick_random()
-			var foe_team := GameData.build_team(foe["team"], 3)
-			var team: Array = await _pick_team(a, "vs %s!" % foe["name"], foe_team)
-			if not team.is_empty():
-				var copies: Array = team.map(func(m): return m.duplicate(true))
-				var setup := BattleSetup.vs_npc(a, copies, foe_team, String(foe["name"]), foe["portrait"], "warden",
-					CardsData.npc_deck(2))
-				setup["hand"] = GameState.players[a].inventory.hand.duplicate()
+			var roster := GameData.build_team(foe["team"], 3)
+			var foe_team := BattleSetup.counter_pick(roster, GameState.players[a].living_team())
+			var pick: Dictionary = await BattleSetup.pick_for(_select, a, "vs %s!" % foe["name"], roster)
+			if not pick.is_empty():
+				var copies: Array = pick["team"].map(func(m): return m.duplicate(true))
+				var setup := BattleSetup.vs_npc(a, copies, pick["cards"], foe_team, String(foe["name"]), foe["portrait"],
+					"warden", CardsData.npc_deck(BattleSetup.BATTLE_CARDS))
+				setup["hand_source"] = []   # dev fight: cards aren't used up
 				await BattleSetup.run(_battle, setup, a)
 		"PVP":
 			if a != b:

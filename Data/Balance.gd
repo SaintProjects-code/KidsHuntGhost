@@ -15,20 +15,26 @@ const ELITE_WINS_TO_WIN := 2
 # ── Gold ──────────────────────────────────────────────────────────────────────
 const GOLD_START := 10
 const GOLD_CATCH := 10
-const GOLD_WILD_WIN := 10
 const GOLD_GYM := 25
 
-# ── Capture: roll d100 + bonuses ≥ target ─────────────────────────────────────
-# Target by spirit stage (legendaries use LEGEND_TARGET). With a plain Ghost
-# Jar and no badges that's 75% / 60% / 45%.
+# ── Wild ghosts: Spook Duel, then capture ─────────────────────────────────────
+# A wild ghost is never fought. First your lead stares it down: lead power +
+# 🎲d6 vs the ghost's power + 🎲d6 (ties to you; power = rounded average of
+# ATK/DEF/SPD + stars, ±1 for type advantage). Lose and it runs away. Win and
+# you get CATCH_THROWS throws: roll d100 + bonuses ≥ the target.
+# Target by stage (legendaries: LEGEND_TARGET). Plain Ghost Jar, no badges,
+# duel won: 90% / 75% / 60%.
 const CATCH_TARGET := {1: 26, 2: 41, 3: 56}
 const LEGEND_TARGET := 80
 const CATCH_BADGE_BONUS := 2            # per badge…
 const CATCH_BADGE_CAP := 3              # …counting at most this many badges
-const CATCH_FOUGHT_BONUS := 15          # the spirit was worn down in battle first
+const DUEL_BONUS := 15                  # the ghost is spooked (you won the duel)
 const CATCH_LURE_BONUS := 10            # a Spooky Lure drew it in
-const CATCH_FAIL_PENALTY := 10          # target rises after each escape
-const CATCH_MAX_FAILS := 3              # then it flees
+const CATCH_FAIL_PENALTY := 15          # target rises after a missed throw
+const CATCH_THROWS := 2                 # throws per encounter, then it flees
+# Catching levels your lead up: ½ star (a full star for stage 2+ ghosts).
+const CATCH_LEAD_STARS := 0.5
+const CATCH_LEAD_STARS_STRONG := 1.0
 
 # ── Cards ─────────────────────────────────────────────────────────────────────
 const HAND_SIZE := 5
@@ -40,7 +46,7 @@ const SHOP_CARD_OFFERS := 4
 const FAST_MODE_TURN := 24              # from this turn everyone rolls 2 dice
 const FLY_BADGES := 3                   # badges needed to fly / enter the Spectral Trail
 const TEAM_MAX := 6
-const BATTLE_PICK_MAX := 4
+const BATTLE_PICK_MAX := 3              # 3v3 battles
 
 # ── Spectral Trail ────────────────────────────────────────────────────────────
 # Wardens scale with how far PAST the entry requirement you are: entering with

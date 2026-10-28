@@ -13,7 +13,8 @@ extends "res://Scenes/UI/Battle/BattleRules.gd"
 ##   atk_mod              event blessing/curse for this battle (+1 / -1)
 ##   trainer, foe_trainer portrait candidate lists
 ##   pvp_names            [your name, their name] in PvP
-##   hand / opp_hand      Arrays of card keys (used cards are removed from them)
+##   hand / opp_hand      the tactic cards each side brought (2 each)
+##   hand_source / opp_source  the player's real hand (a used card leaves it too)
 ##   hand_owner / opp_owner  player index (for hand_changed) or -1 for NPCs
 ##   human / opp_human    whether that side picks its own cards
 ##   stakes               0..1, how hard the CPU side spends cards
@@ -23,6 +24,8 @@ extends "res://Scenes/UI/Battle/BattleRules.gd"
 var _src_team: Array = []
 var _hand: Array = []
 var _opp_hand: Array = []
+var _hand_src: Array = []
+var _opp_src: Array = []
 var _hand_owner := -1
 var _opp_owner := -1
 var _human := true
@@ -44,6 +47,8 @@ func present(setup: Dictionary) -> void:
 	_opp = _copy_team(setup.get("opp", []))
 	_hand = setup.get("hand", [])
 	_opp_hand = setup.get("opp_hand", [])
+	_hand_src = setup.get("hand_source", [])
+	_opp_src = setup.get("opp_source", [])
 	_hand_owner = setup.get("hand_owner", -1)
 	_opp_owner = setup.get("opp_owner", -1)
 	_human = setup.get("human", true)
@@ -175,8 +180,9 @@ func _choose_cards() -> Array:
 	_opp_armed = ""
 	return [mine, theirs]
 
-func _use_card(hand: Array, owner: int, key: String) -> void:
+func _use_card(hand: Array, source: Array, owner: int, key: String) -> void:
 	hand.erase(key)
+	source.erase(key)
 	if owner >= 0:
 		EventBus.hand_changed.emit(owner)
 		EventBus.card_played.emit(owner, key)
@@ -187,7 +193,7 @@ func _play_tactic(key: String, is_me: bool) -> void:
 	var theirs: Array = _opp if is_me else _team
 	var me: Dictionary = mine[_active if is_me else _opp_active]
 	var foe: Dictionary = theirs[_opp_active if is_me else _active]
-	_use_card(_hand if is_me else _opp_hand, _hand_owner if is_me else _opp_owner, key)
+	_use_card(_hand if is_me else _opp_hand, _hand_src if is_me else _opp_src, _hand_owner if is_me else _opp_owner, key)
 	if not _quiet():
 		Sfx.play("card")
 		Juice.pop(_card_of(me), 1.12)

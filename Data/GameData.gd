@@ -51,7 +51,6 @@ const GYMS := {
 		{"name": "Clamshade",   "ability": "bulwark",    "ability2": "reflect", "stars": 1},  # threat
 		{"name": "Frostpup",    "ability": "dynasty"}]},
 }
-# Gym leaders bring (tier - 1) tactic cards: none at your first gym.
 
 # ─── The Haunted Four: the Spectral Trail's wardens ───────────────────────────
 # Each fields an ★3 ACE plus two more ★3-at-cap threats — all with two abilities.
@@ -77,7 +76,6 @@ const HAUNTED_FOUR := [
 		{"name": "Hissperor",    "ability": "taunt",    "ability2": "poison_point", "stars": 1},  # threat
 		{"name": "Mothgeist",    "ability": "spore"}]},
 ]
-const WARDEN_DECK := 1
 
 # ─── Champion Vesper, keeper of the Spectral Peak ─────────────────────────────
 const CHAMPION := {
@@ -89,7 +87,6 @@ const CHAMPION := {
 		{"name": "Tidetomb",     "ability": "reflect",     "ability2": "multiscale", "stars": 1},  # threat
 		{"name": "Emberhound",   "ability": "drought"}],
 }
-const CHAMPION_DECK := 1
 
 # ─── Trainer battles: random team fights on EVENT tiles ───────────────────────
 # Themed trainers with synergy teams that scale with the challenger's badges.
@@ -205,6 +202,8 @@ static func trail_tier(badges: int) -> int:
 #   tier 2 — second abilities unlock; listed stars as written
 #   tier 3 — everyone +1 star on top (capped at 3)
 # Plain members get tier − 1 stars.
+# Rosters hold 4; the NPC counter-picks 3 of them once it sees your team
+# (BattleSetup.counter_pick).
 static func build_team(entries: Array, tier: int) -> Array:
 	var team: Array = []
 	for raw in entries:

@@ -80,39 +80,52 @@ func result_text() -> String:
 	return "😱 %s was scariest!" % best["name"]
 
 func _draw_game() -> void:
-	var font := ThemeDB.fallback_font
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
 		var top := i * LANE_H
-		var mid := top + LANE_H * 0.58
-		draw_rect(Rect2(0, top + 2, size.x, LANE_H - 4), Color(0.13, 0.08, 0.05))
-		draw_rect(Rect2(0, top + LANE_H - 14, size.x, 12), Color(0.22, 0.14, 0.06))   # field
+		var card := Rect2(4, top + 3, size.x - 8, LANE_H - 6)
+		var mid := top + LANE_H * 0.6
 		var fill: float = lane["meter"] / GOAL
-		# your spirit puffs up as the meter fills
+		# dusk pumpkin patch; the sky reddens as the fright builds
+		lane_card(lane, card, Color("2a1236").lerp(Color("4a0f1a"), fill), Color("8a3a1a").lerp(Color("c2401a"), fill))
+		draw_circle(Vector2(size.x * 0.62, top + LANE_H - 8), 120, Color(1, 0.6, 0.2, 0.08))
+		grad_rect(Rect2(7, top + LANE_H - 22, size.x - 14, 17), Color(0.16, 0.08, 0.04), Color(0.08, 0.04, 0.02))
+		for k in 6:   # little pumpkins in the patch
+			var px := 220.0 + k * 62.0
+			draw_circle(Vector2(px, top + LANE_H - 16), 6, Color(0.9, 0.45, 0.1, 0.7))
 		var grow: float = 1.0 + fill * 0.7 + lane["pulse"] * 0.12
 		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * fill * 3.0
-		draw_spirit(lane, Vector2(90, mid) + shake, 22.0 * grow)
-		# fright meter
-		var bar := Rect2(150, mid - 9, 330, 18)
-		draw_rect(bar, Color(0, 0, 0, 0.6))
-		draw_rect(Rect2(bar.position, Vector2(bar.size.x * fill, bar.size.y)), Color(0.55, 0.2, 0.75).lerp(Color(1, 0.3, 0.2), fill))
-		draw_rect(bar, Color(1, 1, 1, 0.5), false, 1.5)
-		# the scarecrow trembles more as the meter fills, then flees
-		var sx: float = 580.0 + lane["run_x"]
-		var tremble := Vector2(randf_range(-1, 1), 0) * fill * 5.0
+		shadow(Vector2(90, top + LANE_H - 14), 22 * grow, 5)
+		draw_spirit(lane, Vector2(90, mid - 6) + shake, 20.0 * grow, Color.WHITE, Vector2.ONE, 0.6 + fill)
+		# fright meter with tick marks
+		var bar := Rect2(150, mid - 20, 320, 18)
+		pill_bar(bar, fill, Color("8a4dff"), Color("ff4a3a"))
+		for k in range(1, 4):
+			var tx := bar.position.x + bar.size.x * k / 4.0
+			draw_line(Vector2(tx, bar.position.y + 3), Vector2(tx, bar.end.y - 3), Color(1, 1, 1, 0.2), 1.0)
+		if fill > 0.85 and lane["done_t"] < 0.0:
+			glow(Vector2(bar.end.x, bar.get_center().y), 14, Color(1, 0.4, 0.2, 0.8), 5)
+		# the scarecrow trembles, then flees
+		var sx: float = 590.0 + lane["run_x"]
 		if sx < size.x + 40:
-			var base := Vector2(sx, mid) + tremble
-			draw_line(base + Vector2(0, -6), base + Vector2(0, 26), Color(0.45, 0.3, 0.15), 4.0)
-			draw_line(base + Vector2(-20, 6), base + Vector2(20, 6), Color(0.45, 0.3, 0.15), 4.0)
+			var base := Vector2(sx, mid) + Vector2(randf_range(-1, 1), 0) * fill * 5.0
+			shadow(Vector2(sx, top + LANE_H - 14), 18, 4)
+			draw_line(base + Vector2(0, -4), base + Vector2(0, 24), Color(0.5, 0.33, 0.16), 4.0)
+			draw_line(base + Vector2(-20, 6), base + Vector2(20, 6), Color(0.5, 0.33, 0.16), 4.0)
+			glow(base + Vector2(0, -18), 14, Color(1, 0.6, 0.2, 0.5 + fill * 0.5), 4)
 			draw_circle(base + Vector2(0, -18), 15, Color(0.95, 0.5, 0.1))
-			draw_colored_polygon(PackedVector2Array([base + Vector2(-8, -22), base + Vector2(-3, -22), base + Vector2(-5, -17)]), Color.BLACK)
-			draw_colored_polygon(PackedVector2Array([base + Vector2(3, -22), base + Vector2(8, -22), base + Vector2(5, -17)]), Color.BLACK)
-			var mouth := 3.0 + fill * 6.0
-			draw_rect(Rect2(base + Vector2(-6, -12), Vector2(12, mouth)), Color.BLACK)
+			draw_circle(base + Vector2(-5, -22), 5, Color(1, 0.7, 0.35, 0.5))   # highlight
+			draw_rect(Rect2(base + Vector2(-2, -36), Vector2(4, 5)), Color(0.3, 0.5, 0.15))
+			var eye := Color(1, 0.9, 0.3) if fill > 0.5 else Color.BLACK
+			draw_colored_polygon(PackedVector2Array([base + Vector2(-9, -23), base + Vector2(-3, -23), base + Vector2(-6, -17)]), eye)
+			draw_colored_polygon(PackedVector2Array([base + Vector2(3, -23), base + Vector2(9, -23), base + Vector2(6, -17)]), eye)
+			draw_rect(Rect2(base + Vector2(-6, -13), Vector2(12, 3.0 + fill * 6.0)), Color.BLACK)
 		if lane["done_t"] >= 0.0 and lane["boo_t"] < 1.2:
-			var fs := int(30 + lane["boo_t"] * 20)
-			draw_string(font, Vector2(150, mid + 12), "BOO!", HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1, 1.0 - lane["boo_t"] / 1.2))
-		var status: String = "BOO! %.1fs" % lane["done_t"] if lane["done_t"] >= 0.0 else "%d%%" % int(fill * 100)
-		lane_label(lane, i, "MASH!  " + status, LANE_H)
+			var a: float = 1.0 - lane["boo_t"] / 1.2
+			glow(Vector2(300, mid - 12), 40 + lane["boo_t"] * 40, Color(1, 1, 1, a * 0.6), 6)
+			text(Vector2(180, mid + 2), "BOO!", int(34 + lane["boo_t"] * 24), Color(1, 1, 1, a), 240, 8)
+		var status: String = "BOO! %.1fs" % lane["done_t"] if lane["done_t"] >= 0.0 else "MASH!  %d%%" % int(fill * 100)
+		nameplate(lane, Vector2(12, top + 8), status)
 	if running:
-		draw_string(font, Vector2(size.x - 120, 20), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 1, 1, 0.75))
+		rrect(Rect2(size.x - 104, 8, 92, 22), Color(0.05, 0.04, 0.12, 0.7), 11)
+		text(Vector2(size.x - 104, 24), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)

@@ -313,6 +313,7 @@ func _apply_outcome(out: Dictionary) -> String:
 		parts.append("%s gains a star! ★" % lead["name"])
 	if out.get("fight", false):
 		_pending_fight = _spirit.duplicate(true)
+		_pending_fight["_event_fight"] = true   # a real battle, not a hunt
 		if String(_event.get("kind", "spirit")) == "trainer":
 			_pending_fight["_no_catch"] = true   # a trainer's spirit: no catching
 	var msg := " ".join(parts)

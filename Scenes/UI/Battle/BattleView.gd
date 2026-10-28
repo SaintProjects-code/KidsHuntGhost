@@ -104,7 +104,7 @@ func _ready() -> void:
 	var hand_col := UIKit.vbox(2)
 	hand_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bottom.add_child(hand_col)
-	var hand_hint := UIKit.label("Tactics — click (or 1-5) to play next round", 11)
+	var hand_hint := UIKit.label("Your 2 tactics — click (or 1-2) to play next round", 11)
 	hand_hint.modulate = Color(1, 1, 1, 0.65)
 	hand_col.add_child(hand_hint)
 	_hand_box = UIKit.hbox(4)

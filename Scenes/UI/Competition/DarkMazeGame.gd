@@ -64,7 +64,8 @@ class MazePanel:
 	const BACK_TIME := 0.9
 	const HINT_HAZARD := 0.6   # chance a hazard arm shows its marker
 	const HINT_PATH := 0.35    # chance the path arm shows its star
-	const BG := Color(0.02, 0.02, 0.04)
+	const BG := Color(0.02, 0.02, 0.05)
+	const WALL := Color(0.08, 0.07, 0.12)
 	const DIRS := ["left", "middle", "right"]
 
 	var lane: Dictionary
@@ -106,8 +107,9 @@ class MazePanel:
 			b.offset_right = x[d][2]
 			b.offset_top = 30
 			b.offset_bottom = 64
-			b.add_theme_stylebox_override("normal", UIKit.box(Color(0.11, 0.6, 0.86), 8))
-			b.add_theme_stylebox_override("hover", UIKit.box(Color(0.3, 0.72, 0.95), 8))
+			b.add_theme_stylebox_override("normal", UIKit.box(Color(0.1, 0.45, 0.75, 0.9), 12, 2, Color(0.6, 0.9, 1.0, 0.6)))
+			b.add_theme_stylebox_override("hover", UIKit.box(Color(0.25, 0.6, 0.9), 12, 2, Color(0.8, 1.0, 1.0, 0.8)))
+			b.add_theme_stylebox_override("pressed", UIKit.box(Color(0.05, 0.3, 0.55), 12, 2, Color(0.6, 0.9, 1.0, 0.6)))
 			b.pressed.connect(func(): choose(d))
 			add_child(b)
 			_buttons[d] = b
@@ -215,25 +217,20 @@ class MazePanel:
 	func _draw() -> void:
 		var font := ThemeDB.fallback_font
 		draw_set_transform(Vector2(randf_range(-1, 1), randf_range(-1, 1)) * _shake, 0.0, Vector2.ONE)
-		draw_rect(Rect2(Vector2.ZERO, size), BG)
-		draw_string(font, Vector2(10, 20), "%s %s — fork %d/%d   ♥%d" % [lane["name"],
-			"" if not lane["human"] else "[%s/%s/%s]" % [Controls.key_name(lane["slot"], "left"),
-			Controls.key_name(lane["slot"], "middle"), Controls.key_name(lane["slot"], "right")],
-			mini(forks_passed + 1, FORKS), FORKS, int(lane["spirit"].get("current_hp", 0))],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, lane["color"])
-		if msg != "":
-			draw_string(font, Vector2(0, size.y - 10), msg, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color(1, 1, 1, 0.85))
-		# the lantern-light oval flickers; walls are cave-black inside it
-		var c := Vector2(size.x * 0.5, size.y * 0.55)
+		var r := Rect2(Vector2.ZERO, size)
+		draw_style_box(UIKit.box(BG, 14, 2, Color(lane["color"], 0.5)), r)
+		# the lantern: a warm radial falloff that flickers (walls only exist inside it)
+		var c := Vector2(size.x * 0.5, size.y * 0.56)
 		var flicker := 1.0 + sin(game.t * 17.0 + lane["idx"]) * 0.02 + randf_range(-0.015, 0.015)
 		var rx := 104.0 * flicker
 		var ry := 68.0 * flicker
-		var pts := PackedVector2Array()
-		for i in 40:
-			var a := TAU * float(i) / 40.0
-			pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
-		var light := Color(1.0, 0.95, 0.8) if phase != "out" else Color(0.75, 1.0, 0.78)
-		draw_colored_polygon(pts, light.lerp(Color(1, 0.3, 0.3), _flash))
+		var light := Color(1.0, 0.86, 0.6) if phase != "out" else Color(0.7, 1.0, 0.8)
+		light = light.lerp(Color(1, 0.3, 0.3), _flash)
+		for k in range(8, 0, -1):
+			var f := float(k) / 8.0
+			_oval(c, rx * (0.55 + f * 0.7), ry * (0.55 + f * 0.7), Color(light, 0.05 + (1.0 - f) * 0.12))
+		_oval(c, rx * 0.95, ry * 0.95, Color(light, 0.55))
+		_oval(c, rx * 0.7, ry * 0.7, Color(light.lightened(0.2), 0.35))
 		var xl := c.x - 52.0
 		var xr := c.x + 52.0
 		if phase == "walk" or phase == "back":
@@ -241,35 +238,63 @@ class MazePanel:
 			var dir := 1.0 if phase == "walk" else -1.5
 			var y := c.y - ry - 30.0 + fposmod(t * speed_px * dir, 30.0)
 			while y < c.y + ry:
-				draw_rect(Rect2(xl - 7, y, 7, 20), BG)
-				draw_rect(Rect2(xr, y, 7, 20), BG)
+				_wall(Rect2(xl - 8, y, 8, 22))
+				_wall(Rect2(xr, y, 8, 22))
 				y += 30.0
 		elif phase == "fork":
 			_draw_fork(font, c, rx, ry, xl, xr)
 		var bob := sin(game.t * 8.0) * 2.0 if phase == "walk" else 0.0
+		_oval(c + Vector2(0, 34), 22, 6, Color(0, 0, 0, 0.35))
+		draw_circle(c + Vector2(0, 8 + bob), 33.0, Color(lane["color"], 0.25))
 		if lane["tex"]:
 			draw_texture_rect(lane["tex"], Rect2(c + Vector2(-26, -18 + bob), Vector2(52, 52)), false)
-		draw_arc(c + Vector2(0, 8 + bob), 31.0, 0, TAU, 48, Color(0.9, 0.12, 0.12), 3.5)
-		for s in _sparkles:
-			draw_circle(s["p"], 2.5, Color(1, 0.85, 0.3, s["life"]))
+		draw_arc(c + Vector2(0, 8 + bob), 31.0, 0, TAU, 48, lane["color"].lightened(0.2), 3.0)
+		for sp in _sparkles:
+			draw_circle(sp["p"], 2.5, Color(1, 0.85, 0.3, sp["life"]))
+		# header pill + message pill
+		var keys := "" if not lane["human"] else "  %s / %s / %s" % [Controls.key_name(lane["slot"], "left"),
+			Controls.key_name(lane["slot"], "middle"), Controls.key_name(lane["slot"], "right")]
+		var head := "%s%s   fork %d/%d   ♥%d" % [lane["name"], keys, mini(forks_passed + 1, FORKS), FORKS,
+			int(lane["spirit"].get("current_hp", 0))]
+		draw_style_box(UIKit.box(Color(0.05, 0.04, 0.12, 0.8), 10, 1, Color(1, 1, 1, 0.1)),
+			Rect2(6, 6, font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 18, 22))
+		draw_rect(Rect2(10, 11, 4, 12), lane["color"])
+		draw_string(font, Vector2(18, 22), head, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, lane["color"].lightened(0.3))
+		if msg != "":
+			var mw := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, 14).x + 24
+			draw_style_box(UIKit.box(Color(0.05, 0.04, 0.12, 0.85), 10), Rect2((size.x - mw) * 0.5, size.y - 28, mw, 22))
+			draw_string(font, Vector2(0, size.y - 12), msg, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color.WHITE)
 		if phase == "out" and place > 0:
-			draw_string(font, Vector2(0, c.y - ry - 8), "🎉 %s!" % CompGame.ORDINAL[clampi(place - 1, 0, 5)],
-				HORIZONTAL_ALIGNMENT_CENTER, size.x, 26, UIKit.GOLD)
+			var label: String = "🎉 %s!" % CompGame.ORDINAL[clampi(place - 1, 0, 5)]
+			draw_string_outline(font, Vector2(0, c.y - ry - 4), label, HORIZONTAL_ALIGNMENT_CENTER, size.x, 28, 6, Color.BLACK)
+			draw_string(font, Vector2(0, c.y - ry - 4), label, HORIZONTAL_ALIGNMENT_CENTER, size.x, 28, UIKit.GOLD)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+	func _oval(c: Vector2, rx: float, ry: float, col: Color) -> void:
+		var pts := PackedVector2Array()
+		for i in 36:
+			var a := TAU * float(i) / 36.0
+			pts.append(c + Vector2(cos(a) * rx, sin(a) * ry))
+		draw_colored_polygon(pts, col)
+
+	# A stone wall block: dark body with a faint lit top edge.
+	func _wall(r: Rect2) -> void:
+		draw_rect(r, WALL)
+		draw_rect(Rect2(r.position, Vector2(r.size.x, 2)), Color(1, 0.9, 0.7, 0.18))
 
 	# The crossroad: the far wall has a centre gap (middle path), the arms
 	# open left and right; hints appear per arm.
 	func _draw_fork(font: Font, c: Vector2, rx: float, ry: float, xl: float, xr: float) -> void:
 		var y_top := c.y - 36.0
 		var y_near := c.y + 16.0
-		draw_rect(Rect2(c.x - rx, y_top, (xl - 7.0) - (c.x - rx), 7), BG)
-		draw_rect(Rect2(xr, y_top, (c.x + rx) - xr, 7), BG)
-		draw_rect(Rect2(xl - 7, y_top - 22, 7, 22), BG)
-		draw_rect(Rect2(xr, y_top - 22, 7, 22), BG)
-		draw_rect(Rect2(c.x - rx, y_near, (xl - 7.0) - (c.x - rx), 7), BG)
-		draw_rect(Rect2(xr, y_near, (c.x + rx) - xr, 7), BG)
-		draw_rect(Rect2(xl - 7, y_near, 7, c.y + ry - y_near), BG)
-		draw_rect(Rect2(xr, y_near, 7, c.y + ry - y_near), BG)
+		_wall(Rect2(c.x - rx, y_top, (xl - 7.0) - (c.x - rx), 8))
+		_wall(Rect2(xr, y_top, (c.x + rx) - xr, 8))
+		_wall(Rect2(xl - 7, y_top - 22, 8, 22))
+		_wall(Rect2(xr, y_top - 22, 8, 22))
+		_wall(Rect2(c.x - rx, y_near, (xl - 7.0) - (c.x - rx), 8))
+		_wall(Rect2(xr, y_near, (c.x + rx) - xr, 8))
+		_wall(Rect2(xl - 7, y_near, 8, c.y + ry - y_near))
+		_wall(Rect2(xr, y_near, 8, c.y + ry - y_near))
 		var mid_y := (y_top + y_near) * 0.5 + 3.0
 		var spots := {"middle": Vector2(c.x, y_top - 12.0), "left": Vector2(c.x - 80.0, mid_y), "right": Vector2(c.x + 80.0, mid_y)}
 		for d in DIRS:
@@ -292,4 +317,6 @@ class MazePanel:
 				draw_colored_polygon(PackedVector2Array([Vector2(p.x - 6, p.y + 2), Vector2(p.x + 6, p.y + 2), Vector2(p.x, p.y + 10)]), Color(0.35, 0.35, 0.4))
 			"path":
 				var twinkle := 0.75 + 0.25 * sin(game.t * 9.0)
-				draw_string(font, Vector2(p.x - 8, p.y + 6), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, int(16 * twinkle + 4), Color(1.0, 0.78, 0.15))
+				for k in range(4, 0, -1):
+					draw_circle(p, 5.0 + k * 3.0 * twinkle, Color(1, 0.8, 0.2, 0.08))
+				draw_string(font, Vector2(p.x - 8, p.y + 6), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, int(16 * twinkle + 4), Color(1.0, 0.85, 0.3))

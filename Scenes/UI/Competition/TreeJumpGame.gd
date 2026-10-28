@@ -149,38 +149,59 @@ func result_text() -> String:
 	return "🏁 %s wins — %.1fs!" % [_lane_by_idx(ranks()[0])["name"], _best_time()]
 
 func _draw_game() -> void:
-	var font := ThemeDB.fallback_font
 	var tree_w := _tree_w()
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
 		var top := i * LANE_H
-		var ground := top + LANE_H - 10.0
+		var card := Rect2(4, top + 3, size.x - 8, LANE_H - 6)
+		var ground := top + LANE_H - 16.0
+		var alive: bool = lane["alive"]
 		var shake := Vector2(randf_range(-1, 1), randf_range(-1, 1)) * float(lane["shake"])
 		draw_set_transform(shake, 0.0, Vector2.ONE)
-		# night sky, stars, moon, rolling hills (parallax)
-		var alive: bool = lane["alive"]
-		draw_rect(Rect2(0, top + 2, size.x, LANE_H - 4), Color(0.07, 0.07, 0.17) if alive else Color(0.16, 0.08, 0.1))
+		# moonlit sky: indigo → violet, dimmed red when out
+		var sky_top := Color("141540") if alive else Color("2a1020")
+		var sky_bot := Color("4a2a72") if alive else Color("40182a")
+		lane_card(lane, card, sky_top, sky_bot)
 		for s in _stars:
 			var tw := 0.5 + 0.5 * sin(t * 3.0 + s.z)
-			draw_circle(Vector2(fposmod(s.x - _scroll * 0.05, size.x), top + 6 + s.y * (LANE_H - 30)), 1.2, Color(1, 1, 1, 0.3 + 0.5 * tw))
-		draw_circle(Vector2(size.x - 60, top + 22), 11, Color(1, 0.96, 0.8, 0.85))
-		for hx in range(-1, 9):
-			var x := fposmod(hx * 110.0 - _scroll * 0.25, size.x + 110.0) - 55.0
-			draw_circle(Vector2(x, ground + 18), 46, Color(0.09, 0.16, 0.12))
-		draw_line(Vector2(0, ground), Vector2(size.x, ground), Color(0.35, 0.65, 0.35) if alive else Color(0.4, 0.3, 0.3), 2.0)
+			var sp := Vector2(fposmod(s.x - _scroll * 0.04, size.x - 20) + 10, top + 10 + s.y * (LANE_H - 40))
+			draw_circle(sp, 1.1 + tw * 0.6, Color(1, 1, 1, 0.25 + 0.55 * tw))
+		var moon := Vector2(size.x - 70, top + 26)
+		glow(moon, 16, Color(1, 0.92, 0.7, 0.9), 6)
+		draw_circle(moon, 11, Color(1, 0.97, 0.86))
+		draw_circle(moon + Vector2(4, -3), 9, sky_top.lerp(sky_bot, 0.2))   # crescent
+		# two hill layers at different parallax speeds
+		for layer in [[0.18, 54.0, 150.0, Color(0.16, 0.12, 0.3)], [0.4, 34.0, 95.0, Color(0.1, 0.08, 0.2)]]:
+			var spd: float = layer[0]
+			var rad: float = layer[1]
+			var gap: float = layer[2]
+			var hx := -fposmod(_scroll * spd, gap)
+			while hx < size.x + gap:
+				draw_circle(Vector2(hx, ground + rad * 0.55), rad, layer[3])
+				hx += gap
+		# ground strip with a glowing edge
+		grad_rect(Rect2(6, ground, size.x - 12, LANE_H - (ground - top) - 5), Color(0.13, 0.25, 0.18), Color(0.05, 0.1, 0.08))
+		draw_line(Vector2(6, ground), Vector2(size.x - 6, ground), Color(0.45, 1.0, 0.65, 0.8 if alive else 0.25), 2.0)
+		# speed streaks once it gets fast
+		if alive and speed > START_SPEED * 1.8:
+			for k in 4:
+				var sx := fposmod(-_scroll * 1.6 + k * 190.0, size.x)
+				draw_line(Vector2(sx, top + 24 + k * 13), Vector2(sx + 40, top + 24 + k * 13), Color(1, 1, 1, 0.08), 2.0)
 		for tr in lane["trees"]:
+			shadow(Vector2(tr["x"] + tree_w * 0.5, ground + 2), tree_w * 0.5, 4.0)
 			draw_texture_rect(TREE_TEX, Rect2(tr["x"], ground - TREE_H, tree_w, TREE_H), false,
-				Color.WHITE if alive else Color(1, 1, 1, 0.4))
+				Color(0.85, 0.9, 1.0) if alive else Color(1, 1, 1, 0.35))
 		for d in lane["dust"]:
-			draw_circle(Vector2(d["p"].x, ground + d["p"].y), 3.0, Color(0.8, 0.8, 0.9, d["life"] * 2.0))
+			draw_circle(Vector2(d["p"].x, ground + d["p"].y), 3.5, Color(0.85, 0.85, 1.0, d["life"] * 1.6))
 		var c := Vector2(RUN_X, ground - R + lane["y"])
-		draw_spirit(lane, c, R, Color.WHITE if alive else Color(1, 1, 1, 0.35), lane["squash"])
-		var extra := ""
-		if not alive:
-			extra = "✗ OUT — %s (%.1fs)" % [ORDINAL[clampi(lane["out_pos"] - 1, 0, 5)], float(lane["time"])]
-		lane_label(lane, i, extra, LANE_H)
+		var height := clampf(-float(lane["y"]) / 90.0, 0.0, 1.0)
+		shadow(Vector2(RUN_X, ground + 1), R * (1.0 - height * 0.5), 5.0, 0.45 * (1.0 - height * 0.6))
+		draw_spirit(lane, c, R, Color.WHITE if alive else Color(1, 1, 1, 0.4), lane["squash"], 1.0 if alive else 0.0)
+		var status := "✗ OUT — %s · %.1fs" % [ORDINAL[clampi(lane["out_pos"] - 1, 0, 5)], float(lane["time"])] if not alive else ""
+		nameplate(lane, Vector2(12, top + 8), status)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if running:
-		var hud := "⏱ %.1fs   🏆 best %.1fs   speed ×%.1f" % [t, record, speed / START_SPEED]
-		draw_string(font, Vector2(size.x - 300, 20), hud, HORIZONTAL_ALIGNMENT_LEFT, -1, 13,
-			UIKit.GOLD if record > 0.0 and t > record else Color(1, 1, 1, 0.7))
+		var hud := "⏱ %.1fs   🏆 %.1fs   ×%.1f" % [t, record, speed / START_SPEED]
+		var w := text_width(hud, 13) + 20
+		rrect(Rect2(size.x - w - 90, 8, w, 22), Color(0.05, 0.04, 0.12, 0.7), 11)
+		text(Vector2(size.x - w - 80, 24), hud, 13, UIKit.GOLD if record > 0.0 and t > record else Color(1, 1, 1, 0.85), -1, 0)

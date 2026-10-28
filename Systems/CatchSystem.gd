@@ -1,7 +1,9 @@
 extends Node
-## Autoloaded. Capture rules: roll a d100, add the jar's bonus plus badge /
-## fought-first / lure bonuses, and meet the spirit's target number.
-## The catch window animates the roll; this owns the maths and the outcome.
+## Autoloaded. Wild-ghost rules (the catch window animates them):
+##   1) SPOOK DUEL — lead power + 🎲d6 vs ghost power + 🎲d6. Lose: it flees.
+##   2) CAPTURE — Balance.CATCH_THROWS throws of d100 + jar/badge/spooked/lure
+##      bonuses ≥ the ghost's target (which rises after every miss).
+## A catch pays points + gold and gives your lead stars.
 
 const JARS := {
 	&"ghost_jar":   {"name": "Ghost Jar",   "bonus": 0,  "cost": 10},
@@ -30,8 +32,8 @@ static func bonus_parts(player_idx: int, spirit: Dictionary, jar: StringName) ->
 	var badges := mini(p.progress.badge_count(), Balance.CATCH_BADGE_CAP)
 	if badges > 0:
 		parts.append(["Badges", badges * Balance.CATCH_BADGE_BONUS])
-	if spirit.get("_fought", false):
-		parts.append(["Worn out", Balance.CATCH_FOUGHT_BONUS])
+	if spirit.get("_spooked", false):
+		parts.append(["Spooked", Balance.DUEL_BONUS])
 	if spirit.get("_lured", false):
 		parts.append(["Lure", Balance.CATCH_LURE_BONUS])
 	return parts
@@ -49,6 +51,32 @@ static func chance(player_idx: int, spirit: Dictionary, jar: StringName) -> int:
 	var need := target_for(spirit) - total_bonus(player_idx, spirit, jar)
 	return clampi(101 - need, 0, 100)
 
+# ── Spook Duel ───────────────────────────────────────────────────────────────
+
+# A spirit's duel power: rounded average of ATK/DEF/SPD, plus its stars.
+static func duel_power(s: Dictionary) -> int:
+	var avg := (float(s.get("atk", 1)) + float(s.get("def", 1)) + float(s.get("spd", 1))) / 3.0
+	return int(round(avg)) + int(float(s.get("stars", 0)))
+
+# +1 if the lead's type beats the ghost's, −1 if the ghost's beats the lead's.
+static func type_edge(lead: Dictionary, ghost: Dictionary) -> int:
+	var t1 := String(lead.get("type", ""))
+	var t2 := String(ghost.get("type", ""))
+	return (1 if SpiritsData.type_mult(t1, t2) > 1.0 else 0) - (1 if SpiritsData.type_mult(t2, t1) > 1.0 else 0)
+
+# Chance (0..1) that the lead wins the duel (ties go to the lead).
+static func duel_chance(lead: Dictionary, ghost: Dictionary) -> float:
+	var mine := duel_power(lead) + type_edge(lead, ghost)
+	var theirs := duel_power(ghost)
+	var wins := 0
+	for a in range(1, 7):
+		for b in range(1, 7):
+			if mine + a >= theirs + b:
+				wins += 1
+	return wins / 36.0
+
+# ── Capture ──────────────────────────────────────────────────────────────────
+
 # The window rolls first (so it can animate the die), then reports the roll
 # here through catch_attempted with spirit["_roll"] set. A missing roll is
 # rolled now (CPU / silent paths).
@@ -65,7 +93,7 @@ func _on_catch_attempted(player_idx: int, spirit: Dictionary, jar: StringName) -
 
 func _succeed(player_idx: int, spirit: Dictionary) -> void:
 	var p: PlayerData = GameState.players[player_idx]
-	for k in ["catch_fails", "_fought", "_lured"]:
+	for k in ["catch_fails", "_spooked", "_lured"]:
 		spirit.erase(k)
 	spirit["current_hp"] = spirit["hp"]
 	spirit["stars"] = 0
@@ -80,3 +108,8 @@ func _succeed(player_idx: int, spirit: Dictionary) -> void:
 	p.inventory.gold += Balance.GOLD_CATCH
 	EventBus.log_entry.emit(player_idx, "%s caught %s! +%d gold." % [
 		p.player_name, spirit.get("name", "?"), Balance.GOLD_CATCH], "#f0c36a")
+	# the hunt levels your lead up (a duplicate catch already gave its star)
+	var lead: Dictionary = p.lead()
+	if not lead.is_empty() and lead != spirit:
+		var stars: float = Balance.CATCH_LEAD_STARS_STRONG if int(spirit.get("stage", 1)) >= 2 else Balance.CATCH_LEAD_STARS
+		SpiritsProgressionSystem.award_stars(player_idx, lead, stars)

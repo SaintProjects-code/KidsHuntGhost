@@ -173,37 +173,125 @@ func _lane_by_idx(idx: int) -> Dictionary:
 			return lane
 	return {"name": "?"}
 
-# ── drawing ───────────────────────────────────────────────────────────────────
+# ── drawing kit (shared modern look) ──────────────────────────────────────────
+# Soft gradients, glows, shadows, rounded glass panels and outlined text, so
+# every game reads as one polished style.
+
+const INK := Color(0.04, 0.03, 0.09)
 
 func _draw() -> void:
 	_draw_game()
 
-func _draw_overlay() -> void:
+# Vertical gradient (top → bottom).
+func grad_rect(r: Rect2, top: Color, bottom: Color) -> void:
+	draw_polygon(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]),
+		PackedColorArray([top, top, bottom, bottom]))
+
+# Horizontal gradient (left → right).
+func grad_rect_h(r: Rect2, left: Color, right: Color) -> void:
+	draw_polygon(PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)]),
+		PackedColorArray([left, right, right, left]))
+
+# A soft radial glow: stacked translucent circles fading outward.
+func glow(c: Vector2, r: float, col: Color, rings: int = 7) -> void:
+	for k in range(rings, 0, -1):
+		var f := float(k) / rings
+		draw_circle(c, r * (0.4 + f * 1.1), Color(col, col.a * 0.16 * (1.0 - f * 0.7)))
+
+# A soft elliptical drop shadow on the ground.
+func shadow(c: Vector2, w: float, h: float, alpha: float = 0.35) -> void:
+	draw_set_transform(c, 0.0, Vector2(1.0, h / w))
+	for k in 4:
+		draw_circle(Vector2.ZERO, w * (1.0 - k * 0.18), Color(0, 0, 0, alpha * 0.25))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+func rrect(r: Rect2, col: Color, radius: int = 10, border: int = 0, border_col := Color(1, 1, 1, 0.15)) -> void:
+	draw_style_box(UIKit.box(col, radius, border, border_col), r)
+
+# Crisp outlined text. width > 0 = centred inside that width.
+func text(pos: Vector2, s: String, fs: int, col: Color = Color.WHITE, width: float = -1.0, outline: int = 4) -> void:
 	var font := ThemeDB.fallback_font
-	if _countdown > 0.0:
-		var n := int(ceil(_countdown))
-		var pulse: float = 1.0 + (ceil(_countdown) - _countdown) * 0.5
-		banner(font, "%d" % n if n > 0 else "GO!", 0.0, int(44 * pulse))
-	elif ended:
-		banner(font, result_text())
-		if beat_record():
-			banner(font, "🎉 NEW RECORD! (+%d pts)" % Balance.RECORD_BONUS, 42.0, 28)
+	var align := HORIZONTAL_ALIGNMENT_CENTER if width > 0.0 else HORIZONTAL_ALIGNMENT_LEFT
+	if outline > 0:
+		draw_string_outline(font, pos, s, align, width, fs, outline, Color(INK, 0.9 * col.a))
+	draw_string(font, pos, s, align, width, fs, col)
 
-func banner(font: Font, text: String, dy: float = 0.0, fs: int = 34) -> void:
-	var w := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	var p := Vector2((size.x - w) * 0.5, size.y * 0.5 + dy)
-	_overlay.draw_string(font, p + Vector2(3, 3), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(0, 0, 0, 0.75))
-	_overlay.draw_string(font, p, text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, UIKit.GOLD)
+func text_width(s: String, fs: int) -> float:
+	return ThemeDB.fallback_font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
 
-# A spirit in a player-coloured ring (the token every game uses).
-func draw_spirit(lane: Dictionary, c: Vector2, r: float, tint := Color.WHITE, squash := Vector2.ONE) -> void:
-	draw_circle(c, r + 3.0, lane["color"] * tint)
-	draw_circle(c, r, Color(0.12, 0.12, 0.2) * tint)
+# A rounded progress bar with a glossy gradient fill.
+func pill_bar(r: Rect2, fill: float, from: Color, to: Color) -> void:
+	rrect(r, Color(0, 0, 0, 0.55), int(r.size.y * 0.5), 1, Color(1, 1, 1, 0.18))
+	if fill > 0.0:
+		var inner := Rect2(r.position + Vector2(2, 2), Vector2((r.size.x - 4) * clampf(fill, 0, 1), r.size.y - 4))
+		rrect(inner, from.lerp(to, fill), int(inner.size.y * 0.5))
+		draw_rect(Rect2(inner.position + Vector2(4, 1), Vector2(maxf(0, inner.size.x - 8), inner.size.y * 0.35)), Color(1, 1, 1, 0.22))
+
+# The lane card behind each player's playfield: a rounded dark glass panel
+# with a gradient sky inside and a thin border in the player's colour.
+func lane_card(lane: Dictionary, r: Rect2, sky_top: Color, sky_bottom: Color) -> void:
+	rrect(r.grow(2), Color(0, 0, 0, 0.35), 14)
+	grad_rect(r.grow(-3), sky_top, sky_bottom)
+	draw_style_box(UIKit.box(Color(0, 0, 0, 0), 12, 2, Color(lane["color"], 0.55)), r)
+
+# Frosted nameplate: colour stripe, name, key chip, then live status text.
+func nameplate(lane: Dictionary, at: Vector2, status: String) -> void:
+	var key := key_hint(lane)
+	var w := text_width(lane["name"], 14) + text_width(key, 12) + text_width(status, 13) + 54
+	var r := Rect2(at, Vector2(w, 24))
+	rrect(r, Color(0.05, 0.04, 0.12, 0.72), 12, 1, Color(1, 1, 1, 0.12))
+	rrect(Rect2(at + Vector2(6, 6), Vector2(4, 12)), lane["color"], 2)
+	text(at + Vector2(16, 17), lane["name"], 14, lane["color"].lightened(0.25), -1, 3)
+	var kx := at.x + 22 + text_width(lane["name"], 14)
+	rrect(Rect2(kx, at.y + 4, text_width(key, 12) + 10, 16), Color(1, 1, 1, 0.14), 6)
+	text(Vector2(kx + 5, at.y + 16), key, 12, Color(1, 1, 1, 0.9), -1, 0)
+	text(Vector2(kx + text_width(key, 12) + 18, at.y + 17), status, 13, Color(1, 1, 1, 0.85), -1, 3)
+
+# A spirit token: ground shadow, coloured glow, ring, sprite.
+func draw_spirit(lane: Dictionary, c: Vector2, r: float, tint := Color.WHITE, squash := Vector2.ONE, glow_amt: float = 1.0) -> void:
+	if glow_amt > 0.0:
+		glow(c, r * 1.3, Color(lane["color"], 0.9 * tint.a * glow_amt), 5)
+	draw_circle(c, r + 3.0, Color(lane["color"].lightened(0.2), tint.a))
+	draw_circle(c, r, Color(0.08, 0.07, 0.16, tint.a))
+	draw_arc(c, r - 1.5, PI * 1.1, PI * 1.9, 16, Color(1, 1, 1, 0.25 * tint.a), 2.0)   # glossy rim
 	if lane["tex"]:
 		var side := Vector2(r * 1.6, r * 1.6) * squash
 		draw_texture_rect(lane["tex"], Rect2(c - side * 0.5, side), false, tint)
 
-func lane_label(lane: Dictionary, i: int, extra: String, lane_h: float) -> void:
+func _draw_overlay() -> void:
 	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(10, i * lane_h + 20), "%s  %s  %s" % [lane["name"], key_hint(lane), extra],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, lane["color"])
+	# soft vignette over every game
+	var o := _overlay
+	var edge := 26.0
+	var dark := Color(0, 0, 0, 0.35)
+	var clear := Color(0, 0, 0, 0.0)
+	o.draw_polygon(PackedVector2Array([Vector2.ZERO, Vector2(size.x, 0), Vector2(size.x, edge), Vector2(0, edge)]),
+		PackedColorArray([dark, dark, clear, clear]))
+	o.draw_polygon(PackedVector2Array([Vector2(0, size.y - edge), Vector2(size.x, size.y - edge), size, Vector2(0, size.y)]),
+		PackedColorArray([clear, clear, dark, dark]))
+	if _countdown > 0.0:
+		var n := int(ceil(_countdown))
+		var frac: float = ceil(_countdown) - _countdown          # 0 → 1 within each second
+		var fs := int(64 + 40 * (1.0 - frac))
+		var label := "%d" % n if n > 0 else "GO!"
+		var c := size * 0.5
+		for k in range(6, 0, -1):
+			o.draw_circle(c, 40.0 + k * 14.0 * (1.0 - frac * 0.5), Color(UIKit.GOLD, 0.05))
+		var w := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+		var p := Vector2(c.x - w * 0.5, c.y + fs * 0.35)
+		o.draw_string_outline(font, p, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 10, Color(INK, 0.95))
+		o.draw_string(font, p, label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 0.95, 0.7).lerp(UIKit.GOLD, frac))
+	elif ended and result_text() != "":
+		var appear := clampf(_end_t / 0.35, 0.0, 1.0)
+		banner(font, result_text(), -10.0 * (1.0 - appear), 32, appear)
+		if beat_record():
+			banner(font, "🎉 NEW RECORD!  +%d pts" % Balance.RECORD_BONUS, 48.0, 24, appear)
+
+func banner(font: Font, s: String, dy: float = 0.0, fs: int = 34, alpha: float = 1.0) -> void:
+	var o := _overlay
+	var w := font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
+	var r := Rect2(Vector2((size.x - w) * 0.5 - 26, size.y * 0.5 + dy - fs * 0.95), Vector2(w + 52, fs * 1.45))
+	o.draw_style_box(UIKit.box(Color(0.06, 0.04, 0.14, 0.88 * alpha), 18, 2, Color(UIKit.GOLD, 0.7 * alpha)), r)
+	var p := Vector2((size.x - w) * 0.5, size.y * 0.5 + dy)
+	o.draw_string_outline(font, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 6, Color(INK, alpha))
+	o.draw_string(font, p, s, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(UIKit.GOLD, alpha))

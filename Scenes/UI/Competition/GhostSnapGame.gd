@@ -115,44 +115,58 @@ func result_text() -> String:
 	return "📸 %s wins with %d points!" % [best["name"], _score(best)]
 
 func _draw_game() -> void:
-	var font := ThemeDB.fallback_font
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
 		var top := i * LANE_H
-		draw_rect(Rect2(0, top + 2, size.x, LANE_H - 4), Color(0.06, 0.08, 0.14))
-		# drifting fog bands
+		var card := Rect2(4, top + 3, size.x - 8, LANE_H - 6)
+		lane_card(lane, card, Color("0e1a2a"), Color("1f3a3f"))
+		# misty forest: trunk silhouettes + drifting fog bands
+		for k in 9:
+			var tx := fposmod(k * 97.0 + 30.0, size.x - 40) + 20
+			draw_rect(Rect2(tx, top + 30, 7, LANE_H - 36), Color(0.03, 0.07, 0.09, 0.7))
 		for k in 3:
-			var fx := fposmod(t * (20 + k * 9) + k * 230, size.x + 200) - 100
-			draw_rect(Rect2(fx, top + 30 + k * 16, 160, 10), Color(0.6, 0.65, 0.8, 0.06))
-		# the camera frame: four corner brackets
+			var fx := fposmod(t * (18 + k * 9) + k * 230, size.x + 220) - 110
+			draw_circle(Vector2(fx, top + 48 + k * 12), 40, Color(0.75, 0.85, 0.95, 0.05))
+			draw_circle(Vector2(fx + 50, top + 52 + k * 10), 30, Color(0.75, 0.85, 0.95, 0.04))
 		var fw: float = lane["frame_w"]
-		var fr := Rect2(_frame_x() - fw * 0.5, top + 26, fw, LANE_H - 36)
-		var col := Color(1, 1, 1, 0.85)
-		var l := 12.0
+		var fr := Rect2(_frame_x() - fw * 0.5, top + 30, fw, LANE_H - 40)
+		var ghost_in: bool = lane["shots"].size() < SHOTS and absf(lane["gx"] - _frame_x()) < fw * 0.5
+		var fcol := Color("7dffcf") if ghost_in else Color(1, 1, 1, 0.75)
+		draw_rect(fr, Color(fcol, 0.06))
+		var l := 13.0
 		for corner in [fr.position, Vector2(fr.end.x, fr.position.y), Vector2(fr.position.x, fr.end.y), fr.end]:
 			var sx := 1.0 if corner.x == fr.position.x else -1.0
 			var sy := 1.0 if corner.y == fr.position.y else -1.0
-			draw_line(corner, corner + Vector2(l * sx, 0), col, 2.0)
-			draw_line(corner, corner + Vector2(0, l * sy), col, 2.0)
-		draw_circle(Vector2(_frame_x(), fr.get_center().y), 2.0, Color(1, 0.3, 0.3, 0.8))
-		# the ghost (translucent, bobbing)
+			draw_line(corner, corner + Vector2(l * sx, 0), fcol, 3.0)
+			draw_line(corner, corner + Vector2(0, l * sy), fcol, 3.0)
+		draw_circle(fr.get_center(), 3.0, Color(1, 0.35, 0.35, 0.9))
+		draw_arc(fr.get_center(), 8.0, 0, TAU, 20, Color(1, 0.35, 0.35, 0.5), 1.5)
 		if lane["shots"].size() < SHOTS:
 			var g := Vector2(lane["gx"], fr.get_center().y + sin(lane["wobble"]) * 8.0)
-			var tint := Color(1, 1, 1, 0.55 + 0.3 * sin(lane["wobble"] * 2.0))
+			var fade := 0.55 + 0.3 * sin(lane["wobble"] * 2.0)
+			for k in 4:   # motion trail
+				var tp: Vector2 = g - Vector2(lane["dir"] * (10 + k * 10), 0)
+				draw_circle(tp, GHOST_R * (0.8 - k * 0.15), Color(0.7, 0.95, 1.0, 0.07))
+			glow(g, GHOST_R * 1.2, Color(0.6, 0.9, 1.0, fade), 6)
 			if lane["tex"]:
-				draw_texture_rect(lane["tex"], Rect2(g - Vector2(GHOST_R, GHOST_R) * 1.2, Vector2(GHOST_R, GHOST_R) * 2.4), false, tint)
-		# camera flash
+				draw_texture_rect(lane["tex"], Rect2(g - Vector2(GHOST_R, GHOST_R) * 1.2, Vector2(GHOST_R, GHOST_R) * 2.4),
+					false, Color(1, 1, 1, fade))
 		if lane["flash"] > 0.0:
-			draw_rect(Rect2(0, top + 2, size.x, LANE_H - 4), Color(1, 1, 1, lane["flash"] * 0.6))
-		# film strip of results
-		for s in SHOTS:
-			var p := Vector2(size.x - 24 - (SHOTS - 1 - s) * 22, top + 14)
-			var shot: int = lane["shots"][s] if s < lane["shots"].size() else -1
-			draw_rect(Rect2(p - Vector2(9, 7), Vector2(18, 14)), Color(0.2, 0.2, 0.25))
+			rrect(card.grow(-3), Color(1, 1, 1, lane["flash"] * 0.65), 12)
+		# film strip
+		var strip := Rect2(size.x - 26 - SHOTS * 24, top + 8, SHOTS * 24 + 12, 24)
+		rrect(strip, Color(0.05, 0.04, 0.12, 0.75), 8)
+		for k in SHOTS:
+			var cell := Rect2(strip.position + Vector2(6 + k * 24, 4), Vector2(20, 16))
+			var shot: int = lane["shots"][k] if k < lane["shots"].size() else -1
+			rrect(cell, Color(1, 1, 1, 0.08), 4)
 			if shot >= 0:
-				var sc: Color = [Color(0.5, 0.2, 0.2), Color(0.6, 0.6, 0.4), Color(0.4, 0.8, 0.5), UIKit.GOLD][shot]
-				draw_rect(Rect2(p - Vector2(7, 5), Vector2(14, 10)), sc)
+				var sc: Color = [Color("6b2a3a"), Color("8a8a5a"), Color("4fc98a"), UIKit.GOLD][shot]
+				rrect(cell.grow(-2), sc, 3)
+				if shot == 3:
+					text(cell.position + Vector2(0, 13), "★", 12, Color.WHITE, cell.size.x, 0)
 		if lane["pop_t"] > 0.0:
-			draw_string(font, Vector2(_frame_x() - 60, top + 22 - (0.8 - lane["pop_t"]) * 18), lane["pop"],
-				HORIZONTAL_ALIGNMENT_CENTER, 120, 18, Color(UIKit.GOLD, lane["pop_t"] / 0.8))
-		lane_label(lane, i, "📷 %d   shots %d/%d" % [_score(lane), lane["shots"].size(), SHOTS], LANE_H)
+			var a: float = lane["pop_t"] / 0.8
+			text(Vector2(_frame_x() - 80, top + 26 - (1.0 - a) * 16), lane["pop"], 20,
+				Color(UIKit.GOLD if lane["pop"] == "PERFECT!" else Color.WHITE, a), 160, 5)
+		nameplate(lane, Vector2(12, top + 8), "📷 %d pts · %d/%d" % [_score(lane), lane["shots"].size(), SHOTS])

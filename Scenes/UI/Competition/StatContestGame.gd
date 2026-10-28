@@ -12,15 +12,19 @@ var _list: VBoxContainer
 func _init_game() -> void:
 	use_countdown = false
 	running = true
-	custom_minimum_size = Vector2(620, 70 * lanes.size() + 10)
+	custom_minimum_size = Vector2(640, 76 * lanes.size() + 10)
 	_list = UIKit.vbox(8)
 	_list.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_list)
 	move_child(_list, 0)
 	for lane in lanes:
 		var s: Dictionary = lane["spirit"]
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", UIKit.box(Color(0.07, 0.05, 0.16, 0.85), 14, 2,
+			Color(lane["color"], 0.55), Vector2(12, 4)))
 		var row := UIKit.hbox(12)
-		row.custom_minimum_size = Vector2(0, 62)
+		row.custom_minimum_size = Vector2(0, 58)
+		card.add_child(row)
 		var who := UIKit.label(lane["name"], 16, lane["color"])
 		who.custom_minimum_size = Vector2(120, 0)
 		who.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -31,8 +35,8 @@ func _init_game() -> void:
 		bar.custom_minimum_size = Vector2(200, 18)
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		bar.max_value = 6 * 2 + 3 + 6
-		bar.add_theme_stylebox_override("background", UIKit.box(Color(0, 0, 0, 0.5), 6))
-		bar.add_theme_stylebox_override("fill", UIKit.box(lane["color"], 6))
+		bar.add_theme_stylebox_override("background", UIKit.box(Color(0, 0, 0, 0.55), 9, 1, Color(1, 1, 1, 0.15)))
+		bar.add_theme_stylebox_override("fill", UIKit.box(lane["color"].lightened(0.1), 9))
 		row.add_child(bar)
 		var die := DiceView.new(46)
 		die.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -40,9 +44,9 @@ func _init_game() -> void:
 		var total := UIKit.label("", 22, UIKit.GOLD)
 		total.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(total)
-		_list.add_child(row)
+		_list.add_child(card)
 		var base := int(s.get(stat, 0)) * 2 + int(s.get("stars", 0))
-		_rows.append({"lane": lane, "box": row, "bar": bar, "die": die, "total": total,
+		_rows.append({"lane": lane, "box": card, "bar": bar, "die": die, "total": total,
 			"base": base, "roll": randi_range(1, 6)})
 
 func _ready() -> void:

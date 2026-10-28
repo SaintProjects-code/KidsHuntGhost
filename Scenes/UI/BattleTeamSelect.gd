@@ -1,15 +1,18 @@
 extends MenuWindow
 ## "Choose Your Battle Team" — your spirits on the left, the enemy on the right.
 ##
-## Single mode: present(player, vs_label, opp_team); emits chosen(team).
-##   Click rows (or press 1–6) to pick up to 4 — pick order = battle order.
-##   Space/Enter starts.
-## PvP mode: present_pvp(player_a, player_b); emits chosen_pvp([team_a, team_b]).
+## Single mode: present(player, vs_label, opp_pool); emits chosen({team, cards}).
+##   Click rows (or press 1–6) to pick up to 3 — pick order = battle order —
+##   and click up to 2 tactic cards to bring. Space/Enter starts. The right
+##   column is the other side's whole pool (they bring 3, picked blind).
+## PvP mode: present_pvp(player_a, player_b); emits chosen_pvp([pick_a, pick_b]).
 ##   BOTH columns are clickable so two players pick on one screen.
-## An empty array = backed out.
+## {} / [] = backed out.
 
-signal chosen(team: Array)
-signal chosen_pvp(teams: Array)
+signal chosen(pick: Dictionary)
+signal chosen_pvp(picks: Array)
+
+const CARD_SIZE := Vector2(56, 76)
 
 const SLOT_NAMES := ["Lead", "2nd", "3rd", "End"]
 const ROW_BG := Color(0.08, 0.07, 0.16, 0.9)
@@ -19,6 +22,8 @@ var _player: PlayerData
 var _player_b: PlayerData      # PvP: the right-hand player
 var _selected: Array = []      # indices into _player.team, in pick order
 var _selected_b: Array = []
+var _cards: Array = []         # tactic cards brought, side A
+var _cards_b: Array = []
 var _opp_team: Array = []
 var _pvp := false
 
@@ -29,6 +34,7 @@ var _vs_lbl: Label
 var _your_list: VBoxContainer
 var _opp_list: VBoxContainer
 var _slots_row: HBoxContainer
+var _cards_row: HBoxContainer
 var _start: Button
 
 func _ready() -> void:
@@ -54,6 +60,9 @@ func _ready() -> void:
 	_slots_row = UIKit.hbox(10)
 	_slots_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_slots_row)
+	_cards_row = UIKit.hbox(24)
+	_cards_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(_cards_row)
 	_start = _button("", _on_start, 36)
 	col.add_child(_start)
 	var cancel := _button("Back out", _cancel, 24)
@@ -73,8 +82,10 @@ func present(player: PlayerData, vs_label: String, opp_team: Array = []) -> void
 	_player = player
 	_opp_team = opp_team
 	_selected.clear()
+	_cards = BattleSetup.cpu_cards(player)   # pre-pick the 2 best; click to change
 	_title_lbl.text = "⚔ Choose Your Battle Team"
-	_hint_lbl.text = "Press 1–6 or click a spirit (up to %d) · Space to start" % Balance.BATTLE_PICK_MAX
+	_hint_lbl.text = "Press 1–6 or click a spirit (up to %d) · pick %d tactic cards · Space to start" % [
+		Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]
 	_your_head.text = "YOUR TEAM"
 	_vs_lbl.text = vs_label
 	_refresh()
@@ -85,6 +96,8 @@ func present_pvp(a: PlayerData, b: PlayerData) -> void:
 	_player_b = b
 	_selected.clear()
 	_selected_b.clear()
+	_cards = BattleSetup.cpu_cards(a)
+	_cards_b = BattleSetup.cpu_cards(b)
 	_title_lbl.text = "⚔ Pick Your Teams"
 	_hint_lbl.text = "Both players — click your own spirits (up to %d each). %s can also use 1–6." % [
 		Balance.BATTLE_PICK_MAX, a.player_name]
@@ -126,6 +139,10 @@ func _refresh() -> void:
 	_slots_row.visible = not _pvp
 	if not _pvp:
 		_refresh_slots()
+	UIKit.clear(_cards_row)
+	_cards_row.add_child(_card_picker(_player, _cards))
+	if _pvp:
+		_cards_row.add_child(_card_picker(_player_b, _cards_b))
 
 func _team_for(side: int) -> Array:
 	return _player.team if side == 0 else _player_b.team
@@ -201,6 +218,29 @@ func _refresh_slots() -> void:
 			vb.add_child(l)
 		_slots_row.add_child(chip)
 
+# One player's tactic cards: click to bring / leave (up to BATTLE_CARDS).
+func _card_picker(p: PlayerData, picked: Array) -> Control:
+	var box := UIKit.vbox(2)
+	box.add_child(UIKit.label("%s brings %d/%d tactic cards:" % [p.player_name, picked.size(), BattleSetup.BATTLE_CARDS], 12, UIKit.GOLD))
+	var row := UIKit.hbox(4)
+	box.add_child(row)
+	var tactics: Array = p.inventory.cards_of_kind("tactic")
+	for i in tactics.size():
+		var key: String = tactics[i]
+		var cv := CardView.new(key, CARD_SIZE)
+		cv.armed = picked.has(key) and picked.count(key) > tactics.slice(0, i).count(key)
+		cv.pressed.connect(func():
+			if cv.armed:
+				picked.erase(key)
+			elif picked.size() < BattleSetup.BATTLE_CARDS:
+				picked.append(key)
+			Sfx.play("card", 1.2)
+			_refresh())
+		row.add_child(cv)
+	if tactics.is_empty():
+		row.add_child(UIKit.label("— no tactic cards —", 12))
+	return box
+
 func _on_toggle(i: int, side: int) -> void:
 	if int(_team_for(side)[i].get("current_hp", 0)) <= 0:
 		return
@@ -219,12 +259,13 @@ func _on_start() -> void:
 	Sfx.play("click")
 	if _pvp:
 		if not (_selected.is_empty() or _selected_b.is_empty()):
-			chosen_pvp.emit([_team_from(_player.team, _selected), _team_from(_player_b.team, _selected_b)])
+			chosen_pvp.emit([{"team": _team_from(_player.team, _selected), "cards": _cards.duplicate()},
+				{"team": _team_from(_player_b.team, _selected_b), "cards": _cards_b.duplicate()}])
 	elif not _selected.is_empty():
-		chosen.emit(_team_from(_player.team, _selected))
+		chosen.emit({"team": _team_from(_player.team, _selected), "cards": _cards.duplicate()})
 
 func _cancel() -> void:
 	if _pvp:
 		chosen_pvp.emit([])
 	else:
-		chosen.emit([])
+		chosen.emit({})
