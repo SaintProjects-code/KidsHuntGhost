@@ -1,6 +1,6 @@
 extends Node
 ## Autoloaded. Owns players' hands: drawing (with the hand limit), playing
-## FIELD cards on the board, charms, stealing, and the CPU's card sense.
+## FIELD cards on the board, stealing, and the CPU's card sense.
 ## Tactic cards are played inside BattleScreen; this only decides which one a
 ## CPU or NPC would pick.
 
@@ -68,7 +68,7 @@ func can_target(key: String, target) -> bool:
 		"spirit":
 			if not (target is Dictionary):
 				return false
-			if CardsData.kind_of(key) == "charm" or key == "star_candy":
+			if key == "star_candy":
 				return true
 			return int(target.get("current_hp", 0)) > 0 and int(target["current_hp"]) < int(target.get("hp", 1))
 		"fainted":
@@ -79,7 +79,7 @@ func can_target(key: String, target) -> bool:
 			return target is String
 	return true
 
-# Play a field card or attach a charm. Returns the log/flash message.
+# Play a field card. Returns the log/flash message.
 func play_field(idx: int, key: String, target = null) -> String:
 	var p: PlayerData = GameState.players[idx]
 	if not remove(idx, key):
@@ -126,28 +126,10 @@ func play_field(idx: int, key: String, target = null) -> String:
 			p.inventory.gold += 25
 			msg = "+25 gold!"
 			Sfx.play("coin")
-		_:
-			if CardsData.kind_of(key) == "charm":
-				msg = attach_charm(idx, target, key)
 	Sfx.play("card")
 	EventBus.card_played.emit(idx, key)
 	EventBus.log_entry.emit(idx, "%s plays %s — %s" % [p.player_name, CardsData.card_name(key), msg], "#7fe0d0")
 	return msg
-
-# Put a charm on a spirit; a charm it already wore goes back into the hand.
-func attach_charm(idx: int, mon: Dictionary, key: String) -> String:
-	var old := String(mon.get("charm", ""))
-	mon["charm"] = key
-	if old != "":
-		give.call_deferred(idx, old)
-	return "%s now wears the %s." % [mon["name"], CardsData.card(key)["name"]]
-
-func take_charm(idx: int, mon: Dictionary) -> void:
-	var old := String(mon.get("charm", ""))
-	if old == "":
-		return
-	mon.erase("charm")
-	await give(idx, old)
 
 # Move a random card from one hand to another. Returns the key ("" if none).
 func steal(from_idx: int, to_idx: int) -> String:
@@ -210,11 +192,6 @@ func _cpu_target(p: PlayerData, idx: int, key: String, wanted_city: String):
 			for j in GameState.players.size():
 				if j != idx and not GameState.players[j].inventory.hand.is_empty():
 					return j
-		_:
-			if CardsData.kind_of(key) == "charm":
-				for m in p.team:
-					if String(m.get("charm", "")) == "":
-						return m
 	return null
 
 # Pick a tactic card for this round, or "" to save it. `me`/`foe` are the
@@ -228,16 +205,24 @@ func pick_tactic(hand: Array, me: Dictionary, foe: Dictionary, incoming: int, ou
 	var lethal := incoming >= hp
 	var can_ko := outgoing >= int(foe.get("current_hp", 1))
 	var prefs: Array = []
+	var charmed := me.has("charm")   # one charm per spirit at a time
 	if lethal:
 		prefs = ["hold_on", "spirit_shield", "boo", "ecto_patch", "switcheroo", "mirror_veil"]
+		if not charmed:
+			prefs += ["lucky_scarf", "phoenix_feather"]
 	elif float(hp) / float(maxi(1, int(me.get("hp", 1)))) < 0.4:
 		prefs = ["ecto_patch", "soul_siphon", "spirit_shield", "switcheroo"]
+		if not charmed:
+			prefs.append("moon_berry")
 	elif me.has("_status"):
 		prefs = ["purify"]
 	elif not can_ko and outgoing * 2 >= int(foe.get("current_hp", 1)):
 		prefs = ["fury", "battle_cry"]
 	elif randf() < 0.3:
 		prefs = ["rally", "haste", "soul_siphon", "battle_cry"]
+	elif not charmed and float(hp) / float(maxi(1, int(me.get("hp", 1)))) > 0.6:
+		# a healthy lead is worth charming for the long haul
+		prefs = ["power_band", "ghost_cloak", "war_drum", "brave_ribbon", "guard_pin", "echo_bell", "spiky_helm", "last_trophy"]
 	# Low-stakes fights only spend cards when it really counts.
 	if stakes < 0.5 and not lethal and randf() > stakes:
 		return ""

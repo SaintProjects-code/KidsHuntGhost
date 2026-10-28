@@ -15,37 +15,49 @@ The server only passes messages along; the game itself runs on the TV computer.
 
 ---
 
-## 1. Try it at home first (no server needed)
+## 1. Play at home (nothing to install)
 
-Everything on the same Wi-Fi.
+The game has its own little phone server built in. Everyone just needs to be
+on the **same Wi-Fi** as the computer running the game.
 
-1. Install **Node.js 18+** on the game computer (https://nodejs.org, LTS).
-2. In a terminal:
-   ```bash
-   cd "Kids Hunt Ghost/server"
-   npm install
-   npm start
-   ```
-   It prints `Kids Hunt Ghost server on http://localhost:8080`.
-3. Find the computer's local IP (Windows: `ipconfig` → "IPv4 Address", e.g. `192.168.1.20`).
-4. Run the game → **New Game** → **📱 Phones**. Set the server to
-   `ws://192.168.1.20:8080/ws` (your IP) and press **Start room**. A room code appears.
-5. On each phone open `http://192.168.1.20:8080`, type the code and a name → **Join!**
-   Each phone takes a player card (it fills in the name). Phones can flip
-   through trainers with **◀ Change trainer ▶**.
-6. Press **▶ Start Game** on the computer.
+1. Run the game → **New Game** → press **📱 Phones**. A room starts right away
+   and the panel shows a big **4-letter room code** and an address like
+   `http://192.168.1.20:8080/?code=KLNN`.
+2. On each phone, open that address in the browser (Chrome / Safari). The code
+   is already filled in — type your name → **Join!**
+3. Each phone takes a player card (it fills in the name). Phones can flip
+   through trainers with **◀ Change trainer ▶**. Add CPUs on the computer if you like.
+4. Press **▶ Start Game** on the computer. The room code stays in the top-left
+   corner of the board, so a phone that drops out can rejoin.
 
-If phones can't connect, allow Node through the Windows firewall (Windows asks
-the first time `npm start` runs — tick "Private networks").
+**Phone says "can't reach this page"?**
+- The first time, Windows asks whether Godot may use the network: tick
+  **Private networks** and Allow. Missed it? Windows Security → Firewall →
+  "Allow an app through firewall" → tick *Private* for Godot.
+- Your Wi-Fi must be set to **Private** on the PC (Settings → Network → Wi-Fi →
+  your network → Network profile type: Private). On "Public" Windows blocks phones.
+- Phones must be on the same Wi-Fi, not mobile data and not a *guest* network.
+- The panel lists other addresses under "Won't load? Try:" — PCs with WSL,
+  Hyper-V, VirtualBox or a VPN have extra network adapters.
+- Test on the PC itself: open the same address in the PC's browser. If that
+  works but phones don't, it's the firewall or the Wi-Fi settings above.
+- You don't need `npm start` for home play. (If something else holds port
+  8080 the game uses 8090, 8180… instead — the panel shows the right one.)
 
 What a phone does during the game:
 - **Your turn:** the buttons on the TV's current window are copied to your phone
   (Roll, card plays, fork choices, the catch roll, shop, Warden challenge, events…).
-- **Battles:** pick your team and tactic cards on the phone. In a ⚔ player battle
-  each phone picks its own side.
+  Your cards show face-down on the TV — only your phone shows what they are.
+- **Your battles:** pick your team and cards on the phone; during the fight
+  tap a tactic card (or charm) to play it next round. In a ⚔ player battle
+  each phone picks its own side and the TV hides both hands.
+- **Someone else's battle:** 🗳 vote on who wins during the first 2 rounds.
+  Guess right → +1 card (or ★ on a spirit if your hand is full).
+- **Someone else's turn:** 🃏 *My hand* — look at your cards and play healing /
+  dice / lure / salt / coin cards; 👻 *My team* — see stats and change your lead
+  or order.
 - **Competitions:** everyone picks their spirit on their own phone, then the phone
   becomes a **gamepad** (ACTION + ◀ ● ▶) for the minigame.
-- **Someone else's turn:** the phone says whose turn it is.
 
 You can mix phones, keyboard players and CPUs in one game.
 
@@ -73,6 +85,8 @@ You can mix phones, keyboard players and CPUs in one game.
 Later changes: `git add -A && git commit -m "what changed" && git push`.
 
 `server/node_modules/` is git-ignored, so `npm install` must be run again on the server.
+
+The Node server (below) is only for playing **over the internet**.
 
 ---
 

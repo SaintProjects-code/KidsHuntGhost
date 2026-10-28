@@ -1,7 +1,7 @@
 extends MenuWindow
 ## The party screen (TEAM button). present(player_index) fills it; emits
 ## stats_requested(spirit) for a card's Stats button. ▲▼ reorder the team
-## (slot 1 leads); "Take charm" returns a charm to the hand.
+## (slot 1 leads).
 
 signal stats_requested(spirit: Dictionary)
 
@@ -13,7 +13,7 @@ func _ready() -> void:
 	var col := _init_window(680, 0)
 	_title = _title_label("", 28)
 	col.add_child(_title)
-	var hint := UIKit.label("▲▼ reorder team · Stats to inspect · charms come from your hand", 15)
+	var hint := UIKit.label("▲▼ reorder team · Stats to inspect", 15)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint.modulate = Color(1, 1, 1, 0.7)
 	col.add_child(hint)
@@ -49,9 +49,7 @@ func _make_card(i: int) -> Control:
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(info)
 	info.add_child(UIKit.label("[%d] %s  %s" % [i + 1, mon["name"], SpiritsData.star_text(mon.get("stars", 0))], 16))
-	var charm := String(mon.get("charm", ""))
-	var sub := UIKit.label("✦%s · [%s]%s" % [SpiritsData.move_of(SpiritsData.move_key(mon))["name"], SpiritsData.type_text(mon),
-		(" · " + CardsData.card_name(charm)) if charm != "" else ""], 13)
+	var sub := UIKit.label("✦%s · [%s]" % [SpiritsData.move_of(SpiritsData.move_key(mon))["name"], SpiritsData.type_text(mon)], 13)
 	sub.clip_text = true
 	sub.modulate = Color(1, 1, 1, 0.75)
 	info.add_child(sub)
@@ -63,10 +61,6 @@ func _make_card(i: int) -> Control:
 	var buttons := UIKit.hbox(4)
 	info.add_child(buttons)
 	buttons.add_child(UIKit.small_button("Stats", func(): stats_requested.emit(mon), 13))
-	if charm != "":
-		buttons.add_child(UIKit.small_button("Take charm", func():
-			await CardSystem.take_charm(_idx, mon)
-			_refresh(), 13))
 	buttons.add_child(UIKit.small_button("▲", _move.bind(i, -1), 13))
 	buttons.add_child(UIKit.small_button("▼", _move.bind(i, 1), 13))
 	return card

@@ -187,10 +187,9 @@ func _row_content(num: String, mon: Dictionary, order: int, fainted: bool, enemy
 	row.add_child(info)
 	info.add_child(UIKit.label("%s  %s%s" % [mon["name"], SpiritsData.star_text(mon.get("stars", 0)),
 		"   💀 FAINTED" if fainted else ""], 14, UIKit.BAD if fainted else null))
-	var stat := UIKit.label("HP %d/%d   A%d D%d S%d   [%s] ✦%s%s" % [mon.get("current_hp", 0), mon.get("hp", 0),
+	var stat := UIKit.label("HP %d/%d   A%d D%d S%d   [%s] ✦%s" % [mon.get("current_hp", 0), mon.get("hp", 0),
 		mon.get("atk", 0), mon.get("def", 0), mon.get("spd", 0), SpiritsData.type_text(mon),
-		SpiritsData.move_of(SpiritsData.move_key(mon))["name"],
-		("  " + CardsData.card_name(mon["charm"])) if mon.has("charm") else ""], 11, Color("ffb45a") if enemy else null)
+		SpiritsData.move_of(SpiritsData.move_key(mon))["name"]], 11, Color("ffb45a") if enemy else null)
 	stat.modulate = Color(1, 1, 1, 0.8)
 	info.add_child(stat)
 	if order != -1:
@@ -228,6 +227,7 @@ func _card_picker(p: PlayerData, picked: Array) -> Control:
 	for i in tactics.size():
 		var key: String = tactics[i]
 		var cv := CardView.new(key, CARD_SIZE)
+		cv.face_down = Remote.has_phone(GameState.players.find(p))   # picked on the phone
 		cv.armed = picked.has(key) and picked.count(key) > tactics.slice(0, i).count(key)
 		cv.pressed.connect(func():
 			if cv.armed:

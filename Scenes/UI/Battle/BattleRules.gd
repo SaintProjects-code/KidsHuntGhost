@@ -253,6 +253,26 @@ func _on_entry(is_me: bool) -> void:
 	if idx >= mine.size():
 		return
 	var m: Dictionary = mine[idx]
+	_charm_entry(is_me)
+	if m.get("_spikes_pending", false):
+		m.erase("_spikes_pending")
+		_chip(m, 30)
+		_anim_shake(m)
+		_logln("%s is hurt by Spikes! -30 HP." % _who(m))
+		await _beat(0.45)
+	for slot in 2:
+		await _entry_ability(m, mine, theirs, their_idx, _ability_slot(m, slot))
+
+# The "on entry" half of a charm: runs when a charmed spirit becomes the active
+# fighter, and right away when a charm card is played on the lead.
+func _charm_entry(is_me: bool) -> void:
+	var mine: Array = _team if is_me else _opp
+	var theirs: Array = _opp if is_me else _team
+	var idx: int = _active if is_me else _opp_active
+	var their_idx: int = _opp_active if is_me else _active
+	if idx >= mine.size():
+		return
+	var m: Dictionary = mine[idx]
 	match _charm(m):
 		"brave_ribbon":
 			_buff(m, "atk", 1)
@@ -270,14 +290,6 @@ func _on_entry(is_me: bool) -> void:
 				_buff(m, "atk", 1)
 				m["_trophy_on"] = true
 				_logln("%s raises the Last Trophy! ATK +1, but it takes more damage." % _who(m))
-	if m.get("_spikes_pending", false):
-		m.erase("_spikes_pending")
-		_chip(m, 30)
-		_anim_shake(m)
-		_logln("%s is hurt by Spikes! -30 HP." % _who(m))
-		await _beat(0.45)
-	for slot in 2:
-		await _entry_ability(m, mine, theirs, their_idx, _ability_slot(m, slot))
 
 func _entry_ability(m: Dictionary, mine: Array, theirs: Array, their_idx: int, ab: String) -> void:
 	match ab:

@@ -3,9 +3,15 @@ extends Button
 ## A playing card drawn as a button: kind-coloured frame, big icon, name, and
 ## the effect text (full text in the tooltip). `armed` lifts and glows it —
 ## used for "this card plays next round" in battle and for selections.
-## A face-down card (key "") shows the card back.
+## A face-down card (key "") shows the card back. `face_down` hides a real card
+## the same way (a phone player's hand on the TV) while it keeps working.
 
 var key := ""
+var face_down := false:
+	set(v):
+		face_down = v
+		tooltip_text = "" if v else tooltip_text
+		queue_redraw()
 var armed := false:
 	set(v):
 		armed = v
@@ -39,7 +45,7 @@ func _draw() -> void:
 	var rad := int(clampf(size.x * 0.12, 6, 12))
 	# drop shadow
 	draw_style_box(UIKit.box(Color(0, 0, 0, 0.35), rad), Rect2(r.position + Vector2(0, 3), r.size))
-	if key == "":
+	if key == "" or face_down:
 		# card back: deep purple with a ghost emblem
 		draw_style_box(UIKit.box(Color(0.2, 0.14, 0.42), rad, 2, Color(0.66, 0.56, 1.0, 0.9)), r)
 		_grad(r.grow(-4), Color(0.32, 0.22, 0.62), Color(0.12, 0.08, 0.28))

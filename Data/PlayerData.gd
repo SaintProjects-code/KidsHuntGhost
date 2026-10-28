@@ -95,4 +95,10 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.extra_die = d.get("extra_die", false)
 	p.lure = d.get("lure", false)
 	p.salt = d.get("salt", false)
+	# old saves: charms used to be worn by spirits; now they're cards again
+	for mon in p.team + p.pc:
+		if mon.has("charm"):
+			if not p.inventory.hand_full():
+				p.inventory.hand.append(String(mon["charm"]))
+			mon.erase("charm")
 	return p

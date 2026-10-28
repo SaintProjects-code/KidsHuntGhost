@@ -4,9 +4,10 @@ class_name CardsData
 ## kind:
 ##   capture — Lanterns: spent when you roll to catch a wild ghost (more dice)
 ##   field  — played on the board during your turn (heals, dice, lures…)
-##   tactic — played in battle, one per round (shields, haste, fury…)
-##   charm  — attached to a spirit; it stays on that spirit (battle effects
-##            live in BattleRules) until it's taken back into the hand
+##   tactic — played in battle, one per round (shields, haste, fury…). Tactics
+##            marked "charm" are ONE-USE charms: played in battle, the charm
+##            goes on your lead for the rest of that battle (effects live in
+##            BattleRules), then the card is gone
 ## target: "spirit" (a living team spirit) | "fainted" | "player" | "city" | ""
 ## weight: how often ITEM tiles / events draw it.  value: CPU trade/discard worth.
 
@@ -68,36 +69,35 @@ const CARDS := {
 		"desc": "Whole team +1 ATK and +1 DEF for the battle"},
 	"mirror_veil":   {"name": "Mirror Veil",    "kind": "tactic", "icon": "🪞", "cost": 25, "weight": 3, "value": 5,
 		"desc": "Bounce half the damage your lead takes this round"},
-	# ── charms (old held items) ──────────────────────────────────────────────
-	"power_band":    {"name": "Power Band",     "kind": "charm", "icon": "💪", "cost": 20, "weight": 2, "value": 4,
-		"desc": "+20% damage on all attacks", "target": "spirit"},
-	"ghost_cloak":   {"name": "Ghost Cloak",    "kind": "charm", "icon": "🧥", "cost": 22, "weight": 2, "value": 4,
-		"desc": "Take 15% less damage", "target": "spirit"},
-	"brave_ribbon":  {"name": "Brave Ribbon",   "kind": "charm", "icon": "🎀", "cost": 25, "weight": 2, "value": 4,
-		"desc": "+1 ATK when entering battle", "target": "spirit"},
-	"guard_pin":     {"name": "Guard Pin",      "kind": "charm", "icon": "📌", "cost": 22, "weight": 2, "value": 4,
-		"desc": "+1 DEF when entering battle", "target": "spirit"},
-	"moon_berry":    {"name": "Moon Berry",     "kind": "charm", "icon": "🫐", "cost": 10, "weight": 2, "value": 3,
-		"desc": "Below 50% HP: heal 30% (once per battle)", "target": "spirit"},
-	"lucky_scarf":   {"name": "Lucky Scarf",    "kind": "charm", "icon": "🧣", "cost": 20, "weight": 2, "value": 4,
-		"desc": "Survive a KO at 1 HP (once per battle)", "target": "spirit"},
-	"echo_bell":     {"name": "Echo Bell",      "kind": "charm", "icon": "🔔", "cost": 20, "weight": 2, "value": 4,
-		"desc": "Heal 10% of the damage you deal", "target": "spirit"},
-	"spiky_helm":    {"name": "Spiky Helm",     "kind": "charm", "icon": "⛑", "cost": 18, "weight": 2, "value": 3,
-		"desc": "Attackers take 15 recoil damage", "target": "spirit"},
-	"phoenix_feather":{"name": "Phoenix Feather","kind": "charm", "icon": "🪶", "cost": 25, "weight": 2, "value": 5,
-		"desc": "On KO: revive at 25% HP (once per battle)", "target": "spirit"},
-	"war_drum":      {"name": "War Drum",       "kind": "charm", "icon": "🥁", "cost": 20, "weight": 2, "value": 4,
-		"desc": "Free hit at 40% ATK when entering battle", "target": "spirit"},
-	"last_trophy":   {"name": "Last Trophy",    "kind": "charm", "icon": "🏆", "cost": 28, "weight": 2, "value": 4,
-		"desc": "Last spirit standing: +1 ATK but +20% damage taken", "target": "spirit"},
+	# ── charms: tactic cards whose effect lasts the rest of the battle ────────
+	"power_band":    {"name": "Power Band",     "kind": "tactic", "charm": true, "icon": "💪", "cost": 20, "weight": 2, "value": 4,
+		"desc": "This battle: lead deals +20% damage"},
+	"ghost_cloak":   {"name": "Ghost Cloak",    "kind": "tactic", "charm": true, "icon": "🧥", "cost": 22, "weight": 2, "value": 4,
+		"desc": "This battle: lead takes 15% less damage"},
+	"brave_ribbon":  {"name": "Brave Ribbon",   "kind": "tactic", "charm": true, "icon": "🎀", "cost": 25, "weight": 2, "value": 4,
+		"desc": "This battle: lead +1 ATK (again each time it re-enters)"},
+	"guard_pin":     {"name": "Guard Pin",      "kind": "tactic", "charm": true, "icon": "📌", "cost": 22, "weight": 2, "value": 4,
+		"desc": "This battle: lead +1 DEF (again each time it re-enters)"},
+	"moon_berry":    {"name": "Moon Berry",     "kind": "tactic", "charm": true, "icon": "🫐", "cost": 10, "weight": 2, "value": 3,
+		"desc": "This battle: lead heals 30% once when below 50% HP"},
+	"lucky_scarf":   {"name": "Lucky Scarf",    "kind": "tactic", "charm": true, "icon": "🧣", "cost": 20, "weight": 2, "value": 4,
+		"desc": "This battle: lead survives one KO at 1 HP"},
+	"echo_bell":     {"name": "Echo Bell",      "kind": "tactic", "charm": true, "icon": "🔔", "cost": 20, "weight": 2, "value": 4,
+		"desc": "This battle: lead heals 10% of the damage it deals"},
+	"spiky_helm":    {"name": "Spiky Helm",     "kind": "tactic", "charm": true, "icon": "⛑", "cost": 18, "weight": 2, "value": 3,
+		"desc": "This battle: lead's attackers take 15 recoil"},
+	"phoenix_feather":{"name": "Phoenix Feather","kind": "tactic", "charm": true, "icon": "🪶", "cost": 25, "weight": 2, "value": 5,
+		"desc": "This battle: lead revives once at 25% HP"},
+	"war_drum":      {"name": "War Drum",       "kind": "tactic", "charm": true, "icon": "🥁", "cost": 20, "weight": 2, "value": 4,
+		"desc": "Free hit at 40% ATK now (and on re-entry)"},
+	"last_trophy":   {"name": "Last Trophy",    "kind": "tactic", "charm": true, "icon": "🏆", "cost": 28, "weight": 2, "value": 4,
+		"desc": "This battle: last spirit standing gets +1 ATK, takes +20%"},
 }
 
 const KIND_COLORS := {
 	"capture": Color("2b8c9a"),
 	"field":  Color("3d8b5a"),
 	"tactic": Color("b0473f"),
-	"charm":  Color("6a4fc4"),
 }
 
 static func card(key: String) -> Dictionary:
@@ -113,8 +113,18 @@ static func kind_of(key: String) -> String:
 static func value_of(key: String) -> int:
 	return int(card(key).get("value", 0))
 
+static func is_charm(key: String) -> bool:
+	return bool(card(key).get("charm", false))
+
+# "charm" picks the charm tactics (events still hand out charms as prizes).
 static func keys_of_kind(kind: String) -> Array:
+	if kind == "charm":
+		return CARDS.keys().filter(func(k): return CARDS[k].get("charm", false))
 	return CARDS.keys().filter(func(k): return CARDS[k]["kind"] == kind)
+
+# Field cards a phone player may play while it's someone else's turn: ones
+# that don't need the board, a roll or a popup.
+const OFF_TURN := ["glow_tonic", "mega_tonic", "wake_bell", "group_hug", "loaded_die", "spooky_lure", "salt_circle", "lucky_coin"]
 
 # A weighted random card, optionally of one kind ("" = any).
 static func random_card(kind: String = "") -> String:

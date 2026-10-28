@@ -92,7 +92,7 @@ func _fill_items(p: PlayerData) -> void:
 	_items.add_child(strip)
 	var count := _chip("🃏 %d/%d" % [p.inventory.hand.size(), Balance.HAND_SIZE])
 	var kinds: Array = []
-	for kind in ["capture", "tactic", "field", "charm"]:
+	for kind in ["capture", "tactic", "field"]:
 		var n := p.inventory.cards_of_kind(kind).size()
 		if n > 0:
 			kinds.append("%d %s" % [n, kind])

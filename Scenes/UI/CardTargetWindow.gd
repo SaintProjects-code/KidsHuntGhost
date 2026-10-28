@@ -1,5 +1,5 @@
 extends MenuWindow
-## Pick which spirit a field card or charm goes on. Spirits the card can't
+## Pick which spirit a field card goes on. Spirits the card can't
 ## affect (full HP for a tonic, awake for a Wake Bell…) are greyed out.
 ## present(player, card_key); emits chose(spirit Dictionary, or null on cancel).
 
@@ -41,9 +41,7 @@ func _spirit_row(mon: Dictionary, key: String, i: int) -> Control:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(info)
-	var charm := String(mon.get("charm", ""))
-	info.add_child(UIKit.label("[%d] %s  %d/%d%s" % [i + 1, mon["name"], mon["current_hp"], mon["hp"],
-		("  · " + CardsData.card_name(charm)) if charm != "" else ""], 14))
+	info.add_child(UIKit.label("[%d] %s  %d/%d" % [i + 1, mon["name"], mon["current_hp"], mon["hp"]], 14))
 	var bar := UIKit.hp_bar(8)
 	UIKit.set_hp(bar, int(mon["current_hp"]), int(mon["hp"]))
 	info.add_child(bar)

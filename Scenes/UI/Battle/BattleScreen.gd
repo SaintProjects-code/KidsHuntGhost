@@ -8,7 +8,13 @@ extends "res://Scenes/UI/Battle/BattleRules.gd"
 ## The Auto button pauses; Next Round plays a round now and resumes Auto.
 ## TACTIC CARDS: each side may play ONE tactic card per round. A human clicks a
 ## card (or presses 1–5) to arm it; it plays at the start of the next round.
-## CPUs and NPC leaders pick with CardSystem.pick_tactic.
+## CPUs and NPC leaders pick with CardSystem.pick_tactic. A CHARM card puts its
+## charm on your lead for the rest of the battle (one use, then it's gone).
+##
+## 📱 PHONES: a side played from a phone keeps its cards face-down on the TV and
+## plays them from the phone (remote_view). Phone players who aren't in the
+## fight VOTE on who wins during the first VOTE_ROUNDS rounds; a right guess
+## earns a card (or a star when their hand is full) — see _pay_votes.
 ##
 ## present(setup) — setup keys:
 ##   team, opp            Arrays of spirit dicts (yours / theirs)
@@ -39,6 +45,10 @@ var _attacking := false   # this round's attacks have begun (a card now waits fo
 var _played := [false, false]   # [you, them]: a tactic already used this round (one each)
 var _auto_gen := 0        # bumped per battle so an old auto loop stops
 var _opp_armed := ""
+var _votes := {}          # player index -> 0 (the left side wins) / 1 (the right side wins)
+var _vote_paid := {}      # player index -> what they won ("" = guessed wrong)
+
+const VOTE_ROUNDS := 2    # voting closes when this round starts
 
 # 📱 The players whose phones drive this battle (see Remote): the human side(s).
 func remote_owners() -> Array:
@@ -71,6 +81,8 @@ func present(setup: Dictionary) -> void:
 	_stakes = setup.get("stakes", 0.5)
 	_armed = ""
 	_opp_armed = ""
+	_votes = {}
+	_vote_paid = {}
 	_attacking = false
 	_played = [false, false]
 	var atk_mod: int = setup.get("atk_mod", 0)
@@ -146,8 +158,10 @@ func _fill_hand(box: HBoxContainer, hand: Array, interactive: bool, mine: bool) 
 		for i in tactics.size():
 			box.add_child(CardView.new("", Vector2(28, 38) if not mine else HAND_CARD))
 		return
+	var on_phone := Remote.has_phone(_hand_owner if mine else _opp_owner)
 	for key in tactics:
 		var cv := CardView.new(key, HAND_CARD)
+		cv.face_down = on_phone   # the phone shows this hand; the TV doesn't
 		cv.armed = (_armed if mine else _opp_armed) == key
 		cv.disabled = _over
 		cv.pressed.connect(_arm.bind(key, mine))
@@ -284,6 +298,10 @@ func _play_tactic(key: String, is_me: bool) -> void:
 				_buff(a, "def", 1)
 		"switcheroo":
 			await _switch_lead(is_me)
+		_:
+			if CardsData.is_charm(key):
+				me["charm"] = key   # on the battle copy: it ends with the battle
+				_charm_entry(is_me)
 	await _beat(0.45)
 
 # Swap the lead with the healthiest living ally waiting behind it.
@@ -558,4 +576,107 @@ func _end(player_won: bool) -> void:
 		Sfx.play("win" if player_won else "lose")
 		Juice.pop(_title, 1.3, 0.4)
 	_refresh_hands()
+	_pay_votes(player_won)
 	_continue_btn.show()
+
+# ---------------- 📱 phones ----------------
+
+func _side_name(side: int) -> String:
+	if side == 0:
+		return _team_name_lbl.text
+	if _pvp_names.size() == 2:
+		return _opp_name_lbl.text
+	return "%s (%s)" % [_title.text, String(_opp[0].get("name", "?"))] if not _opp.is_empty() else _title.text
+
+func _lead_line(side: Array, active: int) -> String:
+	if active >= side.size():
+		return "—"
+	var m: Dictionary = side[active]
+	return "%s  ❤ %d/%d  (%d left)" % [m.get("name", "?"), int(m.get("current_hp", 0)), int(m.get("hp", 1)),
+		side.filter(_alive).size()]
+
+# A fighter's phone: the battle state, ITS OWN cards (the TV shows them
+# face-down), and the battle buttons. Spectators get {} → Remote's idle menu,
+# with the vote from spectator_view on top.
+func remote_view(idx: int) -> Dictionary:
+	var mine := idx == _hand_owner and _human
+	var theirs := idx == _opp_owner and _opp_human
+	if idx < 0 or not (mine or theirs):
+		return {}
+	var buttons: Array = []
+	var actions: Array = []
+	var hand: Array = (_hand if mine else _opp_hand).filter(func(k): return CardsData.kind_of(k) == "tactic")
+	var armed: String = _armed if mine else _opp_armed
+	if not _over:
+		for key in hand:
+			buttons.append({"label": "🃏 %s%s" % [CardsData.card_name(key), "  ✓ next" if armed == key else ""]})
+			actions.append(_arm.bind(key, mine))
+	for b in [_continue_btn, _next_btn, _auto_btn, _speed_btn, _skip_btn]:
+		if b.is_visible_in_tree() and not b.disabled:
+			buttons.append({"label": String(b.text).get_slice("  [", 0), "gold": b == _continue_btn})
+			actions.append(Remote.press_action(b))
+	var lines: Array = [
+		"🟢 You: " + _lead_line(_team if mine else _opp, _active if mine else _opp_active),
+		"🔴 Foe: " + _lead_line(_opp if mine else _team, _opp_active if mine else _active)]
+	if not _over:
+		lines.append("Tap a card: it plays at the start of the next round (one per round)." if not hand.is_empty()
+			else "No tactic cards in this battle.")
+	else:
+		lines.append("🏆 You won!" if _won == mine else "💀 You lost…")
+	return {"screen": "buttons", "title": "⚔ %s — round %d" % [_title.text, _round_num], "lines": lines,
+		"buttons": buttons, "_actions": actions}
+
+# A spectator's vote on this battle (Remote puts it above the idle menu).
+func spectator_view(idx: int) -> Dictionary:
+	if not visible or idx < 0 or idx == _hand_owner or idx == _opp_owner:
+		return {}
+	var names := [_side_name(0), _side_name(1)]
+	if _over:
+		if not _votes.has(idx):
+			return {}
+		var got: String = _vote_paid.get(idx, "")
+		return {"title": "🗳 You picked %s" % names[_votes[idx]],
+			"lines": ["✅ Right! You get %s." % got if got != "" else "❌ Wrong guess this time."]}
+	if _votes.has(idx):
+		return {"title": "🗳 You picked %s" % names[_votes[idx]], "lines": ["Right guess = +1 card (★ if your hand is full)."]}
+	if _round_num >= VOTE_ROUNDS:
+		return {"title": "🗳 Voting closed", "lines": ["%s vs %s" % names]}
+	return {"title": "🗳 Who wins this battle?", "lines": ["Votes close at round %d. Right guess = +1 card (★ if your hand is full)." % VOTE_ROUNDS],
+		"buttons": [{"label": "🟢 " + names[0], "gold": true}, {"label": "🔴 " + names[1], "gold": true}],
+		"_actions": [_vote.bind(idx, 0), _vote.bind(idx, 1)]}
+
+func _vote(idx: int, side: int) -> void:
+	if _over or _round_num >= VOTE_ROUNDS or _votes.has(idx):
+		return
+	_votes[idx] = side
+	Sfx.play("pop")
+	_logln("[color=#c8a8ff]🗳 %s votes![/color]" % GameState.players[idx].player_name)
+
+# Right guesses: a random card, or a star on a spirit when the hand is full.
+func _pay_votes(left_won: bool) -> void:
+	for idx in _votes:
+		if idx >= GameState.players.size() or (int(_votes[idx]) == 0) != left_won:
+			_vote_paid[idx] = ""
+			continue
+		var p: PlayerData = GameState.players[idx]
+		var prize := ""
+		if not p.inventory.hand_full():
+			var key := CardsData.random_card()
+			CardSystem.give(idx, key)   # not full → no discard popup
+			prize = CardsData.card_name(key)
+		else:
+			# a star on the spirit furthest from 3★ (3★ would start the bonus flow mid-turn)
+			var best: Dictionary = {}
+			for m in p.team:
+				if float(m.get("stars", 0)) <= 1.5 and (best.is_empty() or float(m.get("stars", 0)) < float(best.get("stars", 0))):
+					best = m
+			if not best.is_empty():
+				SpiritsProgressionSystem.award_star(idx, best)
+				prize = "a ★ for %s" % best.get("name", "?")
+			else:
+				p.inventory.gold += 20
+				prize = "20 gold"
+		_vote_paid[idx] = prize
+		_logln("[color=#c8a8ff]🗳 %s guessed right: %s![/color]" % [p.player_name, prize])
+		EventBus.log_entry.emit(idx, "🗳 %s guessed the battle right: %s!" % [p.player_name, prize], "#c8a8ff")
+

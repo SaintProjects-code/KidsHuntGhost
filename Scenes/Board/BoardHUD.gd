@@ -2,8 +2,8 @@ extends Control
 ## Board HUD drawn over the map:
 ##   • top-left play timer
 ##   • top-right info card for the active player (PlayerPanel.tscn)
-##   • bottom-right HAND: the active player's cards. Click a field card (or
-##     charm) to play it on your turn; tactic cards are played in battle.
+##   • bottom-right HAND: the active player's cards. Click a field card
+##     to play it on your turn; tactic cards (charms too) are played in battle.
 ##   • the dice tray that animates every board roll
 ##   • TEAM / MAP / LOG / DEV buttons (nodes in Board.tscn, wired here)
 ## Menus opened here go through UIManager's overlay slot.
@@ -17,6 +17,7 @@ var elapsed: float = 0.0         # play time, saved with the game
 
 var _players_col: Control
 var _timer_label: Label
+var _room_label: Label           # 📱 "Room KXRT · 192.168.1.20:8080" while phones can join
 var _last_sig := ""
 var _hand_title: Label
 var _hand_row: HBoxContainer
@@ -33,6 +34,11 @@ func _ready() -> void:
 	_timer_label = UIKit.label("00:00", 22)
 	_timer_label.position = Vector2(176, 24)
 	add_child(_timer_label)
+	_room_label = UIKit.label("", 14, UIKit.GOLD)
+	_room_label.position = Vector2(176, 52)
+	_room_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_room_label.add_theme_constant_override("outline_size", 4)
+	add_child(_room_label)
 	_build_player_column()
 	_build_hand()
 	_build_dice_tray()
@@ -63,6 +69,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	elapsed += delta
 	_timer_label.text = "%02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60]
+	_room_label.text = "📱 Room %s · %s" % [Remote.code, Remote.phone_url().trim_prefix("http://")] if Remote.is_on() else ""
 	# gold, cards, badges and spirits change all over the place — poll a
 	# cheap snapshot instead of wiring every signal
 	var sig := _player_sig()
@@ -173,6 +180,7 @@ func _refresh_hand() -> void:
 	_hand_title.text = "🃏 %s's hand  %d/%d" % [p.player_name, p.inventory.hand.size(), Balance.HAND_SIZE]
 	for key in p.inventory.hand:
 		var cv := CardView.new("" if p.is_cpu else key, HAND_CARD)
+		cv.face_down = Remote.has_phone(i)   # 📱 a phone player's hand is on their phone
 		if not p.is_cpu:
 			cv.pressed.connect(_on_card_pressed.bind(i, key, cv))
 		_hand_row.add_child(cv)

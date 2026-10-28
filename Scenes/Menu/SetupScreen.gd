@@ -227,7 +227,7 @@ func _build_phones_panel() -> void:
 	open_btn.size = Vector2(200, 36)
 	UIKit.style_button(open_btn, "secondary", "m")
 	add_child(open_btn)
-	_phone_chip = UIKit.label("", 14, UIKit.GOLD)
+	_phone_chip = UIKit.label("", 18, UIKit.GOLD)
 	_phone_chip.position = Vector2(548, 591)
 	add_child(_phone_chip)
 
@@ -240,11 +240,11 @@ func _build_phones_panel() -> void:
 	_phones_panel.add_child(col)
 	col.add_child(UIKit.label("📱 Play with phones", 24, UIKit.GOLD))
 	var local := Button.new()
-	local.text = "📶 Start on this computer  (phones on the same Wi-Fi)"
+	local.text = "📶 Restart room on this computer  (phones on the same Wi-Fi)"
 	UIKit.style_button(local, "gold", "l")
 	local.pressed.connect(func(): Remote.start_local())
 	col.add_child(local)
-	_phone_status = UIKit.label("", 30, UIKit.GOLD)
+	_phone_status = UIKit.label("", 40, UIKit.GOLD)
 	_phone_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_phone_status)
 	_phone_steps = UIKit.wrap_label("", 16, 660)
@@ -267,7 +267,10 @@ func _build_phones_panel() -> void:
 	done.pressed.connect(func(): _phones_panel.hide())
 	col.add_child(done)
 	_phones_panel.hide()
-	open_btn.pressed.connect(func(): _phones_panel.visible = not _phones_panel.visible)
+	open_btn.pressed.connect(func():
+		_phones_panel.visible = not _phones_panel.visible
+		if _phones_panel.visible and Remote.status_text() == "off":
+			Remote.start_local())   # opening the panel hosts a room straight away
 	Remote.room_changed.connect(func(_c): _refresh_phones())
 	Remote.phones_changed.connect(_on_phones_changed)
 	Remote.lobby_view = _phone_lobby_view
@@ -283,10 +286,13 @@ func _refresh_phones() -> void:
 	_phone_chip.text = ("Room %s · %d phone%s" % [Remote.code, online, "" if online == 1 else "s"]) if Remote.code != "" else ""
 	if Remote.code != "":
 		_phone_status.text = "Room code:  %s" % Remote.code
-		_phone_steps.text = "1.  On each phone open:   %s\n2.  Type the code  %s  and your name, then tap Join!" % [
-			Remote.phone_url(), Remote.code]
+		_phone_steps.text = "1.  On each phone's browser open:   %s/?code=%s\n2.  Type your name, then tap Join!  (code: %s)" % [
+			Remote.phone_url(), Remote.code, Remote.code]
 		if Remote.is_local():
-			_phone_steps.text += "\n(If Windows asks, ALLOW Godot on private networks. Phones must be on this Wi-Fi.)"
+			var others: Array = Remote.other_urls()
+			if not others.is_empty():
+				_phone_steps.text += "\nWon't load? Try:  " + "   ".join(others)
+			_phone_steps.text += "\nPhones must be on this Wi-Fi (not guest Wi-Fi). If Windows asks, ALLOW Godot on private networks."
 	else:
 		_phone_status.text = "" if Remote.status_text() == "off" else "Phones: %s" % Remote.status_text()
 		_phone_steps.text = "Press the gold button, then follow the steps that appear here."

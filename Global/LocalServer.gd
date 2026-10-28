@@ -2,20 +2,22 @@ class_name LocalServer
 extends RefCounted
 ## 📱 The phone server built into the game, for playing on your own Wi-Fi with
 ## nothing else installed (Remote uses it in "this computer" mode):
-##   • HTTP on HTTP_PORT serves the phone page (server/public/) plus a tiny
+##   • HTTP on http_port serves the phone page (server/public/) plus a tiny
 ##     config.js that points the page at…
-##   • WebSockets on WS_PORT, where phones join with the room code.
+##   • WebSockets on http_port + 1, where phones join with the room code.
+## The first free pair in PORTS is used (8080 may be taken by `npm start` or
+## another app).
 ## It speaks the same messages as server/server.js, handing them to Remote as
 ## if they came from that server ({t: "room" | "join" | "leave" | "msg"}).
 ## Remote calls poll() every frame and send_to() to talk to a phone.
 
-const HTTP_PORT := 8080
-const WS_PORT := 8081
+const PORTS := [8080, 8090, 8180, 9080, 9180]   # HTTP; the websocket is the next port
 const PUBLIC := "res://server/public/"
 const TYPES := {"html": "text/html; charset=utf-8", "js": "text/javascript", "css": "text/css"}
 const LETTERS := "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 var code := ""
+var http_port := 0
 var error := ""                  # why it couldn't start ("" = running)
 var _on_message: Callable        # (Dictionary) -> void, the Remote side
 var _http := TCPServer.new()
@@ -28,12 +30,17 @@ func _init(on_message: Callable) -> void:
 	_on_message = on_message
 
 func start() -> bool:
-	if _http.listen(HTTP_PORT) != OK:
-		error = "Port %d is busy — close anything else using it (like npm start) and try again." % HTTP_PORT
-		return false
-	if _ws.listen(WS_PORT) != OK:
-		_http.stop()
-		error = "Port %d is busy — close anything else using it and try again." % WS_PORT
+	http_port = 0
+	for port in PORTS:
+		if _http.listen(port) != OK:
+			continue
+		if _ws.listen(port + 1) != OK:
+			_http.stop()
+			continue
+		http_port = port
+		break
+	if http_port == 0:
+		error = "Ports %s are all busy — close other servers (like npm start) and try again." % str(PORTS)
 		return false
 	if code == "":
 		for i in 4:
@@ -50,16 +57,43 @@ func stop() -> void:
 	_phones.clear()
 	_requests.clear()
 
-# The addresses phones can open: this computer's home-network IPv4s.
-static func lan_urls() -> Array:
+# This computer's home-network IPv4s, likeliest first: Wi-Fi / Ethernet before
+# the virtual adapters Windows adds for WSL, Hyper-V, VirtualBox, VPNs…
+const VIRTUAL := ["vethernet", "virtual", "vmware", "vbox", "hyper-v", "wsl", "docker", "loopback", "vpn",
+	"tap", "tun", "zerotier", "tailscale", "hamachi", "bluetooth"]
+
+static func lan_ips() -> Array:
+	var scored: Array = []
+	for iface in IP.get_local_interfaces():
+		var label := (String(iface.get("friendly", "")) + " " + String(iface.get("name", ""))).to_lower()
+		for ip in iface.get("addresses", []):
+			if ip.count(".") != 3 or ip.begins_with("127.") or ip.begins_with("169.254."):
+				continue
+			var second := int(ip.get_slice(".", 1))
+			var score := -1
+			if ip.begins_with("192.168."):
+				score = 0 if not ip.begins_with("192.168.56.") else 4   # .56 = VirtualBox host-only
+			elif ip.begins_with("10."):
+				score = 1
+			elif ip.begins_with("172.") and second >= 16 and second <= 31:
+				score = 2   # usually Docker / WSL / Hyper-V
+			if score < 0:
+				continue
+			if VIRTUAL.any(func(v): return label.contains(v)):
+				score += 5
+			elif label.contains("wi-fi") or label.contains("wlan") or label.contains("wireless") or label.begins_with("wl"):
+				score -= 1
+			scored.append([score, ip])
+	scored.sort_custom(func(a, b): return a[0] < b[0])
 	var out: Array = []
-	for ip in IP.get_local_addresses():
-		if ip.count(".") == 3 and not ip.begins_with("127.") and not ip.begins_with("169.254."):
-			var private_net: bool = ip.begins_with("192.168.") or ip.begins_with("10.") or \
-				(ip.begins_with("172.") and int(ip.get_slice(".", 1)) >= 16 and int(ip.get_slice(".", 1)) <= 31)
-			if private_net:
-				out.append("http://%s:%d" % [ip, HTTP_PORT])
+	for pair in scored:
+		if not out.has(pair[1]):
+			out.append(pair[1])
 	return out
+
+# The addresses phones can open.
+static func lan_urls(port: int) -> Array:
+	return lan_ips().map(func(ip): return "http://%s:%d" % [ip, port])
 
 func send_to(id: String, data) -> void:
 	for p in _phones:
@@ -96,7 +130,7 @@ func _respond(peer: StreamPeerTCP, path: String) -> void:
 	var type := "text/plain"
 	var status := "200 OK"
 	if path == "/config.js":
-		body = ("window.KHG_WS = \"ws://\" + location.hostname + \":%d\";" % WS_PORT).to_utf8_buffer()
+		body = ("window.KHG_WS = \"ws://\" + location.hostname + \":%d\";" % (http_port + 1)).to_utf8_buffer()
 		type = TYPES["js"]
 	else:
 		var file := "index.html" if path == "/" else path.trim_prefix("/")

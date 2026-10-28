@@ -13,9 +13,11 @@ extends Node
 ##     phone; a tap presses the real button here
 ##   • "pad"     — a competition minigame is running: ACTION + LEFT/MIDDLE/RIGHT,
 ##     injected as that player's shared-keyboard keys (see Controls)
-##   • "wait"    — someone else's turn
+##   • idle menu — someone else's turn: who's playing, plus 🃏 your hand (play
+##     the field cards in CardsData.OFF_TURN) and 👻 your team (stats, reorder)
 ## A window can supply its own phone view with remote_view(player_idx) (the
-## competition pick step does, so everyone picks their own spirit at once).
+## competition pick step does, so everyone picks their own spirit at once),
+## and a spectator section with spectator_view(player_idx) (battle voting).
 ## The setup screen gives each joining phone a player card (see SetupScreen).
 
 signal room_changed(code: String)
@@ -44,6 +46,7 @@ var _sent := {}                  # id -> last view JSON sent
 var _actions := {}               # id -> Array of Callables behind the last view's buttons
 var _rev := {}                   # id -> view revision
 var _held := {}                  # id -> {pad key: true} currently held (released on drop)
+var _page := {}                  # id -> idle-menu page {"p": "main"|"hand"|"card"|"team"|"mon", "key", "i"}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # windows pause the board; phones must keep working
@@ -58,6 +61,13 @@ func is_on() -> bool:
 
 func is_local() -> bool:
 	return _local != null
+
+# Is this player seat being played from a phone that's connected right now?
+func has_phone(idx: int) -> bool:
+	if idx < 0 or idx >= GameState.players.size():
+		return false
+	var id: String = GameState.players[idx].remote_id
+	return id != "" and phones.has(id) and phones[id]["online"]
 
 func status_text() -> String:
 	if _local_error != "":
@@ -108,10 +118,22 @@ func stop() -> void:
 # computer's home-network address when hosting locally).
 func phone_url() -> String:
 	if _local:
-		var urls := LocalServer.lan_urls()
-		return " or ".join(urls) if not urls.is_empty() else "(no Wi-Fi network found)"
-	var u := url.replace("wss://", "https://").replace("ws://", "http://")
-	return u.trim_suffix("/ws")
+		var urls := LocalServer.lan_urls(_local.http_port)
+		return urls[0] if not urls.is_empty() else "(no Wi-Fi network found)"
+	var u := url.replace("wss://", "https://").replace("ws://", "http://").trim_suffix("/ws")
+	# a relay on this computer: phones can't open "localhost", give them our LAN address
+	for host in ["localhost", "127.0.0.1"]:
+		if u.contains("//" + host):
+			var lan := LocalServer.lan_ips()
+			if not lan.is_empty():
+				u = u.replace("//" + host, "//" + lan[0])
+	return u
+
+# Other addresses of this computer, in case the first one doesn't work.
+func other_urls() -> Array:
+	if not _local:
+		return []
+	return LocalServer.lan_urls(_local.http_port).slice(1)
 
 func _open() -> void:
 	_ws = WebSocketPeer.new()
@@ -285,9 +307,10 @@ func _game_view(scene: Node, idx: int) -> Dictionary:
 		var owners: Array = win.remote_owners() if win.has_method("remote_owners") else [_owner_of(win)]
 		if owners.has(idx):
 			return _mirror(win, idx)
-		return {"screen": "wait", "text": _waiting_text()}
+		var extra: Dictionary = win.spectator_view(idx) if win.has_method("spectator_view") else {}
+		return _idle_view(idx, extra)
 	if idx != GameState.current_player_index:
-		return {"screen": "wait", "text": _waiting_text()}
+		return _idle_view(idx, {})
 	# the board itself: a choice prompt, a message, or the action bar + hand
 	for path in ["BoardUI/Root/ChoicePanel", "BoardUI/Root/EventPanel"]:
 		var panel := scene.get_node_or_null(path) as Control
@@ -359,7 +382,7 @@ func _mirror(root: Node, _idx: int, with_text := true) -> Dictionary:
 		if label == "":
 			continue
 		buttons.append({"label": label, "gold": "Roll" in label or "Catch" in label})
-		actions.append(_press_action(b))
+		actions.append(press_action(b))
 	if buttons.is_empty():
 		return {"screen": "wait", "title": title, "lines": lines, "text": "…"}
 	return {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
@@ -375,13 +398,125 @@ func _label_of(b: BaseButton) -> String:
 		s += "  ✓" if b.button_pressed else ""
 	return s.left(40)
 
-func _press_action(b: BaseButton) -> Callable:
+func press_action(b: BaseButton) -> Callable:
 	return func():
 		if not is_instance_valid(b) or b.disabled or not b.is_visible_in_tree():
 			return
 		if b.toggle_mode:
 			b.button_pressed = not b.button_pressed
 		b.pressed.emit()
+
+# ─── idle menu (someone else's turn) ──────────────────────────────────────────
+
+func _go(id: String, page: Dictionary) -> Callable:
+	return func(): _page[id] = page
+
+func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
+	var id: String = GameState.players[idx].remote_id
+	var page: Dictionary = _page.get(id, {"p": "main"})
+	var p: PlayerData = GameState.players[idx]
+	var buttons: Array = []
+	var actions: Array = []
+	var lines: Array = []
+	var title := ""
+	match String(page["p"]):
+		"hand":
+			title = "🃏 Your hand  %d/%d" % [p.inventory.hand.size(), Balance.HAND_SIZE]
+			for key in p.inventory.hand:
+				var c := CardsData.card(key)
+				lines.append("%s — %s" % [CardsData.card_name(key), c.get("desc", "")])
+			var seen := {}
+			for key in p.inventory.hand:
+				if key in CardsData.OFF_TURN and not seen.has(key) and idx != GameState.current_player_index:
+					seen[key] = true
+					buttons.append({"label": "▶ Play " + CardsData.card_name(key), "gold": true})
+					actions.append(_play_off_turn.bind(idx, key))
+			if p.inventory.hand.is_empty():
+				lines.append("No cards yet.")
+			elif buttons.is_empty():
+				lines.append("Tactic cards are for battles; Lanterns for catching; the rest wait for your turn.")
+		"card":
+			var key: String = page["key"]
+			title = "%s — on which spirit?" % CardsData.card_name(key)
+			for i in p.team.size():
+				var m: Dictionary = p.team[i]
+				if CardSystem.can_target(key, m):
+					buttons.append({"label": "%s  ❤ %d/%d" % [m["name"], int(m["current_hp"]), int(m["hp"])], "gold": true})
+					actions.append(_play_off_turn.bind(idx, key, m))
+			if buttons.is_empty():
+				lines.append("No spirit needs this right now.")
+		"team":
+			title = "👻 Your team (top = lead)"
+			for i in p.team.size():
+				var m: Dictionary = p.team[i]
+				buttons.append({"label": "%d. %s %s  ❤ %d/%d" % [i + 1, m["name"], SpiritsData.star_text(m.get("stars", 0)),
+					int(m["current_hp"]), int(m["hp"])]})
+				actions.append(_go(id, {"p": "mon", "i": i}))
+			if not p.pc.is_empty():
+				lines.append("Spirit Box: %d more spirit%s" % [p.pc.size(), "" if p.pc.size() == 1 else "s"])
+		"mon":
+			var i: int = page["i"]
+			if i >= p.team.size():
+				_page[id] = {"p": "team"}
+				return _idle_view(idx, extra)
+			var m: Dictionary = p.team[i]
+			title = "%s  %s%s" % [m["name"], SpiritsData.star_text(m.get("stars", 0)), "  (lead)" if i == 0 else ""]
+			lines = ["❤ HP %d/%d   ATK %d  DEF %d  SPD %d" % [int(m["current_hp"]), int(m["hp"]), int(m.get("atk", 0)),
+					int(m.get("def", 0)), int(m.get("spd", 0))],
+				"Type: %s   Stage %d" % [SpiritsData.type_text(m), int(m.get("stage", 1))],
+				"✦ Move: %s" % SpiritsData.move_of(SpiritsData.move_key(m))["name"]]
+			if i > 0:
+				buttons.append({"label": "⭐ Make lead", "gold": true})
+				actions.append(_move_mon.bind(idx, i, -i, id))
+				buttons.append({"label": "▲ Move up"})
+				actions.append(_move_mon.bind(idx, i, -1, id))
+			if i < p.team.size() - 1:
+				buttons.append({"label": "▼ Move down"})
+				actions.append(_move_mon.bind(idx, i, 1, id))
+		_:
+			title = String(extra.get("title", _waiting_text()))
+			lines = extra.get("lines", []).duplicate()
+			if extra.has("title"):
+				lines.push_front(_waiting_text())
+			buttons = extra.get("buttons", []).duplicate()
+			actions = extra.get("_actions", []).duplicate()
+			buttons.append({"label": "🃏 My hand (%d)" % p.inventory.hand.size()})
+			actions.append(_go(id, {"p": "hand"}))
+			buttons.append({"label": "👻 My team"})
+			actions.append(_go(id, {"p": "team"}))
+	if String(page["p"]) != "main":
+		buttons.append({"label": "◀ Back"})
+		actions.append(_go(id, {"p": "team"} if page["p"] == "mon" else ({"p": "hand"} if page["p"] == "card" else {"p": "main"})))
+		if not extra.is_empty():
+			lines.push_front("🗳 " + String(extra.get("title", "")).trim_prefix("🗳 "))
+	return {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
+
+func _play_off_turn(idx: int, key: String, target = null) -> void:
+	var p: PlayerData = GameState.players[idx]
+	var id := p.remote_id
+	if not p.inventory.hand.has(key) or idx == GameState.current_player_index:
+		return
+	var kind := String(CardsData.card(key).get("target", ""))
+	if target == null and kind in ["spirit", "fainted"]:
+		_page[id] = {"p": "card", "key": key}
+		return
+	if target == null:
+		target = true
+	if not CardSystem.can_target(key, target):
+		return
+	CardSystem.play_field(idx, key, target)   # OFF_TURN cards never await
+	_page[id] = {"p": "hand"}
+
+func _move_mon(idx: int, i: int, dir: int, id: String) -> void:
+	var team: Array = GameState.players[idx].team
+	var j := i + dir
+	if j < 0 or j >= team.size():
+		return
+	var m = team[i]
+	team.remove_at(i)
+	team.insert(j, m)
+	_page[id] = {"p": "mon", "i": j}
+	EventBus.log_entry.emit(idx, "%s's lead is now %s." % [GameState.players[idx].player_name, team[0]["name"]], "#a9b0c4")
 
 # Helpers: depth-first search of the scene tree.
 func _find(root: Node, pred: Callable) -> Node:
