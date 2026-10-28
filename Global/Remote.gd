@@ -229,7 +229,7 @@ func _process(delta: float) -> void:
 func _raw(obj: Dictionary) -> void:
 	if _local:
 		if obj.get("t") == "send":
-			_local.send_to(String(obj["id"]), obj["data"])
+			_local.send_to(LocalServer.text(obj.get("id")), obj["data"])
 		return
 	if _ws and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		_ws.send_text(JSON.stringify(obj))
@@ -238,24 +238,24 @@ func send_view(id: String, view: Dictionary) -> void:
 	_raw({"t": "send", "id": id, "data": {"view": view}})
 
 func _on_server(m: Dictionary) -> void:
-	match String(m.get("t", "")):
+	match LocalServer.text(m.get("t")):
 		"room":
-			code = String(m["code"])
+			code = LocalServer.text(m.get("code"))
 			_sent.clear()
 			room_changed.emit(code)
 		"join":
-			var id := String(m["id"])
-			phones[id] = {"name": String(m.get("name", "Player")), "online": true}
+			var id := LocalServer.text(m.get("id"))
+			phones[id] = {"name": LocalServer.text(m.get("name"), "Player"), "online": true}
 			_sent.erase(id)
 			phones_changed.emit()
 		"leave":
-			var id := String(m["id"])
+			var id := LocalServer.text(m.get("id"))
 			if phones.has(id):
 				phones[id]["online"] = false
 			_release_all(id)
 			phones_changed.emit()
 		"msg":
-			_on_phone(String(m["id"]), m.get("data", {}))
+			_on_phone(LocalServer.text(m.get("id")), m.get("data", {}))
 
 # ─── phone input ──────────────────────────────────────────────────────────────
 
@@ -263,8 +263,11 @@ func _on_phone(id: String, data) -> void:
 	if not (data is Dictionary):
 		return
 	if data.has("press"):
+		if not (data["press"] is float or data["press"] is int):
+			return
 		var i := int(data["press"])
-		if int(data.get("rev", -1)) != int(_rev.get(id, 0)):
+		var rev = data.get("rev")
+		if not (rev is float or rev is int) or int(rev) != int(_rev.get(id, 0)):
 			return   # stale: the screen changed since the phone drew it
 		var acts: Array = _actions.get(id, [])
 		if i >= 0 and i < acts.size():
@@ -273,7 +276,7 @@ func _on_phone(id: String, data) -> void:
 		else:
 			phone_pressed.emit(id, i)
 	elif data.has("pad"):
-		_pad(id, String(data["pad"]), bool(data.get("down", false)))
+		_pad(id, LocalServer.text(data["pad"]), data.get("down") == true)
 
 # A minigame button: press/release that player's shared-keyboard key.
 func _pad(id: String, action: String, down: bool) -> void:

@@ -29,6 +29,13 @@ var _requests: Array = []        # {peer: StreamPeerTCP, buf: PackedByteArray, t
 var _phones: Array = []          # {ws: WebSocketPeer, id: String, name: String, open: bool}
 var _names := {}                 # id -> name, kept so a phone can rejoin its seat
 
+# Phone messages are JSON from a browser: a field may be null, a number or
+# missing. String(null) crashes in Godot 4, so every text field goes through this.
+static func text(v, fallback := "") -> String:
+	if v is String or v is StringName:
+		return String(v)
+	return fallback if v == null else str(v)
+
 func _init(on_message: Callable) -> void:
 	_on_message = on_message
 
@@ -185,12 +192,12 @@ func _poll_ws() -> void:
 
 func _on_phone(p: Dictionary, m: Dictionary) -> void:
 	var ws: WebSocketPeer = p["ws"]
-	match String(m.get("t", "")):
+	match text(m.get("t")):
 		"join":
-			if String(m.get("code", "")).strip_edges().to_upper() != code:
+			if text(m.get("code")).strip_edges().to_upper() != code:
 				ws.send_text(JSON.stringify({"t": "error", "text": "Wrong code — use the code shown on the TV."}))
 				return
-			var id := String(m.get("id", ""))
+			var id := text(m.get("id"))
 			if not _names.has(id):
 				id = "%08x" % randi()
 			# a rejoin replaces the old connection for that seat
@@ -198,7 +205,7 @@ func _on_phone(p: Dictionary, m: Dictionary) -> void:
 				if q != p and q["id"] == id:
 					q["id"] = ""
 					q["ws"].close()
-			var name := String(m.get("name", "Player")).strip_edges().left(14)
+			var name := text(m.get("name"), "Player").strip_edges().left(14)
 			p["id"] = id
 			_names[id] = name if name != "" else "Player"
 			ws.send_text(JSON.stringify({"t": "joined", "id": id, "code": code}))
