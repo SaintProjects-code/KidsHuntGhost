@@ -57,6 +57,8 @@ var _next_btn: Button
 var _skip_btn: Button
 var _continue_btn: Button
 var _speed_btn: Button
+var _auto_btn: Button
+var _auto := false                    # rounds play by themselves (never picks your cards)
 var _detached := false
 var _opening_pending := false
 
@@ -123,8 +125,12 @@ func _ready() -> void:
 	_continue_btn = _small("Continue ⏎", 110, func(): finished.emit(_won))
 	_continue_btn.hide()
 	brow.add_child(_continue_btn)
-	_speed_btn = _small("2x", 0, _on_speed_toggle)
-	btns.add_child(_speed_btn)
+	var arow := UIKit.hbox(8)
+	btns.add_child(arow)
+	_auto_btn = _small("⏸ Auto", 110, _on_auto_toggle)
+	arow.add_child(_auto_btn)
+	_speed_btn = _small("1x", 70, _on_speed_toggle)
+	arow.add_child(_speed_btn)
 
 	# layout is only final once shown — refit every time the window opens,
 	# and start the intro once it can actually be seen
@@ -434,9 +440,14 @@ func _on_next() -> void:
 func _on_skip() -> void:
 	pass
 
+func _on_auto_toggle() -> void:
+	pass
+
+# Battle speed: 1x ⇄ 3x (the label shows the current speed).
 func _on_speed_toggle() -> void:
-	_speed = 2.0 if _speed == 1.0 else 1.0
-	_speed_btn.text = "1x" if _speed == 2.0 else "2x"
+	_speed = 3.0 if _speed == 1.0 else 1.0
+	_speed_btn.text = "%dx" % int(_speed)
+	Sfx.play("click")
 
 # The trainer portrait in a circle tinted with the team's colour.
 class TrainerDisc:

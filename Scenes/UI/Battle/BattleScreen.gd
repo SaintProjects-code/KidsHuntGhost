@@ -3,6 +3,9 @@ extends "res://Scenes/UI/Battle/BattleRules.gd"
 ## on Next Round (or by themselves for CPU fights). Reused for wild spirits,
 ## trainers, gyms, the Haunted Four, the Champion and PvP.
 ##
+## AUTO: human battles start on Auto — rounds play by themselves (1x / 3x).
+## Auto NEVER picks your cards: arm one and it plays at the next round.
+## The Auto button pauses; Next Round plays a round now and resumes Auto.
 ## TACTIC CARDS: each side may play ONE tactic card per round. A human clicks a
 ## card (or presses 1–5) to arm it; it plays at the start of the next round.
 ## CPUs and NPC leaders pick with CardSystem.pick_tactic.
@@ -32,6 +35,7 @@ var _human := true
 var _opp_human := false
 var _stakes := 0.5
 var _armed := ""          # your card queued for next round
+var _auto_gen := 0        # bumped per battle so an old auto loop stops
 var _opp_armed := ""
 
 func present(setup: Dictionary) -> void:
@@ -66,7 +70,11 @@ func present(setup: Dictionary) -> void:
 	_won = false
 	_skipping = false
 	_speed = 1.0
-	_speed_btn.text = "2x"
+	_speed_btn.text = "1x"
+	_auto = _human or _opp_human   # humans start on Auto; CPU-only fights use autoplay()
+	_auto_gen += 1
+	_auto_btn.visible = _auto
+	_update_auto_btn()
 	_round_num = 0
 	_star_credits = {}
 	_ko_stars = {}
@@ -256,12 +264,37 @@ func _clear_round_flags() -> void:
 # ---------------- flow ----------------
 
 func _on_next() -> void:
-	if not _over and not _busy:
-		Sfx.play("click")
+	if _over:
+		return
+	Sfx.play("click")
+	_auto = true   # Next Round also (re)starts Auto
+	_update_auto_btn()
+	if not _busy:
 		_round()
+
+func _on_auto_toggle() -> void:
+	if _over:
+		return
+	_auto = not _auto
+	Sfx.play("click")
+	_update_auto_btn()
+
+func _update_auto_btn() -> void:
+	_auto_btn.text = "⏸ Auto" if _auto else "▶ Auto"
+	_auto_btn.modulate = Color(1.2, 1.15, 0.7) if _auto else Color.WHITE
+
+# Runs while the battle window is up: plays a round whenever Auto is on and
+# nothing else is playing. A short pause between rounds keeps it readable.
+func _auto_loop(gen: int) -> void:
+	while gen == _auto_gen and not _over and is_inside_tree():
+		await get_tree().create_timer(0.9 / _speed).timeout
+		if gen == _auto_gen and _auto and not _busy and not _over and visible:
+			await _round()
 
 # CPU fights: plays the whole battle on screen at a watchable pace.
 func autoplay() -> void:
+	_auto_gen += 1   # the CPU loop below drives this one
+	_auto_btn.hide()
 	_next_btn.disabled = true
 	_skip_btn.disabled = true
 	while not _over:
@@ -301,6 +334,8 @@ func _opening() -> void:
 	await _on_entry(false)
 	_refresh()
 	_busy = false
+	if _auto:
+		_auto_loop(_auto_gen)
 
 func _round() -> void:
 	if _over or _busy:
@@ -428,6 +463,7 @@ func _end(player_won: bool) -> void:
 	_won = player_won
 	_next_btn.disabled = true
 	_skip_btn.hide()
+	_auto_btn.hide()
 	# battle damage is real: write HP back (clamped to the true max)
 	for m in _team:
 		var oi: int = int(m.get("_oi", -1))
