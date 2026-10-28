@@ -36,9 +36,7 @@ var NODES := {
 
 	"VEnter": Vector2i(169, 53),
 	"VEnd": Vector2i(169, 5),
-	
-	
-	 # Victory Peak — top of the E4/Gary corridor (dead end)
+	# the Spectral Trail: a dead-end climb guarded by the Haunted Four
 }
 
 # Which nodes are drawn as big cities. Any node NOT in here is a small junction.
@@ -66,8 +64,8 @@ var NAMES := {
 	"J7": "Route 11",
 	"J8": "Route 12",
 	"J9": "Route 14",
-	"VEnter": "Victory Entrance",
-	"VEnd":  "Victory Peak",
+	"VEnter": "Spectral Trail",
+	"VEnd":  "Spectral Peak",
 }
 
 # Roads. Each connects two node names; "corners" are the bend tiles in between
@@ -78,66 +76,66 @@ var NAMES := {
 # "types": one entry per space, naming what kind of tile it is (see
 # SPACE_TYPE_NAMES below). The list runs from the "from" node toward the "to"
 # node. Any space with no type listed falls back to DEFAULT_SPACE_TYPE.
-# Every route carries 1 EVENT and 1 COMPETITION tile (plus its SP/ITEM tiles;
+# Every route carries 1 EVENT and 1 COMPETITION tile (plus its ghost/ITEM tiles;
 # the long J5→E scenic road keeps a 2nd EVENT).
 var ROUTES := [
 	{ "from": "A", "to": "J1", "corners": [], "spaces": 4,
-		"types": [&"PKMN_PINK", &"EVENT", &"PKMN_PINK", &"ITEM"] },
+		"types": [&"WISP", &"EVENT", &"WISP", &"ITEM"] },
 	{ "from": "B", "to": "J3", "corners": [], "spaces": 4,
-		"types": [&"PKMN_PINK", &"EVENT", &"COMPETITION", &"PKMN_PINK"] },
+		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP"] },
 	{ "from": "C", "to": "H", "corners": [], "spaces": 6,
-		"types": [&"PKMN_GREEN", &"EVENT", &"ITEM", &"PKMN_GREEN", &"PKMN_GREEN", &"PKMN_GREEN"] },
+		"types": [&"GHOST", &"EVENT", &"ITEM", &"GHOST", &"GHOST", &"GHOST"] },
 	{ "from": "C", "to": "J5", "corners": [], "spaces": 2,
 		"types": [&"EVENT", &"COMPETITION"] },
 	{ "from": "E", "to": "D", "corners": [Vector2i(46, 66),Vector2i(46, 35)], "spaces": 5,
-		"types": [&"PKMN_GREEN", &"EVENT", &"COMPETITION", &"ITEM", &"PKMN_GREEN"] },
+		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"ITEM", &"GHOST"] },
 	{ "from": "H", "to": "J8", "corners": [], "spaces": 4,
-		"types": [&"PKMN_GREEN", &"EVENT", &"PKMN_GREEN", &"ITEM"] },
+		"types": [&"GHOST", &"EVENT", &"GHOST", &"ITEM"] },
 	{ "from": "D", "to": "J6", "corners": [], "spaces": 6,
-		"types": [&"PKMN_GREEN", &"EVENT", &"COMPETITION", &"PKMN_GREEN", &"ITEM", &"PKMN_GREEN"] },
+		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"GHOST", &"ITEM", &"GHOST"] },
 	{ "from": "D", "to": "F", "corners": [Vector2i(91, 36),Vector2i(91, 25),Vector2i(104, 25)], "spaces": 6,
-		"types": [&"PKMN_RED", &"EVENT", &"ITEM", &"PKMN_GREEN", &"PKMN_RED", &"PKMN_RED"] },
+		"types": [&"PHANTOM", &"EVENT", &"ITEM", &"GHOST", &"PHANTOM", &"PHANTOM"] },
 
 	#junctions
 	# Parallel roads share both endpoints, so each is named after one of its two
 	# junctions ("name_of") to keep the fork choices distinct and meaningful.
 	{ "from": "J1", "to": "J2", "corners": [Vector2i(7, 43),Vector2i(7, 21)], "spaces": 5, "name_of": "J1",
-		"types": [&"EVENT", &"PKMN_PINK", &"PKMN_PINK", &"ITEM", &"PKMN_PINK"] },
+		"types": [&"EVENT", &"WISP", &"WISP", &"ITEM", &"WISP"] },
 	{ "from": "J1", "to": "J2", "corners": [], "spaces": 4, "name_of": "J2",
-		"types": [&"EVENT", &"PKMN_PINK", &"EVENT", &"EVENT"] },
+		"types": [&"EVENT", &"WISP", &"EVENT", &"EVENT"] },
 	{ "from": "J2", "to": "B", "corners": [], "spaces": 5,
-		"types": [&"PKMN_PINK", &"EVENT", &"COMPETITION", &"ITEM", &"PKMN_PINK"] },
+		"types": [&"WISP", &"EVENT", &"COMPETITION", &"ITEM", &"WISP"] },
 
 	{ "from": "J3", "to": "J4", "corners": [Vector2i(28, -21),Vector2i(61, -22)], "spaces": 5, "name_of": "J3",
-		"types": [&"PKMN_PINK", &"EVENT", &"PKMN_PINK", &"ITEM", &"PKMN_PINK"] },
+		"types": [&"WISP", &"EVENT", &"WISP", &"ITEM", &"WISP"] },
 	{ "from": "J3", "to": "J4", "corners": [], "spaces": 5, "name_of": "J4",
-		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"PKMN_PINK", &"PKMN_PINK"] },
+		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 	{ "from": "J4", "to": "C", "corners": [], "spaces": 5,
-		"types": [&"PKMN_PINK", &"EVENT", &"COMPETITION", &"PKMN_PINK", &"PKMN_PINK"] },
+		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 
 	{ "from": "J5", "to": "E", "corners": [Vector2i(42, -1),Vector2i(42, 10),Vector2i(30, 10)], "spaces": 10,
-		"types": [&"EVENT", &"PKMN_GREEN", &"COMPETITION", &"ITEM", &"PKMN_GREEN", &"PKMN_GREEN", &"EVENT", &"PKMN_GREEN", &"PKMN_GREEN", &"PKMN_GREEN"] },
+		"types": [&"EVENT", &"GHOST", &"COMPETITION", &"ITEM", &"GHOST", &"GHOST", &"EVENT", &"GHOST", &"GHOST", &"GHOST"] },
 	{ "from": "J5", "to": "D", "corners": [Vector2i(85, 12),Vector2i(65, 13)], "spaces": 6,
-		"types": [&"PKMN_GREEN", &"COMPETITION", &"ITEM", &"EVENT", &"PKMN_GREEN", &"PKMN_GREEN"] },
+		"types": [&"GHOST", &"COMPETITION", &"ITEM", &"EVENT", &"GHOST", &"GHOST"] },
 
 	{ "from": "J6", "to": "J7", "corners": [Vector2i(116, 70)], "spaces": 5, "name_of": "J6",
-		"types": [&"PKMN_GREEN", &"EVENT", &"PKMN_GREEN", &"ITEM", &"PKMN_RED"] },
+		"types": [&"GHOST", &"EVENT", &"GHOST", &"ITEM", &"PHANTOM"] },
 	{ "from": "J6", "to": "J7", "corners": [Vector2i(66, 86)], "spaces": 5, "name_of": "J7",
-		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"PKMN_GREEN", &"PKMN_RED"] },
+		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"GHOST", &"PHANTOM"] },
 	{ "from": "J7", "to": "G", "corners": [], "spaces": 5,
-		"types": [&"PKMN_RED", &"EVENT", &"PKMN_RED", &"ITEM", &"PKMN_RED"] },
+		"types": [&"PHANTOM", &"EVENT", &"PHANTOM", &"ITEM", &"PHANTOM"] },
 
 	{ "from": "J8", "to": "J9", "corners": [], "spaces": 6, "name_of": "J8",
-		"types": [&"PKMN_GREEN", &"PKMN_GREEN", &"ITEM", &"EVENT", &"PKMN_GREEN", &"PKMN_RED"] },
+		"types": [&"GHOST", &"GHOST", &"ITEM", &"EVENT", &"GHOST", &"PHANTOM"] },
 	{ "from": "J8", "to": "J9", "corners": [Vector2i(132, 7),Vector2i(132, 54)], "spaces": 6, "name_of": "J9",
-		"types": [&"PKMN_GREEN", &"EVENT", &"COMPETITION", &"ITEM", &"PKMN_RED", &"PKMN_RED"] },
+		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"ITEM", &"PHANTOM", &"PHANTOM"] },
 	{ "from": "J9", "to": "G", "corners": [], "spaces": 5,
-		"types": [&"PKMN_RED", &"EVENT", &"EVENT", &"ITEM", &"PKMN_RED"] },
+		"types": [&"PHANTOM", &"EVENT", &"EVENT", &"ITEM", &"PHANTOM"] },
 
-	# Victory road: the dirt corridor north of Echo End. A dead end — two
-	# Elite Four tiles guard the climb and Gary waits on the platform at the top.
+	# The Spectral Trail: a dead-end climb. Each WARDEN tile is a fight against
+	# one of the Haunted Four (or Champion Vesper).
 	{ "from": "VEnter", "to": "VEnd", "corners": [], "spaces": 7,
-		"types": [&"ITEM", &"E4", &"ITEM",&"E4",&"ITEM",&"E4",&"E4"] },
+		"types": [&"ITEM", &"WARDEN", &"ITEM",&"WARDEN",&"ITEM",&"WARDEN",&"WARDEN"] },
 
 ]
 
@@ -151,44 +149,56 @@ const LINE_WIDTH := 4.0
 const CITY_COLOR := Color("2f6bd0")
 const MARKER_ALPHA := 0.95          # tile fill opacity (1 = fully solid)
 
-# White name printed on each tile (and shown in the landing window). pkmnfl is
-# the same pixel font the menus use.
-const LABEL_FONT := preload("res://Assets/UI/pkmnfl.ttf")
+# White name printed on each tile.
+var LABEL_FONT: Font = ThemeDB.fallback_font
 const LABEL_FONT_SIZE := 11
 const LABEL_COLOR := Color.WHITE
 const LABEL_OUTLINE_SIZE := 2
 const LABEL_OUTLINE_COLOR := Color(0, 0, 0, 0.9)
 
-# The kinds of tile a space can be. The KEY is the type the game logic reacts to
-# (SpaceResolver dispatches on it); the VALUE is the short white name drawn on
-# the tile and shown in the landing window.
-#
-# PKMN comes in three colours = three spirit types; all three read "SP".
+# The kinds of tile a space can be. The KEY is the type the game logic reacts
+# to; the VALUE is the short white name drawn on the tile.
+# Three ghost tiles, weakest to strongest: Wisp, Ghost, Phantom.
 const SPACE_TYPE_NAMES := {
-	&"PKMN_PINK":   "SP",
-	&"PKMN_GREEN":  "SP",
-	&"PKMN_RED":    "SP",
+	&"WISP":        "Wisp",
+	&"GHOST":       "Ghost",
+	&"PHANTOM":     "Phantom",
 	&"EVENT":       "Event",
 	&"ITEM":        "Item",
 	&"COMPETITION": "Comp",
-	&"E4":          "E4",
-	&"GARY":        "Gary",
+	&"WARDEN":      "Warden",
 }
+
+const GHOST_TILES := [&"WISP", &"GHOST", &"PHANTOM"]
+
+# Spirit stage odds per ghost tile: [stage, chance %] pairs.
+const STAGE_ODDS := {
+	&"WISP":    [[1, 100]],
+	&"GHOST":   [[1, 80], [2, 20]],
+	&"PHANTOM": [[2, 80], [3, 20]],
+}
+
+static func roll_stage(type: StringName) -> int:
+	var roll := randi_range(1, 100)
+	for pair in STAGE_ODDS.get(type, [[1, 100]]):
+		roll -= int(pair[1])
+		if roll <= 0:
+			return int(pair[0])
+	return 1
 
 # A colour per kind, so the board reads at a glance which tile is which.
 const SPACE_TYPE_COLORS := {
-	&"PKMN_PINK":   Color("f7a8c0"),
-	&"PKMN_GREEN":  Color("2fa84f"),
-	&"PKMN_RED":    Color("e03131"),
+	&"WISP":        Color("f7a8c0"),
+	&"GHOST":       Color("2fa84f"),
+	&"PHANTOM":     Color("e03131"),
 	&"EVENT":       Color("f4d03f"),
 	&"ITEM":        Color("f08a2e"),
 	&"COMPETITION": Color("8e8e93"),
-	&"E4":          Color("7b5cd6"),
-	&"GARY":        Color("d4af37"),
+	&"WARDEN":      Color("7b5cd6"),
 }
 
 # Used when a space has no type listed in its route's "types".
-const DEFAULT_SPACE_TYPE := &"PKMN_GREEN"
+const DEFAULT_SPACE_TYPE := &"GHOST"
 
 @onready var tilemap: TileMap = $TileMap
 
@@ -351,7 +361,7 @@ func _draw() -> void:
 		draw_circle(p, SPACE_RADIUS + 1.5, outline)
 		draw_circle(p, SPACE_RADIUS, Color(sc, MARKER_ALPHA))
 		_draw_label(p, space_type_name(space_types[i]))
-	# 3) cities on top (big blue circle + "City" name). Junctions are invisible.
+	# 3) towns on top (big blue circle + "Town"). Junctions are invisible.
 	for node_name in NODES:
 		var nn: String = node_name
 		if not CITIES.has(nn):
@@ -359,7 +369,7 @@ func _draw() -> void:
 		var cc: Vector2 = _cell_to_world(NODES[nn])
 		draw_circle(cc, CITY_RADIUS + 2.0, outline)
 		draw_circle(cc, CITY_RADIUS, Color(CITY_COLOR, MARKER_ALPHA))
-		_draw_label(cc, "City")
+		_draw_label(cc, "Town")
 
 # Draw a short white name centred on a tile, with a dark outline for contrast.
 func _draw_label(center: Vector2, text: String) -> void:

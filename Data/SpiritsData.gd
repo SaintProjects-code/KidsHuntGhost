@@ -1,5 +1,5 @@
 extends Node
-## Spirit (Pokémon) database. Autoloaded as `SpiritsData`.
+## Ghost-spirit database. Autoloaded as `SpiritsData`.
 ##
 ## get_spirit(name) -> fresh battle-ready dict:
 ##   name, type, hp, current_hp, hp_stat, atk, def, spd, stage, stars,
@@ -7,12 +7,12 @@ extends Node
 ##
 ## Scale:  hp = 30 + hp_stat×30 (tier 1=60 … 6=210).  atk/def/spd are 1–6 tiers.
 ##
-## Sprites: each Assets/Pokemon/*.png is a 129×163 sheet (header + 2×2 grid of
+## Sprites: each Assets/Spirits/spirit_NNN.png is a 129×163 sheet (header + 2×2 grid of
 ## front / front-shiny / back / back-shiny). sprite_tex(name, view) slices out one
 ## frame so different screens can show different views (front in menus, back for
 ## your own battler, etc.).
 
-const SPRITE_DIR := "res://Assets/Pokemon/"
+const SPRITE_DIR := "res://Assets/Spirits/"
 
 # Sub-rectangles within a 129×163 sheet. Tweak here if a frame looks off-centre.
 const SHEET_REGIONS := {
@@ -21,7 +21,7 @@ const SHEET_REGIONS := {
 	"back":        Rect2(2, 100, 60, 60),
 	"back_shiny":  Rect2(67, 100, 60, 60),
 	# Centred on the header icon (all sheets draw it centred at ~(81, 21));
-	# sized to cover the largest icons (Onix) and stop above the underline row.
+	# sized to cover the largest icons (Cryptcoil) and stop above the underline row.
 	"icon":        Rect2(65, 9, 32, 24),
 }
 
@@ -45,10 +45,10 @@ const TYPE_COLORS := {
 
 # ─── Abilities (ported from the reference game) ───────────────────────────────
 const ABILITY_DATA := {
-	"intimidate":    {"name":"Intimidate",    "cat":"Match Start", "desc":"Match start: opponent team loses -2 ATK"},
+	"intimidate":    {"name":"Intimidate",    "cat":"Match Start", "desc":"Match start: opponent team loses -1 ATK"},
 	"drought":       {"name":"Drought",       "cat":"Round Start · Lead", "desc":"Round start: your whole team gains +1 ATK"},
 	"thunder_wave":  {"name":"Thunder Wave",  "cat":"Match Start", "desc":"Match start: Stun the opponent lead for 2 rounds"},
-	"veteran":       {"name":"Veteran",       "cat":"Match Start", "desc":"Match start: 2+ stars: +2 ATK and immune to status"},
+	"veteran":       {"name":"Veteran",       "cat":"Match Start", "desc":"Match start: 1+ star: +2 ATK and immune to status"},
 	"screech":       {"name":"Screech",       "cat":"Match Start", "desc":"Match start: opponent lead loses -2 DEF"},
 	"spikes":        {"name":"Spikes",        "cat":"Match Start", "desc":"Match start: each opponent takes 30 dmg on first entry"},
 	"confuse_ray":   {"name":"Confuse Ray",   "cat":"Match Start", "desc":"Match start: Confuse the opponent lead 2–3 rounds"},
@@ -56,11 +56,11 @@ const ABILITY_DATA := {
 	"speed_boost":   {"name":"Speed Boost",   "cat":"Match Start", "desc":"Match start: your team gains +1 SPD and +1 ATK"},
 	"taunt":         {"name":"Taunt",         "cat":"Match Start", "desc":"Match start: opponent cannot heal or inflict status"},
 	"sniper":        {"name":"Sniper",        "cat":"Match Start", "desc":"Match start: deal 25×(ATK/2) to a random opponent"},
-	"fire_bond":     {"name":"Fire Bond",     "cat":"Match Start", "desc":"Match start: +2 ATK per Fire ally; team +1 DEF"},
+	"fire_bond":     {"name":"Fire Bond",     "cat":"Match Start", "desc":"Match start: +1 ATK per Fire ally; team +1 DEF"},
 	"water_bond":    {"name":"Water Bond",    "cat":"Match Start", "desc":"Match start: +1 ATK per Water ally; team +3 DEF"},
 	"grass_bond":    {"name":"Grass Bond",    "cat":"Match Start", "desc":"Match start: +1 ATK per Grass ally; team +2 HP Tier"},
 	"electric_bond": {"name":"Electric Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Electric ally; team +3 SPD"},
-	"fighting_bond": {"name":"Fighting Bond", "cat":"Match Start", "desc":"Match start: +3 ATK per Fighting ally"},
+	"fighting_bond": {"name":"Fighting Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Fighting ally; team +1 DEF"},
 	"psychic_bond":  {"name":"Psychic Bond",  "cat":"Match Start", "desc":"Match start: +1 ATK per Psychic ally; team immune to status"},
 	"dark_bond":     {"name":"Dark Bond",     "cat":"Match Start", "desc":"Match start: +1 ATK per Dark ally; opponent team -2 DEF"},
 	"u_turn":        {"name":"U-Turn",        "cat":"Match Start · Lead", "desc":"Match start: hit the lead, then switch out (ally +1 ATK)"},
@@ -86,7 +86,7 @@ const ABILITY_DATA := {
 	"counter":       {"name":"Counter",       "cat":"Passive · Lead", "desc":"When hit for 50+: deal back 40% of that damage"},
 	"sturdy":        {"name":"Sturdy",        "cat":"Passive · Lead · Once", "desc":"Survive one KO per battle at 1 HP"},
 	"hypnosis":      {"name":"Hypnosis",      "cat":"Passive · Lead · Once", "desc":"Lead: opponent falls Asleep"},
-	"all_for_one":   {"name":"All For One",   "cat":"Passive · Lead · Once", "desc":"Lead: if your only spirit, +3 ATK/DEF/SPD"},
+	"all_for_one":   {"name":"Underdog",      "cat":"Entry", "desc":"On entry: if the enemy has more spirits standing, +2 ATK and +2 SPD"},
 	"reflect":       {"name":"Reflect",       "cat":"Passive · Lead · Once", "desc":"Lead: your whole team gains +2 DEF"},
 	"shell_smash":   {"name":"Shell Smash",   "cat":"Passive · Lead · Once", "desc":"Lead: DEF -3, ATK +3, SPD +1"},
 	"explosion":     {"name":"Explosion",     "cat":"Passive · Lead · Once", "desc":"On faint: deal 60% max HP as damage"},
@@ -101,7 +101,7 @@ const ABILITY_DATA := {
 	"bulwark":       {"name":"Bulwark",       "cat":"Passive · Lead", "desc":"Lead: +2 DEF while above 50% HP"},
 	"fortress":      {"name":"Fortress",      "cat":"Passive · Lead", "desc":"Lead: +1 DEF per round survived (max +3)"},
 	"iron_will":     {"name":"Iron Will",     "cat":"Round Start · Lead", "desc":"Round start: if full HP, gain +1 ATK"},
-	"monument":      {"name":"Monument",      "cat":"Match Start", "desc":"Match start: if your last spirit, +3 to all stats"},
+	"monument":      {"name":"Last Stand",    "cat":"Entry · Once", "desc":"On entry as your last spirit standing: +2 ATK/DEF/SPD"},
 	"reckless":      {"name":"Reckless",      "cat":"Passive · Lead", "desc":"Deal +25% damage but take +15% damage"},
 	"spore":         {"name":"Spore",         "cat":"Passive · Lead", "desc":"When hit: inflict a random status on the attacker"},
 	# ── interactive set ──────────────────────────────────────────────────────
@@ -111,21 +111,56 @@ const ABILITY_DATA := {
 	"mind_hold":     {"name":"Mind Hold",     "cat":"Match Start", "desc":"Match start: cancel two opponent spirits' abilities for the battle"},
 	"bodyguard":     {"name":"Bodyguard",     "cat":"Passive", "desc":"Redirect the first hit each round away from a hurt ally"},
 	"phoenix":       {"name":"Phoenix",       "cat":"Passive · Once", "desc":"On faint: revive once at 30% HP"},
+	# ── move set (work with signature moves) ─────────────────────────────────
+	"focus_energy":  {"name":"Focus Energy",  "cat":"Match Start", "desc":"Match start: its move starts one charge from ready"},
+	"overcharge":    {"name":"Overcharge",    "cat":"Passive", "desc":"Its move hits (and heals) 30% harder"},
+	"rally_call":    {"name":"Rally Call",    "cat":"Passive", "desc":"Each time it uses its move, the team gains +1 ATK (max 2×)"},
+}
+
+# ─── Signature moves ──────────────────────────────────────────────────────────
+# Every spirit knows ONE move from its type's pool. It gains a charge each
+# round it attacks; when full it uses the move INSTEAD of a normal hit, then
+# starts charging again. Effects live in BattleRules._use_move.
+#   charge: rounds to fill   power: hit multiplier (0 = no direct hit)
+const MOVES := {
+	# Fire — burst damage
+	"ember_burst":  {"name": "Ember Burst",  "type": "Fire", "charge": 2, "power": 1.5, "desc": "Hit ×1.5 and burn the target"},
+	"inferno":      {"name": "Inferno",      "type": "Fire", "charge": 3, "power": 2.3, "desc": "Huge hit ×2.3"},
+	"heat_wave":    {"name": "Heat Wave",    "type": "Fire", "charge": 3, "power": 0.8, "desc": "Hit EVERY enemy ×0.8"},
+	# Water — sustain and defence
+	"tidal_guard":  {"name": "Tidal Guard",  "type": "Water", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; halve the next hit it takes"},
+	"soak":         {"name": "Soak",         "type": "Water", "charge": 2, "power": 1.0, "desc": "Hit ×1.0; target SPD −2"},
+	"whirlpool":    {"name": "Whirlpool",    "type": "Water", "charge": 3, "power": 1.3, "desc": "Hit ×1.3 and heal 25% max HP"},
+	# Grass — drain, poison, team healing
+	"vine_drain":   {"name": "Vine Drain",   "type": "Grass", "charge": 2, "power": 1.1, "desc": "Hit ×1.1, heal half the damage"},
+	"spore_cloud":  {"name": "Spore Cloud",  "type": "Grass", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; poison AND sleep the target"},
+	"bloom":        {"name": "Bloom",        "type": "Grass", "charge": 3, "power": 0.0, "desc": "Heal the whole team 35 HP"},
+	# Electric — speed and spread
+	"spark_rush":   {"name": "Spark Rush",   "type": "Electric", "charge": 1, "power": 1.1, "desc": "Quick hit ×1.1; self SPD +1"},
+	"chain_bolt":   {"name": "Chain Bolt",   "type": "Electric", "charge": 3, "power": 0.7, "desc": "Hit up to 3 enemies ×0.7"},
+	"thunderclap":  {"name": "Thunderclap",  "type": "Electric", "charge": 2, "power": 1.2, "desc": "Hit ×1.2; stun the target"},
+	# Psychic — control
+	"mind_blast":   {"name": "Mind Blast",   "type": "Psychic", "charge": 2, "power": 1.3, "desc": "Hit ×1.3 that ignores DEF"},
+	"hex_sleep":    {"name": "Hex Sleep",    "type": "Psychic", "charge": 3, "power": 0.5, "desc": "Hit ×0.5; target sleeps 2 rounds"},
+	"calm_mind":    {"name": "Calm Mind",    "type": "Psychic", "charge": 2, "power": 0.0, "desc": "Self ATK +1, DEF +1, cure status"},
+	# Fighting — raw power and toughness
+	"haymaker":     {"name": "Haymaker",     "type": "Fighting", "charge": 3, "power": 2.2, "desc": "Hit ×2.2; self DEF −1"},
+	"iron_guard":   {"name": "Iron Guard",   "type": "Fighting", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; self DEF +2"},
+	"combo_strike": {"name": "Combo Strike", "type": "Fighting", "charge": 2, "power": 0.7, "desc": "Hit twice ×0.7"},
+	# Dark — debuffs and finishing
+	"shadow_sneak": {"name": "Shadow Sneak", "type": "Dark", "charge": 2, "power": 1.2, "desc": "Hit ×1.2; ×2 if the target is below half HP"},
+	"curse":        {"name": "Curse",        "type": "Dark", "charge": 3, "power": 0.5, "desc": "Hit ×0.5; target is poisoned 4 rounds"},
+	"dread":        {"name": "Dread",        "type": "Dark", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; target ATK −2"},
 }
 
 const TYPE_ABILITY_POOLS := {
-	"Fire":     ["drought", "fire_bond", "moxie", "sniper", "explosion", "flame_body", "berserker", "shell_smash", "blaze", "flash_fire", "reckless", "phoenix"],
-	"Water":    ["thick_fat", "sturdy", "u_turn", "water_bond", "multiscale", "bulwark", "wish", "reflect", "drain_punch", "static"],
-	"Grass":    ["leech_seed", "poison_point", "screech", "spikes", "wish", "healer", "medic", "grass_bond", "drain_punch", "overgrow", "spore"],
-	"Electric": ["thunder_wave", "electric_bond", "speed_boost", "soul_heart", "anger_point", "static", "berserker", "volt_absorb", "electric_field", "tailwind"],
-	"Psychic":  ["hypnosis", "confuse_ray", "encore", "psychic_bond", "helping_hand", "reflect", "wish", "destiny_bond", "mind_hold"],
-	"Fighting": ["veteran", "intimidate", "fighting_bond", "battle_armor", "monument", "fortress", "iron_will", "berserker", "drain_punch", "all_for_one", "grit", "counter", "fallen", "bodyguard"],
-	"Dark":     ["thief", "taunt", "vengeance", "dynasty", "dark_bond", "destiny_bond", "poison_point", "mayhem"],
-}
-
-const HIDDEN_ABILITY_BY_TYPE := {
-	"Fire": "berserker", "Water": "shell_smash", "Grass": "regenerator",
-	"Electric": "all_for_one", "Psychic": "drain_punch", "Fighting": "reflect", "Dark": "destiny_bond",
+	"Fire":     ["drought", "fire_bond", "moxie", "sniper", "explosion", "flame_body", "berserker", "shell_smash", "blaze", "flash_fire", "reckless", "phoenix", "overcharge"],
+	"Water":    ["thick_fat", "sturdy", "u_turn", "water_bond", "multiscale", "bulwark", "wish", "reflect", "drain_punch", "static", "focus_energy"],
+	"Grass":    ["leech_seed", "poison_point", "screech", "spikes", "wish", "healer", "medic", "grass_bond", "drain_punch", "overgrow", "spore", "rally_call"],
+	"Electric": ["thunder_wave", "electric_bond", "speed_boost", "soul_heart", "anger_point", "static", "berserker", "volt_absorb", "electric_field", "tailwind", "focus_energy", "overcharge"],
+	"Psychic":  ["hypnosis", "confuse_ray", "encore", "psychic_bond", "helping_hand", "reflect", "wish", "destiny_bond", "mind_hold", "focus_energy"],
+	"Fighting": ["veteran", "intimidate", "fighting_bond", "battle_armor", "monument", "fortress", "iron_will", "berserker", "drain_punch", "all_for_one", "grit", "counter", "fallen", "bodyguard", "rally_call"],
+	"Dark":     ["thief", "taunt", "vengeance", "dynasty", "dark_bond", "destiny_bond", "poison_point", "mayhem", "rally_call", "overcharge"],
 }
 
 # ─── Dual types ───────────────────────────────────────────────────────────────
@@ -135,28 +170,27 @@ const HIDDEN_ABILITY_BY_TYPE := {
 # type still decides stats, the type chart and colours.
 const DUAL_TYPE := {
 	# Fire
-	"Charizard": "Fighting", "Dragonite": "Water", "Moltres": "Psychic",
+	"Cinderwraith": "Fighting", "Wyrmking": "Water", "Flamecrown": "Psychic",
 	# Water
-	"Gyarados": "Dark", "Kabutops": "Fighting", "Cloyster": "Dark", "Articuno": "Psychic",
+	"Floodserpent": "Dark", "Domereaper": "Fighting", "Clamcrypt": "Dark", "Frostcrown": "Psychic",
 	# Grass
-	"Venusaur": "Dark", "Vileplume": "Dark", "Exeggutor": "Psychic",
-	"Scyther": "Fighting", "Pinsir": "Fighting",
+	"Mossmonarch": "Dark", "Rootshroud": "Dark", "Palmphantom": "Psychic",
+	"Reaperling": "Fighting", "Pincergeist": "Fighting",
 	# Electric
-	"Starmie": "Psychic", "Aerodactyl": "Dark", "Zapdos": "Fighting",
+	"Starwraith": "Psychic", "Fossilwing": "Dark", "Stormcrown": "Fighting",
 	# Psychic
-	"Butterfree": "Grass", "Slowbro": "Water", "Lapras": "Water", "Jynx": "Water",
-	"Mewtwo": "Dark", "Mew": "Grass",
+	"Gloomoth": "Grass", "Snoozelord": "Water", "Mistferry": "Water", "Frostsong": "Water",
+	"Omenwraith": "Dark", "Glimmer": "Grass",
 	# Fighting
-	"Poliwrath": "Water", "Golem": "Fire", "Rhydon": "Fire", "Snorlax": "Psychic",
+	"Swirlwrath": "Water", "Gravegolem": "Fire", "Hornhaunt": "Fire", "Slumberghast": "Psychic",
 	# Dark
-	"Gengar": "Psychic", "Beedrill": "Grass", "Venomoth": "Psychic",
-	"Parasect": "Grass", "Tentacruel": "Water", "Muk": "Water",
+	"Hauntking": "Psychic", "Stingspecter": "Grass", "Mothgeist": "Psychic",
+	"Sporeshade": "Grass", "Jellyhaunt": "Water", "Sludgeghast": "Water",
 }
 
-# ─── Roster source: national-dex table ────────────────────────────────────────
-# [dex, name, type(mapped to the 7), evolves_into]. Stage and stats are derived.
+# ─── Roster ────────────────────────────────────────
+# [number, name, type, evolves_into]. Stage and stats are derived.
 const LEGENDARIES := [144, 145, 146, 150, 151]
-const SPRITE_OVERRIDE := {1: "Bulbasaur.png", 4: "Charmander.png", 7: "Squirtle.png", 16: "Pidgey.png", 25: "Pikachu.png", 95: "Onix.png"}
 
 # Base stats per evolution stage, before a small type-flavour tweak.
 const STAGE_BASE := {
@@ -165,11 +199,10 @@ const STAGE_BASE := {
 	3: {"hp_stat": 4, "atk": 5, "def": 4, "spd": 4},
 }
 
-# Real Gen-1 base stats per dex number: [HP, ATK, DEF, SPD], where ATK is the
-# higher of the game's Attack/Special (one attack stat here). Source:
-# Bulbapedia "List of Pokémon by base stats (Generation I)". Each spirit gets
-# +5 tier points split across its stats in proportion to these numbers, so a
-# Chansey is an HP wall and an Abra a glass cannon — same stage or not.
+# Stat PROFILE per roster number: [HP, ATK, DEF, SPD] on a 0–255 scale. Each
+# spirit gets +5 tier points split across its stats in proportion to these
+# numbers, so Mendie is an HP wall and Dreamwisp a glass cannon — same stage
+# or not.
 const BASE_STATS := {
 	1: [45, 65, 49, 45], 2: [60, 80, 63, 60], 3: [80, 100, 83, 80],
 	4: [39, 52, 43, 65], 5: [58, 65, 58, 80], 6: [78, 85, 78, 100],
@@ -250,73 +283,89 @@ const TYPE_PROFILE := {
 }
 
 const DEX := [
-	[1,"Bulbasaur","Grass","Ivysaur"], [2,"Ivysaur","Grass","Venusaur"], [3,"Venusaur","Grass",""],
-	[4,"Charmander","Fire","Charmeleon"], [5,"Charmeleon","Fire","Charizard"], [6,"Charizard","Fire",""],
-	[7,"Squirtle","Water","Wartortle"], [8,"Wartortle","Water","Blastoise"], [9,"Blastoise","Water",""],
-	[10,"Caterpie","Psychic","Metapod"], [11,"Metapod","Psychic","Butterfree"], [12,"Butterfree","Psychic",""],
-	[13,"Weedle","Dark","Kakuna"], [14,"Kakuna","Dark","Beedrill"], [15,"Beedrill","Dark",""],
-	[16,"Pidgey","Electric","Pidgeotto"], [17,"Pidgeotto","Electric","Pidgeot"], [18,"Pidgeot","Electric",""],
-	[19,"Rattata","Electric","Raticate"], [20,"Raticate","Electric",""],
-	[21,"Spearow","Electric","Fearow"], [22,"Fearow","Electric",""],
-	[23,"Ekans","Dark","Arbok"], [24,"Arbok","Dark",""],
-	[25,"Pikachu","Electric","Raichu"], [26,"Raichu","Electric",""],
-	[27,"Sandshrew","Fire","Sandslash"], [28,"Sandslash","Fire",""],
-	[29,"Nidoran-F","Grass","Nidorina"], [30,"Nidorina","Grass","Nidoqueen"], [31,"Nidoqueen","Grass",""],
-	[32,"Nidoran-M","Grass","Nidorino"], [33,"Nidorino","Grass","Nidoking"], [34,"Nidoking","Grass",""],
-	[35,"Clefairy","Psychic","Clefable"], [36,"Clefable","Psychic",""],
-	[37,"Vulpix","Fire","Ninetales"], [38,"Ninetales","Fire",""],
-	[39,"Jigglypuff","Psychic","Wigglytuff"], [40,"Wigglytuff","Psychic",""],
-	[41,"Zubat","Dark","Golbat"], [42,"Golbat","Dark",""],
-	[43,"Oddish","Grass","Gloom"], [44,"Gloom","Grass","Vileplume"], [45,"Vileplume","Grass",""],
-	[46,"Paras","Dark","Parasect"], [47,"Parasect","Dark",""],
-	[48,"Venonat","Dark","Venomoth"], [49,"Venomoth","Dark",""],
-	[50,"Diglett","Fighting","Dugtrio"], [51,"Dugtrio","Fighting",""],
-	[52,"Meowth","Dark","Persian"], [53,"Persian","Dark",""],
-	[54,"Psyduck","Water","Golduck"], [55,"Golduck","Water",""],
-	[56,"Mankey","Fire","Primeape"], [57,"Primeape","Fire",""],
-	[58,"Growlithe","Fire","Arcanine"], [59,"Arcanine","Fire",""],
-	[60,"Poliwag","Fighting","Poliwhirl"], [61,"Poliwhirl","Fighting","Poliwrath"], [62,"Poliwrath","Fighting",""],
-	[63,"Abra","Psychic","Kadabra"], [64,"Kadabra","Psychic","Alakazam"], [65,"Alakazam","Psychic",""],
-	[66,"Machop","Fighting","Machoke"], [67,"Machoke","Fighting","Machamp"], [68,"Machamp","Fighting",""],
-	[69,"Bellsprout","Grass","Weepinbell"], [70,"Weepinbell","Grass","Victreebel"], [71,"Victreebel","Grass",""],
-	[72,"Tentacool","Dark","Tentacruel"], [73,"Tentacruel","Dark",""],
-	[74,"Geodude","Fighting","Graveler"], [75,"Graveler","Fighting","Golem"], [76,"Golem","Fighting",""],
-	[77,"Ponyta","Fire","Rapidash"], [78,"Rapidash","Fire",""],
-	[79,"Slowpoke","Psychic","Slowbro"], [80,"Slowbro","Psychic",""],
-	[81,"Magnemite","Electric","Magneton"], [82,"Magneton","Electric",""],
-	[83,"Farfetch'd","Fighting",""],
-	[84,"Doduo","Electric","Dodrio"], [85,"Dodrio","Electric",""],
-	[86,"Seel","Water","Dewgong"], [87,"Dewgong","Water",""],
-	[88,"Grimer","Dark","Muk"], [89,"Muk","Dark",""],
-	[90,"Shellder","Water","Cloyster"], [91,"Cloyster","Water",""],
-	[92,"Gastly","Dark","Haunter"], [93,"Haunter","Dark","Gengar"], [94,"Gengar","Dark",""],
-	[95,"Onix","Fighting",""],
-	[96,"Drowzee","Psychic","Hypno"], [97,"Hypno","Psychic",""],
-	[98,"Krabby","Water","Kingler"], [99,"Kingler","Water",""],
-	[100,"Voltorb","Electric","Electrode"], [101,"Electrode","Electric",""],
-	[102,"Exeggcute","Grass","Exeggutor"], [103,"Exeggutor","Grass",""],
-	[104,"Cubone","Fighting","Marowak"], [105,"Marowak","Fighting",""],
-	[106,"Hitmonlee","Fighting",""], [107,"Hitmonchan","Fighting",""],
-	[108,"Lickitung","Fighting",""],
-	[109,"Koffing","Dark","Weezing"], [110,"Weezing","Dark",""],
-	[111,"Rhyhorn","Fighting","Rhydon"], [112,"Rhydon","Fighting",""],
-	[113,"Chansey","Psychic",""], [114,"Tangela","Water",""], [115,"Kangaskhan","Fighting",""],
-	[116,"Horsea","Fire","Seadra"], [117,"Seadra","Fire",""],
-	[118,"Goldeen","Water","Seaking"], [119,"Seaking","Water",""],
-	[120,"Staryu","Electric","Starmie"], [121,"Starmie","Electric",""],
-	[122,"Mr. Mime","Psychic",""], [123,"Scyther","Grass",""], [124,"Jynx","Psychic",""],
-	[125,"Electabuzz","Electric",""], [126,"Magmar","Fire",""], [127,"Pinsir","Grass",""], [128,"Tauros","Fire",""],
-	[129,"Magikarp","Water","Gyarados"], [130,"Gyarados","Water",""],
-	[131,"Lapras","Psychic",""], [132,"Ditto","Psychic",""],
-	[133,"Eevee","Psychic",""], [134,"Vaporeon","Water",""], [135,"Jolteon","Electric",""], [136,"Flareon","Fire",""],
-	[137,"Porygon","Electric",""],
-	[138,"Omanyte","Water","Omastar"], [139,"Omastar","Water",""],
-	[140,"Kabuto","Water","Kabutops"], [141,"Kabutops","Water",""],
-	[142,"Aerodactyl","Electric",""], [143,"Snorlax","Fighting",""],
-	[144,"Articuno","Water",""], [145,"Zapdos","Electric",""], [146,"Moltres","Fire",""],
-	[147,"Dratini","Fire","Dragonair"], [148,"Dragonair","Fire","Dragonite"], [149,"Dragonite","Fire",""],
-	[150,"Mewtwo","Psychic",""], [151,"Mew","Psychic",""],
-	[152,"Chikorita","Grass","Bayleef"], [153,"Bayleef","Grass","Meganium"], [154,"Meganium","Grass",""],
+	[1, "Mossprig", "Grass", "Mossmourn"], [2, "Mossmourn", "Grass", "Mossmonarch"], [3, "Mossmonarch", "Grass", ""],
+	[4, "Cinderwisp", "Fire", "Cindershade"], [5, "Cindershade", "Fire", "Cinderwraith"], [6, "Cinderwraith", "Fire", ""],
+	[7, "Puddleboo", "Water", "Puddlegeist"], [8, "Puddlegeist", "Water", "Tidetomb"], [9, "Tidetomb", "Water", ""],
+	[10, "Gloomgrub", "Psychic", "Gloomcoon"], [11, "Gloomcoon", "Psychic", "Gloomoth"], [12, "Gloomoth", "Psychic", ""],
+	[13, "Stingling", "Dark", "Stingshroud"], [14, "Stingshroud", "Dark", "Stingspecter"], [15, "Stingspecter", "Dark", ""],
+	[16, "Hootlet", "Electric", "Hootshade"], [17, "Hootshade", "Electric", "Hootempest"], [18, "Hootempest", "Electric", ""],
+	[19, "Squeakle", "Electric", "Squeakfang"], [20, "Squeakfang", "Electric", ""],
+	[21, "Crowlet", "Electric", "Crowcrypt"], [22, "Crowcrypt", "Electric", ""],
+	[23, "Hissper", "Dark", "Hissperor"], [24, "Hissperor", "Dark", ""],
+	[25, "Zapkin", "Electric", "Zapparition"], [26, "Zapparition", "Electric", ""],
+	[27, "Ashpaw", "Fire", "Ashclaw"], [28, "Ashclaw", "Fire", ""],
+	[29, "Nettlette", "Grass", "Nettlina"], [30, "Nettlina", "Grass", "Nettlequeen"], [31, "Nettlequeen", "Grass", ""],
+	[32, "Nettlet", "Grass", "Nettlino"], [33, "Nettlino", "Grass", "Nettleking"], [34, "Nettleking", "Grass", ""],
+	[35, "Moonmote", "Psychic", "Moonmyst"], [36, "Moonmyst", "Psychic", ""],
+	[37, "Foxfire", "Fire", "Ninetorch"], [38, "Ninetorch", "Fire", ""],
+	[39, "Lullaboo", "Psychic", "Lullabanshee"], [40, "Lullabanshee", "Psychic", ""],
+	[41, "Batling", "Dark", "Batwraith"], [42, "Batwraith", "Dark", ""],
+	[43, "Rootling", "Grass", "Rootgloom"], [44, "Rootgloom", "Grass", "Rootshroud"], [45, "Rootshroud", "Grass", ""],
+	[46, "Sporelet", "Dark", "Sporeshade"], [47, "Sporeshade", "Dark", ""],
+	[48, "Fuzzgeist", "Dark", "Mothgeist"], [49, "Mothgeist", "Dark", ""],
+	[50, "Burrowboo", "Fighting", "Burrowtrio"], [51, "Burrowtrio", "Fighting", ""],
+	[52, "Purrgeist", "Dark", "Purrphantom"], [53, "Purrphantom", "Dark", ""],
+	[54, "Quackle", "Water", "Quackwraith"], [55, "Quackwraith", "Water", ""],
+	[56, "Grumplet", "Fire", "Grumpghast"], [57, "Grumpghast", "Fire", ""],
+	[58, "Emberpup", "Fire", "Emberhound"], [59, "Emberhound", "Fire", ""],
+	[60, "Swirlet", "Fighting", "Swirlgeist"], [61, "Swirlgeist", "Fighting", "Swirlwrath"], [62, "Swirlwrath", "Fighting", ""],
+	[63, "Dreamwisp", "Psychic", "Dreamshade"], [64, "Dreamshade", "Psychic", "Dreamseer"], [65, "Dreamseer", "Psychic", ""],
+	[66, "Brawlboo", "Fighting", "Brawlghast"], [67, "Brawlghast", "Fighting", "Brawltitan"], [68, "Brawltitan", "Fighting", ""],
+	[69, "Vinewisp", "Grass", "Vineweep"], [70, "Vineweep", "Grass", "Vinewraith"], [71, "Vinewraith", "Grass", ""],
+	[72, "Jellyboo", "Dark", "Jellyhaunt"], [73, "Jellyhaunt", "Dark", ""],
+	[74, "Pebblewisp", "Fighting", "Gravelghast"], [75, "Gravelghast", "Fighting", "Gravegolem"], [76, "Gravegolem", "Fighting", ""],
+	[77, "Flickerfoal", "Fire", "Flickermare"], [78, "Flickermare", "Fire", ""],
+	[79, "Snoozle", "Psychic", "Snoozelord"], [80, "Snoozelord", "Psychic", ""],
+	[81, "Sparkbolt", "Electric", "Sparkcluster"], [82, "Sparkcluster", "Electric", ""],
+	[83, "Quillduck", "Fighting", ""],
+	[84, "Twinbeak", "Electric", "Tribeak"], [85, "Tribeak", "Electric", ""],
+	[86, "Frostpup", "Water", "Frostgeist"], [87, "Frostgeist", "Water", ""],
+	[88, "Sludgling", "Dark", "Sludgeghast"], [89, "Sludgeghast", "Dark", ""],
+	[90, "Clamshade", "Water", "Clamcrypt"], [91, "Clamcrypt", "Water", ""],
+	[92, "Wispy", "Dark", "Haunty"], [93, "Haunty", "Dark", "Hauntking"], [94, "Hauntking", "Dark", ""],
+	[95, "Cryptcoil", "Fighting", ""],
+	[96, "Drowsel", "Psychic", "Trancewraith"], [97, "Trancewraith", "Psychic", ""],
+	[98, "Pinchling", "Water", "Pinchking"], [99, "Pinchking", "Water", ""],
+	[100, "Zaporb", "Electric", "Boomorb"], [101, "Boomorb", "Electric", ""],
+	[102, "Seedlings", "Grass", "Palmphantom"], [103, "Palmphantom", "Grass", ""],
+	[104, "Skullpup", "Fighting", "Skullguard"], [105, "Skullguard", "Fighting", ""],
+	[106, "Kickghast", "Fighting", ""],
+	[107, "Punchghast", "Fighting", ""],
+	[108, "Lickspook", "Fighting", ""],
+	[109, "Smogling", "Dark", "Smogwraith"], [110, "Smogwraith", "Dark", ""],
+	[111, "Hornling", "Fighting", "Hornhaunt"], [112, "Hornhaunt", "Fighting", ""],
+	[113, "Mendie", "Psychic", ""],
+	[114, "Tanglewisp", "Water", ""],
+	[115, "Pouchghast", "Fighting", ""],
+	[116, "Seaflicker", "Fire", "Seablaze"], [117, "Seablaze", "Fire", ""],
+	[118, "Finwisp", "Water", "Finmonarch"], [119, "Finmonarch", "Water", ""],
+	[120, "Starmote", "Electric", "Starwraith"], [121, "Starwraith", "Electric", ""],
+	[122, "Mimeghast", "Psychic", ""],
+	[123, "Reaperling", "Grass", ""],
+	[124, "Frostsong", "Psychic", ""],
+	[125, "Buzzghast", "Electric", ""],
+	[126, "Magmawraith", "Fire", ""],
+	[127, "Pincergeist", "Grass", ""],
+	[128, "Bullghast", "Fire", ""],
+	[129, "Flopfin", "Water", "Floodserpent"], [130, "Floodserpent", "Water", ""],
+	[131, "Mistferry", "Psychic", ""],
+	[132, "Blobby", "Psychic", ""],
+	[133, "Kitwisp", "Psychic", ""],
+	[134, "Rainkit", "Water", ""],
+	[135, "Sparkkit", "Electric", ""],
+	[136, "Blazekit", "Fire", ""],
+	[137, "Glitchling", "Electric", ""],
+	[138, "Spiralshade", "Water", "Spiralcrypt"], [139, "Spiralcrypt", "Water", ""],
+	[140, "Domeling", "Water", "Domereaper"], [141, "Domereaper", "Water", ""],
+	[142, "Fossilwing", "Electric", ""],
+	[143, "Slumberghast", "Fighting", ""],
+	[144, "Frostcrown", "Water", ""],
+	[145, "Stormcrown", "Electric", ""],
+	[146, "Flamecrown", "Fire", ""],
+	[147, "Wyrmwisp", "Fire", "Wyrmshade"], [148, "Wyrmshade", "Fire", "Wyrmking"], [149, "Wyrmking", "Fire", ""],
+	[150, "Omenwraith", "Psychic", ""],
+	[151, "Glimmer", "Psychic", ""],
+	[152, "Leaflet", "Grass", "Leafshade"], [153, "Leafshade", "Grass", "Leafmonarch"], [154, "Leafmonarch", "Grass", ""],
 ]
 
 var SPIRITS := {}   # name -> base stats, built from DEX at startup
@@ -344,8 +393,8 @@ func _build_roster() -> void:
 		var spd: int = base["spd"] + int(prof.get("spd", 0))
 		if dex_id in LEGENDARIES:
 			hp_stat += 1; atk += 1; def_ += 1; spd += 1
-		# +5 personality points, split in proportion to the spirit's REAL
-		# base stats — so Chansey walls, Abra nukes, Onix tanks.
+		# +5 personality points, split in proportion to the spirit's stat
+		# profile — so Mendie walls, Dreamwisp nukes, Cryptcoil tanks.
 		var split: Array = _bonus_split(BASE_STATS.get(dex_id, [50, 50, 50, 50]))
 		hp_stat += split[0]
 		atk += split[1]
@@ -361,7 +410,7 @@ func _build_roster() -> void:
 			"stage": stage,
 			"evolution": evo,
 			"rarity": ["Basic", "Mid", "Final"][stage - 1],
-			"sprite": SPRITE_OVERRIDE.get(dex_id, "Pokemon%d.png" % dex_id),
+			"sprite": "spirit_%03d.png" % dex_id,
 		}
 
 func _stage(nm: String, parent: Dictionary) -> int:
@@ -410,14 +459,30 @@ func get_spirit(spirit_name: String) -> Dictionary:
 	s["current_hp"] = s["hp"]
 	s["stars"] = 0
 	s["ability"] = pick_ability_for_type(base["type"], base.get("type2", ""))
+	s["move"] = random_move(base["type"])
 	s["sprite_path"] = SPRITE_DIR + base["sprite"]
 	return s
+
+# ─── Moves ────────────────────────────────────────────────────────────────────
+
+func random_move(type: String) -> String:
+	var pool: Array = MOVES.keys().filter(func(k): return MOVES[k]["type"] == type)
+	return pool.pick_random() if not pool.is_empty() else "ember_burst"
+
+func move_of(key: String) -> Dictionary:
+	return MOVES.get(key, {"name": key, "charge": 3, "power": 1.0, "desc": ""})
+
+# A spirit's move (spirits from older saves get one picked on the spot).
+func move_key(s: Dictionary) -> String:
+	if not s.has("move"):
+		s["move"] = random_move(String(s.get("type", "Fire")))
+	return String(s["move"])
 
 # The 7 starter spirits (one per trainer) are EXCLUSIVE — never found in the
 # wild or in events, so only their trainer owns one. Legendaries are barred
 # from the wild too; they appear ONLY through the legendary event.
-const STARTER_NAMES := ["Charmander", "Squirtle", "Bulbasaur", "Pikachu", "Machop", "Gastly", "Abra"]
-const LEGENDARY_NAMES := ["Articuno", "Zapdos", "Moltres", "Mewtwo", "Mew"]
+const STARTER_NAMES := ["Cinderwisp", "Puddleboo", "Mossprig", "Zapkin", "Brawlboo", "Wispy", "Dreamwisp"]
+const LEGENDARY_NAMES := ["Frostcrown", "Stormcrown", "Flamecrown", "Omenwraith", "Glimmer"]
 
 # A random wild spirit of the given stage — never a starter or a legendary.
 func random_spirit(stage: int = 1) -> Dictionary:
@@ -433,6 +498,9 @@ func random_spirit(stage: int = 1) -> Dictionary:
 
 func _wild_ok(spirit_name: String) -> bool:
 	return not STARTER_NAMES.has(spirit_name) and not LEGENDARY_NAMES.has(spirit_name)
+
+func is_legendary(spirit_name: String) -> bool:
+	return LEGENDARY_NAMES.has(spirit_name)
 
 # A random legendary — only used by the legendary event.
 func random_legendary() -> Dictionary:

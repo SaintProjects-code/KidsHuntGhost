@@ -3,11 +3,9 @@ extends PanelContainer
 ## PlayerPanel.tscn so sizes/spacing can be edited in the Godot editor —
 ## this script only fills in the per-player data on each refresh.
 ##
-## The scene provides: %NameLabel, %Badges (5 circle dots), %PtsLabel,
-## %ItemRow (chips added here), %SpLabel and %PartyRow (6 Slot panels,
-## each holding a hidden "Icon" TextureRect).
-
-const MAX_ITEM_SLOTS := 5
+## The scene provides: %NameLabel, %Badges (circle dots), %PtsLabel,
+## %ItemRow (gold / jar / card chips added here), %SpLabel and %PartyRow (6
+## Slot panels, each holding a hidden "Icon" TextureRect).
 const BADGE_EARNED := Color("ffd24d")
 const BADGE_UNEARNED := Color(1, 1, 1, 0.15)
 const LEAD_TINT := Color("8fff8f")
@@ -26,14 +24,13 @@ func present(p: PlayerData, active: bool) -> void:
 	_name_lbl.text = ("▶ " if active else "") + p.player_name + (" ⚔" if p.pvp_tag else "")
 	_name_lbl.modulate = p.color
 	_pts_lbl.text = "pts: %d / %d" % [p.progress.points, GameState.win_threshold]
-	_sp_lbl.text = "Sp: %d" % p.team.size()
+	_sp_lbl.text = "Team: %d" % p.team.size()
 	_fill_badges(p)
 	_fill_items(p)
 	_fill_party(p, active)
 
 # Trainer portrait beside the name. Built in code (not in the .tscn) so the
-# scene can be re-saved in the editor without dropping it. Prefers the player's
-# stored trainer key, then falls back to the name→trainer mapping.
+# scene can be re-saved in the editor without dropping it.
 func _set_trainer_icon(p: PlayerData) -> void:
 	if _trainer_icon == null:
 		_trainer_icon = TextureRect.new()
@@ -45,17 +42,11 @@ func _set_trainer_icon(p: PlayerData) -> void:
 		var header: Node = _name_lbl.get_parent()
 		header.add_child(_trainer_icon)
 		header.move_child(_trainer_icon, 0)   # sit before the name
-	var cands: Array = []
-	if p.trainer_key != "":
-		cands.append(p.trainer_key)
-	cands.append_array(GameData.player_trainer(p.player_name))
-	_trainer_icon.texture = GameData.trainer_texture(cands)
+	_trainer_icon.texture = GameData.trainer_texture(GameData.player_trainer(p))
 	_trainer_icon.visible = _trainer_icon.texture != null
 
-# The scene's dots have a white circle StyleBox, so a modulate is enough to
-# colour them (gold = earned, faint white = not yet). The scene ships with 5
-# dots but there are 8 badges — grow the row so EVERY badge has a dot, and
-# light them by count (the old index mapping left badges 6–8 invisible).
+# The scene's dots have a white circle StyleBox, so a modulate colours them
+# (gold = earned). The scene ships with 5 dots; grow the row to one per badge.
 func _fill_badges(p: PlayerData) -> void:
 	var total: int = p.progress.badges.size()
 	while _badges.get_child_count() < total:
@@ -70,7 +61,7 @@ func _fill_party(p: PlayerData, active: bool) -> void:
 	var slot_i := 0
 	for node in _party.get_children():
 		if not (node is Panel):
-			continue   # skip the Sp: label
+			continue   # skip the Team: label
 		var icon: TextureRect = node.get_node("Icon")
 		if slot_i < p.team.size():
 			icon.texture = SpiritsData.sprite_tex(p.team[slot_i].get("name", ""), "icon")
@@ -81,51 +72,20 @@ func _fill_party(p: PlayerData, active: bool) -> void:
 			icon.texture = null
 		slot_i += 1
 
-# ---------------- item chips ----------------
+# ---------------- resource chips ----------------
 
 func _fill_items(p: PlayerData) -> void:
-	for c in _items.get_children():
-		c.queue_free()
-	# gold leads the row, then the stacked items
-	_items.add_child(_item_chip("🪙 %d" % p.inventory.gold))
-	for entry in _inventory_slots(p):
-		_items.add_child(_item_chip("%s ×%d" % [entry.name, entry.count]))
+	UIKit.clear(_items)
+	_items.add_child(_chip("🪙 %d" % p.inventory.gold))
+	for jar in CatchSystem.JAR_ORDER:
+		var n: int = p.inventory.jar_count(jar)
+		if n > 0:
+			_items.add_child(_chip("%s ×%d" % [CatchSystem.jar_name(jar), n]))
+	_items.add_child(_chip("🃏 %d/%d" % [p.inventory.hand.size(), Balance.HAND_SIZE]))
 
-# Ball counts first, then bag items — the inventory stacks items itself now
-# (one entry per type with a "count"). Capped at MAX_ITEM_SLOTS shown.
-func _inventory_slots(p: PlayerData) -> Array:
-	var slots: Array = []
-	for ball in p.inventory.balls.keys():
-		var count: int = p.inventory.balls[ball]
-		if count > 0:
-			slots.append({"name": _ball_name(ball), "count": count})
-	for entry in p.inventory.items:
-		slots.append({"name": entry.get("name", "Item"), "count": int(entry.get("count", 1))})
-	return slots.slice(0, MAX_ITEM_SLOTS)
-
-func _ball_name(ball) -> String:
-	return "Spirit Ball" if ball == &"spirit_ball" else "Master Ball"
-
-func _item_chip(text: String) -> Control:
+func _chip(text: String) -> Control:
 	var chip := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.219608, 0.180392, 0.380392, 0.85)
-	sb.border_width_left = 1
-	sb.border_width_top = 1
-	sb.border_width_right = 1
-	sb.border_width_bottom = 1
-	sb.border_color = Color(0.541176, 0.435294, 0.964706, 0.6)
-	sb.corner_radius_top_left = 8
-	sb.corner_radius_top_right = 8
-	sb.corner_radius_bottom_left = 8
-	sb.corner_radius_bottom_right = 8
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	sb.content_margin_top = 3
-	sb.content_margin_bottom = 3
-	chip.add_theme_stylebox_override("panel", sb)
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 16)
-	chip.add_child(lbl)
+	chip.add_theme_stylebox_override("panel", UIKit.box(Color(0.22, 0.18, 0.38, 0.85), 8, 1,
+		Color(UIKit.PURPLE, 0.6), Vector2(8, 3)))
+	chip.add_child(UIKit.label(text, 16))
 	return chip

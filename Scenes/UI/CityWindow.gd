@@ -1,6 +1,7 @@
 extends MenuWindow
-## City hub: challenge the gym, shop, take on the Elite Four, or leave.
-## present(player_index, city_id); emits chose("gym"|"shop"|"elite"|"leave").
+## Town hub: challenge the gym, shop, the Spirit Box, set out on the Spectral
+## Trail (3+ badges), or leave. present(player_index, city);
+## emits chose("gym" | "shop" | "pc" | "trail" | "leave"). Keys 1–5 pick.
 
 signal chose(action: String)
 
@@ -9,41 +10,48 @@ var _buttons: VBoxContainer
 
 func _ready() -> void:
 	var col := _init_window(420, 360)
-	_title = _title_label("City", 28)
+	_title = _title_label("Town", 28)
 	col.add_child(_title)
-	_buttons = VBoxContainer.new()
-	_buttons.add_theme_constant_override("separation", 10)
+	_buttons = UIKit.vbox(10)
 	_buttons.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(_buttons)
 	hide()
 
-func present(player_index: int, city_id: String) -> void:
+func present(player_index: int, city: String) -> void:
 	var p: PlayerData = GameState.players[player_index]
-	var gym: Dictionary = GameData.gym_for_city(city_id)
-	_title.text = gym.get("name", "City")
-	for c in _buttons.get_children():
-		c.queue_free()
-	var badge: String = gym.get("badge", "")
-	var has_badge: bool = p.progress.badges.get(badge, false)
-	if not has_badge:
-		_buttons.add_child(_button("⚔ Challenge Gym (%s)" % gym.get("type", ""), func(): chose.emit("gym")))
+	var gym: Dictionary = GameData.gym_for_city(city)
+	_title.text = gym.get("name", "Town")
+	UIKit.clear(_buttons)
+	var options: Array = []
+	if not p.progress.badges.get(gym.get("badge", ""), false):
+		options.append(["⚔ Challenge Gym (%s)" % gym.get("type", ""), "gym"])
 	else:
-		var got := Label.new()
-		got.text = "✓ %s Badge earned" % badge.capitalize()
+		var got := UIKit.label("✓ %s earned" % GameData.badge_name(gym["badge"]), 18, UIKit.GOOD)
 		got.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		got.add_theme_color_override("font_color", Color("9fff9f"))
 		_buttons.add_child(got)
-	_buttons.add_child(_button("🛒 Shop", func(): chose.emit("shop")))
-	_buttons.add_child(_button("💻 PC (spirit storage)", func(): chose.emit("pc")))
-	# 3+ badges unlock the trip to Victory Road (the only way in)
-	if p.progress.badge_count() >= 3:
-		_buttons.add_child(_button("🌋 Victory Road", func(): chose.emit("victory")))
-	_buttons.add_child(_button("Leave", func(): chose.emit("leave")))
+	options.append(["🛒 Shop", "shop"])
+	options.append(["📦 Spirit Box", "pc"])
+	if p.progress.badge_count() >= Balance.FLY_BADGES:
+		options.append(["🌫 Spectral Trail", "trail"])
+	options.append(["Leave", "leave"])
+	for i in options.size():
+		var action: String = options[i][1]
+		_buttons.add_child(_button("%d · %s" % [i + 1, options[i][0]], func(): chose.emit(action)))
+	Juice.pop(panel, 1.04)
 
 # Spectator view for a CPU's visit: same menu, every button locked.
-func present_cpu(player_index: int, city_id: String) -> void:
-	present(player_index, city_id)
+func present_cpu(player_index: int, city: String) -> void:
+	present(player_index, city)
 	_title.text += "  (%s visits)" % GameState.players[player_index].player_name
 	for c in _buttons.get_children():
 		if c is Button:
 			c.disabled = true
+
+func _unhandled_key_input(ev: InputEvent) -> void:
+	if not visible:
+		return
+	var buttons: Array = _buttons.get_children().filter(func(c): return c is Button and not c.disabled)
+	var n := Controls.number_pressed(ev)
+	if n >= 0 and n < buttons.size():
+		get_viewport().set_input_as_handled()
+		buttons[n].pressed.emit()

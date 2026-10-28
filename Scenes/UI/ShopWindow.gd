@@ -1,167 +1,133 @@
 extends MenuWindow
-## Spend gold on balls, healing items, and a rotating rack of held battle
-## items (3 random offers per visit). present(player_index); emits closed().
+## Spend gold on capture jars and a rotating rack of cards (rerolled each
+## visit), or pay to scrub a trait off a spirit. present(player_index);
+## emits closed(). cpu_shop(idx) is the CPU's shopping list (no window).
 
 signal closed()
 
-const STOCK := [
-	{"name": "Spirit Ball", "kind": "ball",   "amount": 1,  "cost": 10},
-	{"name": "Potion",      "kind": "potion", "amount": 40, "cost": 15},
-	{"name": "Super Potion","kind": "potion", "amount": 80, "cost": 30},
-	{"name": "Revive",      "kind": "revive",               "cost": 35},
-]
-const HELD_OFFERS := 3
+const TRAIT_REMOVAL_COST := 10
 
-var _title: Label
 var _gold_lbl: Label
 var _list: VBoxContainer
-var _player_index: int = -1
-var _held_offer: Array = []   # held-item keys on the rack, rerolled per visit
+var _rack: HBoxContainer
+var _player_index := -1
+var _offers: Array = []   # card keys on the rack this visit
 
 func _ready() -> void:
-	var col := _init_window(460, 0)
-	_title = _title_label("🛒 Shop", 26)
-	col.add_child(_title)
-	_gold_lbl = Label.new()
+	var col := _init_window(560, 0)
+	col.add_child(_title_label("🛒 Shop", 26))
+	_gold_lbl = UIKit.label("", 18, UIKit.GOLD)
 	_gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_gold_lbl)
-	_list = VBoxContainer.new()
-	_list.add_theme_constant_override("separation", 6)
-	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_list = UIKit.vbox(6)
 	col.add_child(_list)
+	col.add_child(_heading("— Cards (they go to your hand) —"))
+	_rack = UIKit.hbox(8)
+	_rack.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.add_child(_rack)
 	col.add_child(_button("Done", func(): closed.emit()))
 	hide()
 
 func present(player_index: int) -> void:
 	_player_index = player_index
-	# reroll the battle-item rack each visit
-	var keys: Array = GameData.HELD_ITEMS.keys()
-	keys.shuffle()
-	_held_offer = keys.slice(0, HELD_OFFERS)
+	_offers = CardsData.shop_pool()
+	_offers.shuffle()
+	_offers = _offers.slice(0, Balance.SHOP_CARD_OFFERS)
 	_refresh()
 
-func _refresh() -> void:
-	var inv = GameState.players[_player_index].inventory
-	_gold_lbl.text = "Gold: %d" % inv.gold
-	for c in _list.get_children():
-		c.queue_free()
-	for item in STOCK:
-		_list.add_child(_stock_row(item["name"], "", int(item["cost"]), _on_buy.bind(item), inv))
-	# held battle items
-	var head := Label.new()
-	head.text = "— Battle Items (equip from your bag) —"
-	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	head.add_theme_font_size_override("font_size", 14)
-	head.modulate = Color(1, 1, 1, 0.7)
-	_list.add_child(head)
-	for key in _held_offer:
-		var d: Dictionary = GameData.HELD_ITEMS[key]
-		_list.add_child(_stock_row(d["name"], d["desc"], int(d["cost"]), _on_buy_held.bind(key), inv))
-	# trait removal service: 10g scrubs a quirk off a spirit
-	var team: Array = GameState.players[_player_index].team
-	var any_traits := false
-	for m in team:
-		if not m.get("traits", []).is_empty():
-			any_traits = true
-			break
-	if any_traits:
-		var thead := Label.new()
-		thead.text = "— Trait Removal —"
-		thead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		thead.add_theme_font_size_override("font_size", 14)
-		thead.modulate = Color(1, 1, 1, 0.7)
-		_list.add_child(thead)
-		for m in team:
-			for key2 in m.get("traits", []):
-				var info: Dictionary = EventsData.trait_of(String(key2))
-				var left: int = EventsData.trait_turns_left(m, String(key2))
-				_list.add_child(_stock_row("%s: ✦%s (%d turns left)" % [
-					m.get("name", "?"), info["name"], left],
-					info["desc"], 10, _on_remove_trait.bind(m, String(key2)), inv))
+func _inv() -> PlayerData.Inventory:
+	return GameState.players[_player_index].inventory
 
-func _stock_row(name: String, desc: String, cost: int, cb: Callable, inv) -> Control:
-	var row := HBoxContainer.new()
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 0)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(col)
-	var lbl := Label.new()
-	lbl.text = "%s — %dg" % [name, cost]
-	lbl.add_theme_font_size_override("font_size", 16)
-	col.add_child(lbl)
-	if desc != "":
-		var sub := Label.new()
-		sub.text = desc
-		sub.add_theme_font_size_override("font_size", 12)
-		sub.modulate = Color(1, 1, 1, 0.65)
-		sub.clip_text = true
-		col.add_child(sub)
-	var buy := _small_btn("Buy", cb)
-	buy.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	buy.disabled = inv.gold < cost
+func _refresh() -> void:
+	var inv := _inv()
+	_gold_lbl.text = "🪙 %d gold   ·   🃏 %d/%d cards" % [inv.gold, inv.hand.size(), Balance.HAND_SIZE]
+	UIKit.clear(_list)
+	for jar in [&"ghost_jar", &"silver_jar", &"golden_jar"]:
+		var d: Dictionary = CatchSystem.JARS[jar]
+		_list.add_child(_row("%s  (+%d to catch)  — %dg   · own %d" % [d["name"], d["bonus"], d["cost"], inv.jar_count(jar)],
+			int(d["cost"]), _buy_jar.bind(jar)))
+	var team: Array = GameState.players[_player_index].team
+	if team.any(func(m): return not m.get("traits", []).is_empty()):
+		_list.add_child(_heading("— Trait Removal —"))
+		for m in team:
+			for key in m.get("traits", []):
+				var info: Dictionary = EventsData.trait_of(String(key))
+				_list.add_child(_row("%s: ✦%s (%d turns left) — %dg" % [m["name"], info["name"],
+					EventsData.trait_turns_left(m, String(key)), TRAIT_REMOVAL_COST], TRAIT_REMOVAL_COST,
+					_remove_trait.bind(m, String(key))))
+	UIKit.clear(_rack)
+	for key in _offers:
+		var col := UIKit.vbox(2)
+		var cv := CardView.new(key, Vector2(96, 128))
+		cv.disabled = inv.gold < int(CardsData.card(key)["cost"])
+		cv.pressed.connect(_buy_card.bind(key))
+		col.add_child(cv)
+		var price := UIKit.label("%dg" % int(CardsData.card(key)["cost"]), 14, UIKit.GOLD)
+		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(price)
+		_rack.add_child(col)
+
+func _heading(text: String) -> Label:
+	var head := UIKit.label(text, 14)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.modulate = Color(1, 1, 1, 0.7)
+	return head
+
+func _row(text: String, cost: int, cb: Callable) -> Control:
+	var row := UIKit.hbox(8)
+	var lbl := UIKit.label(text, 15)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(lbl)
+	var buy := UIKit.small_button("Buy", cb)
+	buy.disabled = _inv().gold < cost
 	row.add_child(buy)
 	return row
 
-# Compact purple button — the theme's default padding makes 7 rows too tall
-# for the screen.
-func _small_btn(text: String, cb: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 14)
-	for state in [["normal", Color(0.541, 0.435, 0.965)], ["hover", Color(0.651, 0.565, 1.0)], ["pressed", Color(0.435, 0.337, 0.847)], ["disabled", Color(0.396, 0.388, 0.471)]]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = state[1]
-		sb.border_width_bottom = 2
-		sb.border_color = Color(0.345, 0.247, 0.737)
-		sb.corner_radius_top_left = 7
-		sb.corner_radius_top_right = 7
-		sb.corner_radius_bottom_left = 7
-		sb.corner_radius_bottom_right = 7
-		sb.content_margin_left = 12.0
-		sb.content_margin_right = 12.0
-		sb.content_margin_top = 4.0
-		sb.content_margin_bottom = 4.0
-		b.add_theme_stylebox_override(state[0], sb)
-	b.pressed.connect(cb)
-	return b
+func _pay(cost: int) -> bool:
+	if _inv().gold < cost:
+		Sfx.play("error")
+		return false
+	_inv().gold -= cost
+	Sfx.play("coin")
+	return true
 
-# Pay 10g to scrub a trait (good or bad — the shop doesn't judge).
-func _on_remove_trait(mon: Dictionary, key: String) -> void:
-	var inv = GameState.players[_player_index].inventory
-	if inv.gold < 10:
-		return
-	inv.gold -= 10
-	var traits: Array = mon.get("traits", [])
-	traits.erase(key)
-	mon["traits"] = traits
-	var timers: Dictionary = mon.get("trait_turns", {})
-	timers.erase(key)
-	mon["trait_turns"] = timers
-	EventBus.log_entry.emit(_player_index, "%s had ✦%s removed at the shop (−10g)." % [
-		mon.get("name", "?"), EventsData.trait_of(key)["name"]], "#7fe0d0")
+func _buy_jar(jar: StringName) -> void:
+	if _pay(int(CatchSystem.JARS[jar]["cost"])):
+		_inv().add_jars(jar, 1)
 	_refresh()
 
-func _on_buy(item: Dictionary) -> void:
-	var inv = GameState.players[_player_index].inventory
-	if inv.gold < item["cost"]:
-		return
-	match item["kind"]:
-		"ball":
-			inv.gold -= item["cost"]
-			inv.balls[&"spirit_ball"] = inv.ball_count(&"spirit_ball") + int(item.get("amount", 1))
-		"potion", "revive":
-			# Only charge if the bag can take it (7 kinds max, stacks of 5).
-			if inv.add_item({"name": item["name"], "kind": item["kind"], "amount": item.get("amount", 0)}):
-				inv.gold -= item["cost"]
+func _buy_card(key: String) -> void:
+	if _pay(int(CardsData.card(key)["cost"])):
+		_offers.erase(key)   # one of each per visit
+		await CardSystem.give(_player_index, key)
 	_refresh()
 
-func _on_buy_held(key: StringName) -> void:
-	var inv = GameState.players[_player_index].inventory
-	var cost: int = int(GameData.HELD_ITEMS[key]["cost"])
-	if inv.gold < cost:
+func _remove_trait(mon: Dictionary, key: String) -> void:
+	if not _pay(TRAIT_REMOVAL_COST):
 		return
-	if inv.add_item(GameData.held_item_entry(key)):
-		inv.gold -= cost
+	mon.get("traits", []).erase(key)
+	mon.get("trait_turns", {}).erase(key)
+	EventBus.log_entry.emit(_player_index, "%s had ✦%s removed at the shop (−%dg)." % [
+		mon["name"], EventsData.trait_of(key)["name"], TRAIT_REMOVAL_COST], "#7fe0d0")
 	_refresh()
+
+# CPU shopping list: keep 3 jars, then buy one useful card if it can afford it.
+func cpu_shop(idx: int) -> void:
+	var inv: PlayerData.Inventory = GameState.players[idx].inventory
+	var bought: Array = []
+	while inv.total_jars() < 3 and inv.gold >= 10:
+		inv.gold -= 10
+		inv.add_jars(&"ghost_jar", 1)
+		bought.append("Ghost Jar")
+	if inv.gold >= 60 and inv.jar_count(&"silver_jar") == 0:
+		inv.gold -= 25
+		inv.add_jars(&"silver_jar", 1)
+		bought.append("Silver Jar")
+	if not inv.hand_full() and inv.gold >= 40:
+		var key: String = ["ecto_patch", "spirit_shield", "glow_tonic", "battle_cry", "wake_bell"].pick_random()
+		inv.gold -= int(CardsData.card(key)["cost"])
+		inv.hand.append(key)
+		bought.append(CardsData.card(key)["name"])
+		EventBus.hand_changed.emit(idx)
+	if not bought.is_empty():
+		EventBus.log_entry.emit(idx, "%s shops: %s" % [GameState.players[idx].player_name, ", ".join(bought)], "#f0c36a")

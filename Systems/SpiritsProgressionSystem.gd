@@ -1,31 +1,26 @@
 extends Node
+## Autoloaded. Stars: duplicate catches, battle credits, events and Star Candy.
+## Each whole star is a small stat bump; 3 stars hand off to BonusReward.
 
 func _ready() -> void:
 	EventBus.catch_succeeded.connect(_on_catch)
-	EventBus.battle_ended.connect(_on_battle_ended)
 
 # ── Catch handling ────────────────────────────────────────────────────────────
 
 func _on_catch(player_idx: int, spirit: Dictionary) -> void:
 	var p := GameState.players[player_idx]
 	var existing := _find_owned(p, spirit["name"])
-	if existing and existing != spirit:
+	if not existing.is_empty() and existing != spirit:
 		# Duplicate — remove the new one (wherever it landed), award a star
 		p.team.erase(spirit)
 		p.pc.erase(spirit)
-		await _award_star(player_idx, existing)
+		await award_star(player_idx, existing)
 	# Fresh catch needs no star handling
-
-# ── Battle handling ───────────────────────────────────────────────────────────
-
-func _on_battle_ended(winner_idx: int, _loser_idx: int) -> void:
-	var p := GameState.players[winner_idx]
-	if p.team.size() > 0:
-		await _award_star(winner_idx, p.team[0])  # star goes to lead
 
 # ── Star logic ────────────────────────────────────────────────────────────────
 
-func _award_star(player_idx: int, spirit: Dictionary) -> void:
+# A whole star from outside a battle (events, Star Candy).
+func award_star(player_idx: int, spirit: Dictionary) -> void:
 	await award_stars(player_idx, spirit, 1.0)
 
 # Stars can come in halves (battle results). Each WHOLE star crossed grants

@@ -1,18 +1,9 @@
 extends Control
+## Pick 2–4 players: name, trainer (each comes with its own starter), CPU or
+## human, plus the game settings (map, points to win, volume).
 
 const MIN_PLAYERS := 2
 const MAX_PLAYERS := 4
-
-# Token tint per player (applied to the shared player sprite).
-const PLAYER_COLORS := [
-	Color("ff5a5a"),  # Player 1 - red
-	Color("5aa6ff"),  # Player 2 - blue
-	Color("5ad26a"),  # Player 3 - green
-	Color("ffd24d"),  # Player 4 - yellow
-]
-
-const PLAYER_SHEET := "res://Assets/Player/Male_Spritesheet.png"
-const TOKEN_FRAME := Rect2(16, 0, 16, 16)  # front-facing frame
 
 @onready var player_cards: HBoxContainer = $PlayerCards
 @onready var add_button: Button = $AddPlayerCard
@@ -43,13 +34,13 @@ func _on_add_player_pressed() -> void:
 # portrait (a sprite no NPC in the game uses). The card shows the trainer big
 # with their starter tucked in the bottom corner.
 const TRAINERS := [
-	{ "name": "Ember",  "starter": "Charmander", "color": Color("ff7a3a"), "portrait": "alain" },
-	{ "name": "Brooke", "starter": "Squirtle",   "color": Color("4aa3df"), "portrait": "adaman" },
-	{ "name": "Ivy",    "starter": "Bulbasaur",  "color": Color("5ad26a"), "portrait": "akari" },
-	{ "name": "Zap",    "starter": "Pikachu",    "color": Color("ffd24d"), "portrait": "acerola" },
-	{ "name": "Rex",    "starter": "Machop",     "color": Color("e0563a"), "portrait": "alder" },
-	{ "name": "Shade",  "starter": "Gastly",     "color": Color("8e6fd6"), "portrait": "allister" },
-	{ "name": "Luna",   "starter": "Abra",       "color": Color("e86fb0"), "portrait": "amarys" },
+	{ "name": "Ember",  "starter": "Cinderwisp", "color": Color("ff7a3a"), "portrait": "alain" },
+	{ "name": "Brooke", "starter": "Puddleboo",  "color": Color("4aa3df"), "portrait": "adaman" },
+	{ "name": "Ivy",    "starter": "Mossprig",   "color": Color("5ad26a"), "portrait": "akari" },
+	{ "name": "Zap",    "starter": "Zapkin",     "color": Color("ffd24d"), "portrait": "acerola" },
+	{ "name": "Rex",    "starter": "Brawlboo",   "color": Color("e0563a"), "portrait": "alder" },
+	{ "name": "Shade",  "starter": "Wispy",      "color": Color("8e6fd6"), "portrait": "allister" },
+	{ "name": "Luna",   "starter": "Dreamwisp",  "color": Color("e86fb0"), "portrait": "amarys" },
 ]
 
 func _add_card() -> void:
@@ -119,6 +110,7 @@ func _apply_trainer(card: Node) -> void:
 		btn.text = "◀ %s ▶\n(%s)" % [trainer["name"], trainer["starter"]]
 
 func _on_confirm_pressed() -> void:
+	SaveManager.delete_save()   # a new game replaces the old save
 	GameState.reset()
 	for i in player_cards.get_child_count():
 		var card := player_cards.get_child(i)
@@ -151,7 +143,7 @@ func _setup_settings() -> void:
 	win_slider.value = GameState.win_threshold
 	win_slider.value_changed.connect(_on_win_changed)
 	_on_win_changed(win_slider.value)
-	# "No pts": points never win — only the E4 does. A compact toggle placed
+	# "No pts": points never win — only the Spectral Trail does. A compact toggle placed
 	# INSIDE the win row, so it doesn't add a row that overflows the panel.
 	var inf := CheckButton.new()
 	inf.text = "No pts"

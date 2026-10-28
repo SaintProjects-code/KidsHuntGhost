@@ -31,19 +31,42 @@ func _ready() -> void:
 	EventBus.turn_started.connect(_on_turn_started)
 	EventBus.dice_rolled.connect(_on_dice_rolled)
 	EventBus.space_landed.connect(_on_space_landed)
-	EventBus.catch_succeeded.connect(func(i, s): _add(i, "caught %s!" % s.get("name", "?"), C_GOOD))
-	EventBus.catch_failed.connect(func(i, s): _add(i, "%s broke free!" % s.get("name", "?"), C_BAD))
-	EventBus.badge_earned.connect(func(i, gym): _add(i, "earned a badge at %s!" % gym, C_GOLD))
-	EventBus.points_awarded.connect(func(i, n): _add(i, "+%d point%s" % [n, "s" if n > 1 else ""], C_GOLD))
-	EventBus.spirit_evolved.connect(func(i, s): _add(i, "%s evolved!" % s.get("name", "?"), C_EVO))
-	EventBus.star_awarded.connect(func(i, s): _add(i, "%s gained a star ★" % s.get("name", "?"), C_EVO))
-	EventBus.game_won.connect(func(i): _add(i, "WINS THE GAME! 🏆", C_GOLD))
+	EventBus.catch_succeeded.connect(_on_caught)
+	EventBus.catch_failed.connect(_on_escaped)
+	EventBus.badge_earned.connect(_on_badge)
+	EventBus.points_awarded.connect(_on_points)
+	EventBus.spirit_evolved.connect(_on_evolved)
+	EventBus.star_awarded.connect(_on_star)
+	EventBus.game_won.connect(_on_won)
 	EventBus.log_entry.connect(_add)
 
-func present() -> void:
-	pass   # the log is always up to date; nothing to rebuild
-
 # ── entry builders ────────────────────────────────────────────────────────────
+# (plain methods, not lambdas: EventBus outlives this window, and a lambda
+# left connected to it after the board is freed can crash the engine)
+
+func _on_dice_rolled(total: int, _faces: Array) -> void:
+	_add(GameState.current_player_index, "rolled a %d" % total, C_DICE)
+
+func _on_caught(i: int, s: Dictionary) -> void:
+	_add(i, "caught %s!" % s.get("name", "?"), C_GOOD)
+
+func _on_escaped(i: int, s: Dictionary) -> void:
+	_add(i, "%s broke free!" % s.get("name", "?"), C_BAD)
+
+func _on_badge(i: int, gym: String) -> void:
+	_add(i, "earned a badge at %s!" % gym, C_GOLD)
+
+func _on_points(i: int, n: int) -> void:
+	_add(i, "+%d point%s" % [n, "s" if n > 1 else ""], C_GOLD)
+
+func _on_evolved(i: int, s: Dictionary) -> void:
+	_add(i, "%s evolved!" % s.get("name", "?"), C_EVO)
+
+func _on_star(i: int, s: Dictionary) -> void:
+	_add(i, "%s gained a star ★" % s.get("name", "?"), C_EVO)
+
+func _on_won(i: int) -> void:
+	_add(i, "WINS THE GAME! 🏆", C_GOLD)
 
 func _on_turn_started(i: int) -> void:
 	var p := _player(i)
@@ -51,12 +74,8 @@ func _on_turn_started(i: int) -> void:
 		return
 	_log.append_text("\n[color=%s]── %s's turn ──[/color]\n" % [p.color.to_html(false), p.player_name])
 
-func _on_dice_rolled(result: int) -> void:
-	_add(GameState.current_player_index, "rolled a %d" % result, C_DICE)
-
 func _on_space_landed(i: int, type: StringName) -> void:
-	var pretty := String(type).replace("PKMN_", "SP ").capitalize()
-	_add(i, "landed on %s" % pretty, C_TILE)
+	_add(i, "landed on %s" % String(type).capitalize(), C_TILE)
 
 # One log line: colour-tagged player name + coloured message.
 func _add(i: int, text: String, color: String) -> void:

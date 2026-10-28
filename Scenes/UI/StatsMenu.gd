@@ -1,5 +1,5 @@
 extends MenuWindow
-## Per-spirit Stats screen (Image 2). Built in code, shown through UIManager.
+## Per-spirit Stats screen. Built in code, shown through UIManager.
 ## Call show_spirit(spirit_dict) before opening.
 ##
 ## Shows: name + stars, type, sprite, ability (name + effect), H/A/D/S stat bars,
@@ -24,6 +24,7 @@ var _ability_lbl: Label
 var _ability_desc: Label
 var _ability2_lbl: Label    # second (stacked) ability — hidden when absent
 var _ability2_desc: Label
+var _move_lbl: Label
 var _traits_lbl: RichTextLabel   # event traits — hidden when the spirit has none
 var _stat_rows := {}        # "H"/"A"/"D"/"S" -> HBoxContainer of 6 boxes
 var _chart: Control
@@ -31,9 +32,6 @@ var _chart: Control
 func _ready() -> void:
 	_build()
 	hide()
-
-func on_closed() -> void:
-	pass
 
 # ─── Build the static layout ──────────────────────────────────────────────────
 func _build() -> void:
@@ -71,11 +69,7 @@ func _build() -> void:
 	mid.add_theme_constant_override("separation", 16)
 	left.add_child(mid)
 
-	_sprite = TextureRect.new()
-	_sprite.custom_minimum_size = Vector2(110, 110)
-	_sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_sprite = UIKit.sprite(null, Vector2(110, 110))
 	mid.add_child(_sprite)
 
 	var stats_col := VBoxContainer.new()
@@ -106,7 +100,13 @@ func _build() -> void:
 	_ability2_desc.add_theme_font_size_override("font_size", 18)
 	left.add_child(_ability2_desc)
 
-	# Traits (permanent quirks from events) — hidden when the spirit has none
+	# Signature move
+	_move_lbl = Label.new()
+	_move_lbl.add_theme_font_size_override("font_size", 20)
+	_move_lbl.add_theme_color_override("font_color", Color("ffd24d"))
+	left.add_child(_move_lbl)
+
+	# Traits (temporary quirks from events) — hidden when the spirit has none
 	_traits_lbl = RichTextLabel.new()
 	_traits_lbl.bbcode_enabled = true
 	_traits_lbl.fit_content = true
@@ -173,6 +173,9 @@ func show_spirit(s: Dictionary) -> void:
 		_ability2_lbl.text = "%s  ·  %s" % [ab2.get("name", ""), ab2.get("cat", "")]
 		_ability2_desc.text = ab2.get("desc", "")
 
+	var mv := SpiritsData.move_of(SpiritsData.move_key(s))
+	_move_lbl.text = "✦ Move: %s  (charge %d) — %s" % [mv["name"], mv["charge"], mv["desc"]]
+
 	# event traits: "✦Sleepyhead — sleeps through round 1…" (green/red by kind)
 	var traits: Array = s.get("traits", [])
 	_traits_lbl.visible = not traits.is_empty()
@@ -203,12 +206,6 @@ func _set_boxes(key: String, value: int) -> void:
 		box.custom_minimum_size = Vector2(20, 18)
 		box.color = STAT_COLORS[key] if i < value else Color(1, 1, 1, 0.12)
 		holder.add_child(box)
-
-func _star_string(stars: int) -> String:
-	var out := ""
-	for i in 3:
-		out += "★" if i < stars else "☆"
-	return out
 
 # ─── Circular type chart drawn with arrows ────────────────────────────────────
 class TypeChartView:

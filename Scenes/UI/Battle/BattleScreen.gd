@@ -1,0 +1,446 @@
+extends "res://Scenes/UI/Battle/BattleRules.gd"
+## Battle screen, layer 3 of 3: the FLOW. present() a fight, then rounds run
+## on Next Round (or by themselves for CPU fights). Reused for wild spirits,
+## trainers, gyms, the Haunted Four, the Champion and PvP.
+##
+## TACTIC CARDS: each side may play ONE tactic card per round. A human clicks a
+## card (or presses 1–5) to arm it; it plays at the start of the next round.
+## CPUs and NPC leaders pick with CardSystem.pick_tactic.
+##
+## present(setup) — setup keys:
+##   team, opp            Arrays of spirit dicts (yours / theirs)
+##   title, color         window title, your trainer colour
+##   atk_mod              event blessing/curse for this battle (+1 / -1)
+##   trainer, foe_trainer portrait candidate lists
+##   pvp_names            [your name, their name] in PvP
+##   hand / opp_hand      Arrays of card keys (used cards are removed from them)
+##   hand_owner / opp_owner  player index (for hand_changed) or -1 for NPCs
+##   human / opp_human    whether that side picks its own cards
+##   stakes               0..1, how hard the CPU side spends cards
+## Fights run on copies (buffs don't stick) but DAMAGE is real: HP is written
+## back to the caller's team when the battle ends.
+
+var _src_team: Array = []
+var _hand: Array = []
+var _opp_hand: Array = []
+var _hand_owner := -1
+var _opp_owner := -1
+var _human := true
+var _opp_human := false
+var _stakes := 0.5
+var _armed := ""          # your card queued for next round
+var _opp_armed := ""
+
+func present(setup: Dictionary) -> void:
+	var team: Array = setup.get("team", [])
+	var color: Color = setup.get("color", Color.WHITE)
+	_pvp_names = setup.get("pvp_names", [])
+	_team_disc.set_data(GameData.trainer_texture(setup.get("trainer", [])), color)
+	_opp_disc.set_data(GameData.trainer_texture(setup.get("foe_trainer", [])), ENEMY_RED)
+	_team_name_lbl.text = _pvp_names[0] if _pvp_names.size() == 2 else String(setup.get("my_name", "YOU"))
+	_opp_name_lbl.text = _pvp_names[1] if _pvp_names.size() == 2 else "ENEMY"
+	_src_team = team
+	_team = _copy_team(team)
+	_opp = _copy_team(setup.get("opp", []))
+	_hand = setup.get("hand", [])
+	_opp_hand = setup.get("opp_hand", [])
+	_hand_owner = setup.get("hand_owner", -1)
+	_opp_owner = setup.get("opp_owner", -1)
+	_human = setup.get("human", true)
+	_opp_human = setup.get("opp_human", false)
+	_stakes = setup.get("stakes", 0.5)
+	_armed = ""
+	_opp_armed = ""
+	var atk_mod: int = setup.get("atk_mod", 0)
+	if atk_mod != 0:
+		for m in _team:
+			m["atk"] = clampi(int(m.get("atk", 1)) + atk_mod, 1, 6)
+	_active = 0
+	_opp_active = 0
+	_over = false
+	_won = false
+	_skipping = false
+	_speed = 1.0
+	_speed_btn.text = "2x"
+	_round_num = 0
+	_star_credits = {}
+	_ko_stars = {}
+	_log.clear()
+	_continue_btn.hide()
+	_skip_btn.show()
+	_next_btn.disabled = false
+	_skip_btn.disabled = false
+	_title.text = String(setup.get("title", "Battle"))
+	_busy = false
+	if atk_mod > 0:
+		_logln("[color=#9f9]Blessed! ATK +%d this battle.[/color]" % atk_mod)
+	elif atk_mod < 0:
+		_logln("[color=#f99]Spooked! ATK %d this battle.[/color]" % atk_mod)
+	_build_cards()
+	_refresh()
+	_refresh_hands()
+	if visible:
+		call_deferred("_opening")   # gauntlets re-present while already shown
+	else:
+		_opening_pending = true
+	_fit_to_screen()
+
+# Stars earned during the battle, keyed by index into the team passed to
+# present(). Cleared on read.
+func take_star_credits() -> Dictionary:
+	var out := _star_credits
+	_star_credits = {}
+	return out
+
+func won() -> bool:
+	return _won
+
+func _copy_team(src: Array) -> Array:
+	var out: Array = []
+	for i in src.size():
+		var c: Dictionary = src[i].duplicate(true)
+		c["current_hp"] = clampi(int(src[i].get("current_hp", c.get("hp", 1))), 0, int(c.get("hp", 1)))
+		c["_oi"] = i
+		for key in ["atk", "def", "spd"]:
+			c["_base_" + key] = int(c.get(key, 1))
+		out.append(c)
+	return out
+
+# ---------------- card hands ----------------
+
+func _refresh_hands() -> void:
+	_fill_hand(_hand_box, _hand, _human, true)
+	_fill_hand(_opp_hand_box, _opp_hand, _opp_human, false)
+
+func _fill_hand(box: HBoxContainer, hand: Array, interactive: bool, mine: bool) -> void:
+	UIKit.clear(box)
+	var tactics: Array = hand.filter(func(k): return CardsData.kind_of(k) == "tactic")
+	if not interactive:
+		# the other side's cards stay face-down
+		for i in tactics.size():
+			box.add_child(CardView.new("", Vector2(28, 38) if not mine else HAND_CARD))
+		return
+	for key in tactics:
+		var cv := CardView.new(key, HAND_CARD)
+		cv.armed = (_armed if mine else _opp_armed) == key
+		cv.disabled = _over
+		cv.pressed.connect(_arm.bind(key, mine))
+		box.add_child(cv)
+	if tactics.is_empty() and mine:
+		var none := UIKit.label("no tactic cards", 11)
+		none.modulate = Color(1, 1, 1, 0.5)
+		box.add_child(none)
+
+func _arm(key: String, mine: bool) -> void:
+	if _over:
+		return
+	if mine:
+		_armed = "" if _armed == key else key
+	else:
+		_opp_armed = "" if _opp_armed == key else key
+	Sfx.play("card", 1.2)
+	_refresh_hands()
+
+# Keyboard: Space/Enter = Next Round / Continue; 1-5 arm your tactic cards.
+func _unhandled_key_input(ev: InputEvent) -> void:
+	if not visible:
+		return
+	if Controls.confirm_pressed(ev):
+		get_viewport().set_input_as_handled()
+		if _continue_btn.visible:
+			finished.emit(_won)
+		elif not _next_btn.disabled:
+			_on_next()
+		return
+	var n := Controls.number_pressed(ev)
+	if n >= 0 and _human:
+		var tactics: Array = _hand.filter(func(k): return CardsData.kind_of(k) == "tactic")
+		if n < tactics.size():
+			get_viewport().set_input_as_handled()
+			_arm(tactics[n], true)
+
+# The card each side plays this round ("" = none).
+func _choose_cards() -> Array:
+	var me: Dictionary = _team[_active]
+	var op: Dictionary = _opp[_opp_active]
+	var mine := _armed if _human and not _skipping else ""
+	if not _human:
+		mine = CardSystem.pick_tactic(_hand, me, op, DamageCalculator.calculate(op, me),
+			DamageCalculator.calculate(me, op), _stakes)
+	var theirs := _opp_armed if _opp_human and not _skipping else ""
+	if not _opp_human:
+		theirs = CardSystem.pick_tactic(_opp_hand, op, me, DamageCalculator.calculate(me, op),
+			DamageCalculator.calculate(op, me), _stakes)
+	_armed = ""
+	_opp_armed = ""
+	return [mine, theirs]
+
+func _use_card(hand: Array, owner: int, key: String) -> void:
+	hand.erase(key)
+	if owner >= 0:
+		EventBus.hand_changed.emit(owner)
+		EventBus.card_played.emit(owner, key)
+
+# Resolve one tactic card for one side at the start of the round.
+func _play_tactic(key: String, is_me: bool) -> void:
+	var mine: Array = _team if is_me else _opp
+	var theirs: Array = _opp if is_me else _team
+	var me: Dictionary = mine[_active if is_me else _opp_active]
+	var foe: Dictionary = theirs[_opp_active if is_me else _active]
+	_use_card(_hand if is_me else _opp_hand, _hand_owner if is_me else _opp_owner, key)
+	if not _quiet():
+		Sfx.play("card")
+		Juice.pop(_card_of(me), 1.12)
+	_logln("[color=#7fe0d0]%s plays %s![/color]" % [
+		(_team_name_lbl.text if is_me else _opp_name_lbl.text), CardsData.card_name(key)])
+	match key:
+		"spirit_shield": me["_r_shield"] = true
+		"battle_cry":
+			_buff(me, "atk", 3)
+			me["_r_cry"] = true
+		"haste": me["_r_haste"] = true
+		"fury": me["_r_fury"] = true
+		"hold_on": me["_r_hold"] = true
+		"mirror_veil": me["_r_mirror"] = true
+		"ecto_patch": _heal_mon(me, 60)
+		"purify":
+			me.erase("_status")
+			me["_r_immune"] = true
+		"boo":
+			foe["_r_boo"] = true
+			_anim_shake(foe)
+			if not _quiet():
+				Sfx.play("boo")
+		"soul_siphon":
+			_chip(foe, 40)
+			_heal_mon(me, 40)
+		"rally":
+			for a in mine.filter(_alive):
+				_buff(a, "atk", 1)
+				_buff(a, "def", 1)
+		"switcheroo":
+			await _switch_lead(is_me)
+	await _beat(0.45)
+
+# Swap the lead with the healthiest living ally waiting behind it.
+func _switch_lead(is_me: bool) -> void:
+	var side: Array = _team if is_me else _opp
+	var active: int = _active if is_me else _opp_active
+	var best := -1
+	for j in range(active + 1, side.size()):
+		if _alive(side[j]) and (best == -1 or int(side[j]["current_hp"]) > int(side[best]["current_hp"])):
+			best = j
+	if best == -1:
+		_logln("…but nobody is free to switch in.")
+		return
+	var lead: Dictionary = side[active]
+	side[active] = side[best]
+	side[best] = lead
+	_build_cards()
+	_logln("%s swaps in for %s!" % [_who(side[active]), _who(lead)])
+	await _on_entry(is_me)
+
+func _clear_round_flags() -> void:
+	for m in _team + _opp:
+		if m.get("_r_cry", false):
+			_buff(m, "atk", -3)
+		for f in ["_r_shield", "_r_shield_logged", "_r_cry", "_r_haste", "_r_fury", "_r_hold", "_r_mirror", "_r_immune", "_r_boo"]:
+			m.erase(f)
+
+# ---------------- flow ----------------
+
+func _on_next() -> void:
+	if not _over and not _busy:
+		Sfx.play("click")
+		_round()
+
+# CPU fights: plays the whole battle on screen at a watchable pace.
+func autoplay() -> void:
+	_next_btn.disabled = true
+	_skip_btn.disabled = true
+	while not _over:
+		await get_tree().create_timer(0.5).timeout
+		if not _busy and not _over:
+			await _round()
+	_continue_btn.hide()   # no button — the caller closes the window
+	await get_tree().create_timer(1.8).timeout
+
+# Resolve the whole battle instantly (no animations, no beats, no cards).
+func _on_skip() -> void:
+	_skip_btn.disabled = true
+	_skipping = true
+	while _busy:
+		await get_tree().process_frame
+	while not _over:
+		await _round()
+	_skipping = false
+
+# "Go, X!" — or in PvP, both trainers announce their picks by name.
+func _sendout_line(is_me: bool) -> String:
+	var mon: Dictionary = _team[_active] if is_me else _opp[_opp_active]
+	if _pvp_names.size() == 2:
+		return "%s chooses %s!" % [_pvp_names[0] if is_me else _pvp_names[1], _who(mon)]
+	return ("Go, %s!" if is_me else "Opponent sends out %s!") % _who(mon)
+
+func _opening() -> void:
+	_busy = true
+	_logln("Battle start! " + _sendout_line(true))
+	await _beat(0.5)
+	if _pvp_names.size() == 2:
+		_logln(_sendout_line(false))
+		await _beat(0.5)
+	await _apply_traits()
+	await _apply_match_start()
+	await _on_entry(true)
+	await _on_entry(false)
+	_refresh()
+	_busy = false
+
+func _round() -> void:
+	if _over or _busy:
+		return
+	_busy = true
+	_round_num += 1
+	_logln("[color=#a89ae0]— Round %d —[/color]" % _round_num)
+	# tactic cards come first (Purify can cure before statuses tick)
+	var picks := _choose_cards()
+	if picks[0] != "":
+		await _play_tactic(picks[0], true)
+	if picks[1] != "":
+		await _play_tactic(picks[1], false)
+	_refresh_hands()
+	var me: Dictionary = _team[_active]
+	var op: Dictionary = _opp[_opp_active]
+	var me_acts: bool = await _process_status(me)
+	var op_acts: bool = await _process_status(op)
+	me_acts = await _trait_tick(me, me_acts) and not me.get("_r_boo", false)
+	op_acts = await _trait_tick(op, op_acts) and not op.get("_r_boo", false)
+	if me.get("_r_boo", false):
+		_logln("%s is too scared to move!" % _who(me))
+	if op.get("_r_boo", false):
+		_logln("%s is too scared to move!" % _who(op))
+	# round-start abilities fire "at the same time" → faster spirit first
+	var me_first := _goes_first(me, op)
+	for actor in ([me, op] if me_first else [op, me]):
+		for slot in 2:
+			await _round_start_abilities(actor, op if actor == me else me, slot)
+	await _bench_round_abilities(_team, _active)
+	await _bench_round_abilities(_opp, _opp_active)
+	if me_first:
+		await _attack_turn(me, op, true, me_acts)
+		await _attack_turn(op, me, false, op_acts)
+	else:
+		await _attack_turn(op, me, false, op_acts)
+		await _attack_turn(me, op, true, me_acts)
+	await _helping_hand(_team, _active)
+	await _helping_hand(_opp, _opp_active)
+	me = _team[_active]
+	op = _opp[_opp_active]
+	# EXHAUSTION: from FATIGUE_START, both fighters lose escalating HP each round
+	# so heal-loop stalemates always end.
+	if _round_num >= Balance.FATIGUE_START:
+		var burn: int = (_round_num - Balance.FATIGUE_START + 1) * 5
+		for m in [me, op]:
+			if _alive(m):
+				m["current_hp"] = maxi(0, int(m["current_hp"]) - burn)
+		_logln("[color=#e0b060]Exhaustion sets in — both fighters lose %d HP![/color]" % burn)
+		await _beat(0.35)
+	if not _alive(me):
+		await _vengeance(_team, op)
+	if not _alive(op):
+		await _vengeance(_opp, me)
+	_clear_round_flags()
+	# independent checks: Destiny Bond / Explosion can drop both at once
+	if not _alive(op):
+		await _faint(op, false)
+	if not _over and not _alive(me):
+		await _faint(me, true)
+	if not _over and _round_num >= Balance.MAX_ROUNDS:
+		_logln("[color=#e0b060]The battle drags on too long — judged by remaining HP![/color]")
+		_end(_side_hp(_team) >= _side_hp(_opp))
+	_refresh()
+	_refresh_hands()
+	_busy = false
+
+func _goes_first(me: Dictionary, op: Dictionary) -> bool:
+	var mh: bool = me.get("_r_haste", false)
+	var oh: bool = op.get("_r_haste", false)
+	if mh != oh:
+		return mh
+	return int(me.get("spd", 0)) >= int(op.get("spd", 0))
+
+# One fighter's attack — or its signature move when charged — twice with Fury.
+func _attack_turn(att: Dictionary, def_: Dictionary, is_me: bool, acts: bool) -> void:
+	if not acts or not _alive(att) or not _alive(def_):
+		return
+	await _attack_or_move(att, def_, is_me)
+	if att.get("_r_fury", false) and _alive(att) and _alive(def_):
+		_logln("💢 Fury! %s strikes again!" % _who(att))
+		await _strike(att, def_, is_me)
+
+func _side_hp(side: Array) -> int:
+	var n := 0
+	for m in side:
+		n += maxi(0, int(m.get("current_hp", 0)))
+	return n
+
+# A fainted spirit leaves only AFTER its damage shake has played.
+func _faint(mon: Dictionary, is_me: bool) -> void:
+	_logln("%s fainted!" % _who(mon))
+	if not _quiet():
+		Sfx.play("faint")
+	await _beat(0.45)
+	# Fallen: surviving allies grow stronger with every loss
+	for a in _side_of(mon):
+		if a != mon and _alive(a) and _has(a, "fallen"):
+			_buff(a, "atk", 1)
+			_buff(a, "def", 1)
+			await _ability_line("Passive", a, "Fallen", "avenges the fallen — ATK/DEF +1")
+	# Last Stand: the final spirit standing rallies
+	var allies: Array = _side_of(mon).filter(_alive)
+	if allies.size() == 1 and _has(allies[0], "monument"):
+		await _entry_ability(allies[0], _side_of(mon), _foes_of(mon), 0, "monument")
+	mon["_gone"] = true
+	_refresh()
+	await _beat(0.35)
+	if is_me:
+		_active += 1
+		if _active >= _team.size():
+			_end(false)
+			return
+	else:
+		_opp_active += 1
+		if _opp_active >= _opp.size():
+			_end(true)
+			return
+	_logln(_sendout_line(is_me))
+	await _beat(0.4)
+	await _on_entry(is_me)
+
+func _end(player_won: bool) -> void:
+	_over = true
+	_won = player_won
+	_next_btn.disabled = true
+	_skip_btn.hide()
+	# battle damage is real: write HP back (clamped to the true max)
+	for m in _team:
+		var oi: int = int(m.get("_oi", -1))
+		if oi >= 0 and oi < _src_team.size():
+			var orig: Dictionary = _src_team[oi]
+			orig["current_hp"] = clampi(int(m.get("current_hp", 0)), 0, int(orig.get("hp", 1)))
+	if player_won:
+		_logln("[color=#9f9]You won the battle![/color]")
+		var survivors: Array = []
+		for m in _team.filter(_alive):
+			_credit_stars(m, 0.5, false)   # survival isn't KO-capped
+			survivors.append(m.get("name", "?"))
+		if not survivors.is_empty():
+			_logln("[color=#d3a8ff]%s earn%s half a star for surviving![/color]" % [
+				", ".join(survivors), "s" if survivors.size() == 1 else ""])
+	else:
+		_logln("[color=#f99]Your team was defeated…[/color]")
+	if not _skipping and visible:
+		Sfx.play("win" if player_won else "lose")
+		Juice.pop(_title, 1.3, 0.4)
+	_refresh_hands()
+	_continue_btn.show()

@@ -22,7 +22,7 @@ const TRACKS := {
 # and opened via UIManager, so there's no scene node to match on).
 const BATTLE_WINDOWS := [
 	"res://Scenes/UI/BattleTeamSelect.gd",
-	"res://Scenes/UI/BattleScreen.gd",
+	"res://Scenes/UI/Battle/BattleScreen.gd",
 ]
 
 var _player: AudioStreamPlayer

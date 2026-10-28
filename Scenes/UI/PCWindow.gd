@@ -1,13 +1,13 @@
 extends MenuWindow
-## The PC storage box — only reachable from a town (CityWindow → "PC").
-## Team holds at most 6 spirits; extras live here. Deposit moves a spirit
-## from team → PC (the team always keeps at least one); Withdraw moves
-## PC → team while there's room.
+## The Spirit Box — only reachable from a town. The team holds at most 6
+## spirits; extras live here. Deposit moves a spirit
+## from team → box (the team always keeps at least one); Withdraw moves
+## box → team while there's room.
 ## present(player_index); emits closed().
 
 signal closed()
 
-const TEAM_MAX := 6
+const TEAM_MAX := Balance.TEAM_MAX
 
 var _player: PlayerData
 var _team_list: VBoxContainer
@@ -17,7 +17,7 @@ var _pc_head: Label
 
 func _ready() -> void:
 	var col := _init_window(680, 520)
-	col.add_child(_title_label("💻 PC Storage", 26))
+	col.add_child(_title_label("📦 Spirit Box", 26))
 
 	var split := HBoxContainer.new()
 	split.add_theme_constant_override("separation", 12)
@@ -57,7 +57,7 @@ func present(player_index: int) -> void:
 
 func _refresh() -> void:
 	_team_head.text = "Team  (%d / %d)" % [_player.team.size(), TEAM_MAX]
-	_pc_head.text = "PC Box  (%d)" % _player.pc.size()
+	_pc_head.text = "Box  (%d)" % _player.pc.size()
 	for list in [_team_list, _pc_list]:
 		for c in list.get_children():
 			c.queue_free()
@@ -75,20 +75,14 @@ func _refresh() -> void:
 func _row(mon: Dictionary, in_team: bool) -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 6)
-	var icon := TextureRect.new()
-	icon.custom_minimum_size = Vector2(28, 28)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	icon.texture = SpiritsData.sprite_tex(mon.get("name", ""), "icon")
-	row.add_child(icon)
+	row.add_child(UIKit.spirit_sprite(mon, Vector2(28, 28), "icon"))
 	var lbl := Label.new()
 	lbl.text = "%s  %s" % [mon.get("name", "?"), SpiritsData.star_text(mon.get("stars", 0))]
 	lbl.clip_text = true
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(lbl)
 	if in_team:
-		var dep := _button("→ PC", _deposit.bind(mon), 32)
+		var dep := _button("→ Box", _deposit.bind(mon), 32)
 		dep.disabled = _player.team.size() <= 1   # never leave the team empty
 		row.add_child(dep)
 	else:

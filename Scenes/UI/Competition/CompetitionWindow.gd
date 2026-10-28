@@ -1,0 +1,241 @@
+extends MenuWindow
+## Competition tile, in three steps:
+##   1) Selection — every player enters ONE spirit (CPUs pick the best one for
+##      the announced event). Keys 1–6 pick for the first human.
+##   2) The event — a minigame (everyone plays at once on one keyboard, see
+##      Controls) or a stat contest with animated dice.
+##   3) Podium — top 3 earn points; beating a minigame record pays a bonus.
+## present(triggering_player_index); emits closed().
+
+signal closed()
+
+const GAMES := {
+	"tree_jump":  {"name": "🌳 Tree Jump",  "script": preload("res://Scenes/UI/Competition/TreeJumpGame.gd"),
+		"hint": "Hop the trees with your ACTION key! Light spirits (low DEF + HP) jump highest."},
+	"maze":       {"name": "🌀 Dark Maze",  "script": preload("res://Scenes/UI/Competition/DarkMazeGame.gd"),
+		"hint": "Pick LEFT / MIDDLE / RIGHT at each crossroad. SPD = walking speed, HP = trap tolerance. First out wins!"},
+	"ghost_snap": {"name": "📸 Ghost Snap", "script": preload("res://Scenes/UI/Competition/GhostSnapGame.gd"),
+		"hint": "Snap the ghost when it's in your frame — ACTION key. SPD = a wider frame, HP = a calmer ghost."},
+	"scare_off":  {"name": "😱 Scare-Off",  "script": preload("res://Scenes/UI/Competition/ScareOffGame.gd"),
+		"hint": "MASH your ACTION key to scare the scarecrow away! ATK = scare power, DEF = slower drain."},
+	"wisp_float": {"name": "🎈 Wisp Float", "script": preload("res://Scenes/UI/Competition/WispFloatGame.gd"),
+		"hint": "HOLD your ACTION key to float, grab wisps, dodge bats. SPD = lift, DEF = shrug off bats."},
+}
+const CONTESTS := {
+	"spd":     {"name": "🏃 Haunted Dash",       "label": "Speed"},
+	"atk":     {"name": "💪 Coffin Lift",        "label": "Attack"},
+	"def":     {"name": "🛡 Spooky Stare-Down",  "label": "Defense"},
+	"hp_stat": {"name": "🌟 Midnight Marathon",  "label": "HP Tier"},
+}
+const MEDALS := ["🥇", "🥈", "🥉"]
+const CONTEST_CHANCE := 0.3   # how often the event is a quick stat contest
+
+# Dev override: a GAMES/CONTESTS key forces that event; "" = random.
+static var dev_forced_event := ""
+
+var _title: Label
+var _hint: Label
+var _body: VBoxContainer
+var _next: Button
+var _phase := 0       # 1 = selection, 2 = event, 3 = podium
+var _event := ""      # a GAMES or CONTESTS key
+var _picks := {}      # player idx -> entered spirit
+var _chips := {}      # player idx -> Array of SpiritChip
+var _ranks: Array = []
+var _game: CompGame
+
+func _ready() -> void:
+	var col := _init_window(700, 0)
+	_title = _title_label("🏅 Competition!", 26)
+	col.add_child(_title)
+	_hint = UIKit.wrap_label("", 14, 660)
+	_hint.modulate = Color(1, 1, 1, 0.85)
+	col.add_child(_hint)
+	_body = UIKit.vbox(8)
+	col.add_child(_body)
+	_next = _button("Start!", _on_next)
+	col.add_child(_next)
+	hide()
+
+static func all_events() -> Array:
+	return GAMES.keys() + CONTESTS.keys()
+
+static func event_name(key: String) -> String:
+	return String(GAMES.get(key, CONTESTS.get(key, {})).get("name", key))
+
+func present(_player_index: int) -> void:
+	_phase = 1
+	_picks.clear()
+	_ranks.clear()
+	_event = dev_forced_event if all_events().has(dev_forced_event) else \
+		(CONTESTS.keys().pick_random() if randf() < CONTEST_CHANCE else GAMES.keys().pick_random())
+	_build_selection()
+
+func _is_game() -> bool:
+	return GAMES.has(_event)
+
+# All-CPU game: nobody can press the buttons, so the window drives itself.
+func run_cpu_auto() -> void:
+	while visible and _phase < 3:
+		await get_tree().create_timer(1.0).timeout
+		if visible and not _next.disabled:
+			_on_next()
+	await get_tree().create_timer(2.5).timeout
+	if visible and _phase == 3:
+		_on_next()
+
+func _on_next() -> void:
+	Sfx.play("click")
+	match _phase:
+		1: _start_event()
+		2: _show_podium()
+		3: closed.emit()
+
+# ─── Step 1: every player picks a spirit ──────────────────────────────────────
+func _build_selection() -> void:
+	_title.text = "🏅 %s — pick your spirit!" % event_name(_event)
+	_hint.text = GAMES[_event]["hint"] if _is_game() else \
+		"Judged on %s ×2, plus stars and a die roll!" % CONTESTS[_event]["label"]
+	if _is_game():
+		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your lane)"
+	_next.text = "Start! ⏎"
+	UIKit.clear(_body)
+	var grid := GridContainer.new()
+	grid.columns = 2   # wide instead of tall, so Start stays on screen
+	grid.add_theme_constant_override("h_separation", 26)
+	grid.add_theme_constant_override("v_separation", 10)
+	_body.add_child(grid)
+	_chips.clear()
+	for i in GameState.players.size():
+		var p: PlayerData = GameState.players[i]
+		var row := UIKit.hbox(12)
+		row.add_child(CompChips.TrainerChip.new(GameData.trainer_texture(GameData.player_trainer(p)), p.color))
+		var right := UIKit.vbox(2)
+		right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(right)
+		var slot := Controls.slot_of(i)
+		right.add_child(UIKit.label(p.player_name + ("  (P%d keys)" % (slot + 1) if not p.is_cpu and slot >= 0 and _is_game() else ""), 16, p.color))
+		var chips_row := UIKit.hbox(8)
+		right.add_child(chips_row)
+		_chips[i] = []
+		for s in p.team:
+			var chip := CompChips.SpiritChip.new(s, "★%.1f" % rating(_event, s))
+			chip.picked.connect(func(c): _on_chip_picked(c, i))
+			chips_row.add_child(chip)
+			_chips[i].append(chip)
+		if p.team.is_empty():
+			chips_row.add_child(UIKit.label("— no spirits —", 14))
+		grid.add_child(row)
+		if p.is_cpu and not p.team.is_empty():
+			_select_chip(i, _chips[i][_best_index(p.team)])
+	_update_next()
+
+func _on_chip_picked(chip, i: int) -> void:
+	if not GameState.players[i].is_cpu and _phase == 1:
+		Sfx.play("pop")
+		_select_chip(i, chip)
+		_update_next()
+
+func _select_chip(i: int, chip) -> void:
+	for c in _chips[i]:
+		c.set_selected(c == chip)
+	_picks[i] = chip.spirit
+
+# Start stays disabled until every player with spirits has picked.
+func _update_next() -> void:
+	_next.disabled = _picks.is_empty() or GameState.players.size() != _picks.size() + \
+		GameState.players.filter(func(p): return p.team.is_empty()).size()
+
+# How well a spirit suits THIS event, 0–10ish. Shown on every chip so the
+# pick is informed, and used for the CPU's pick.
+static func rating(event: String, s: Dictionary) -> float:
+	var g := func(k): return float(s.get(k, 0))
+	match event:
+		"tree_jump":  return 14.0 - g.call("def") - g.call("hp_stat")   # light = good
+		"maze":       return g.call("spd") * 1.5 + g.call("hp_stat") * 0.5
+		"ghost_snap": return g.call("spd") + g.call("hp_stat") * 0.6
+		"scare_off":  return g.call("atk") + g.call("def") * 0.6
+		"wisp_float": return g.call("spd") + g.call("def") * 0.5
+	return g.call(event) * 2.0 + g.call("stars")   # stat contests
+
+func _best_index(team: Array) -> int:
+	var best := 0
+	for i in team.size():
+		if rating(_event, team[i]) > rating(_event, team[best]):
+			best = i
+	return best
+
+func _unhandled_key_input(ev: InputEvent) -> void:
+	if not visible:
+		return
+	if Controls.confirm_pressed(ev) and not _next.disabled and _phase != 2:
+		get_viewport().set_input_as_handled()
+		_on_next()
+		return
+	# 1–6 pick for the first human who hasn't picked yet
+	var n := Controls.number_pressed(ev)
+	if _phase == 1 and n >= 0:
+		for i in GameState.players.size():
+			if not GameState.players[i].is_cpu and n < _chips[i].size():
+				get_viewport().set_input_as_handled()
+				_on_chip_picked(_chips[i][n], i)
+				return
+
+# ─── Step 2: the event ────────────────────────────────────────────────────────
+func _start_event() -> void:
+	_phase = 2
+	_title.text = "%s!" % event_name(_event)
+	_next.text = "Awards ▶"
+	_next.disabled = true
+	UIKit.clear(_body)
+	var entries: Array = []
+	var idxs: Array = _picks.keys()
+	idxs.sort()
+	for i in idxs:
+		var p: PlayerData = GameState.players[i]
+		entries.append({"idx": i, "spirit": _picks[i], "human": not p.is_cpu, "color": p.color, "name": p.player_name})
+	if _is_game():
+		_game = GAMES[_event]["script"].new()
+	else:
+		_game = preload("res://Scenes/UI/Competition/StatContestGame.gd").new()
+		_game.stat = _event
+		_game.label = CONTESTS[_event]["label"]
+	_game.setup(entries)
+	_game.finished.connect(func(r):
+		_ranks = r
+		_next.disabled = false)
+	_body.add_child(_game)
+
+# ─── Step 3: podium ───────────────────────────────────────────────────────────
+func _show_podium() -> void:
+	_phase = 3
+	_title.text = "🏆 Winners!"
+	_hint.text = ""
+	_next.text = "OK ⏎"
+	var record := _game.beat_record()
+	UIKit.clear(_body)
+	for rank in mini(Balance.PODIUM_POINTS.size(), _ranks.size()):
+		var i: int = _ranks[rank]
+		var p: PlayerData = GameState.players[i]
+		var pts: int = Balance.PODIUM_POINTS[rank]
+		GameState.award_points(i, pts)
+		var row := UIKit.hbox(10)
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_child(UIKit.label(MEDALS[rank], 30))
+		var chip := CompChips.SpiritChip.new(_picks[i])
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(chip)
+		var l := UIKit.label("%s's %s   +%d points!" % [p.player_name, _picks[i]["name"], pts], 18, p.color)
+		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(l)
+		_body.add_child(row)
+		Juice.slide_in(row, 30.0 + rank * 10.0, 0.3 + rank * 0.1)
+	if record and not _ranks.is_empty():
+		GameState.award_points(_ranks[0], Balance.RECORD_BONUS)
+		var rec := UIKit.label("🎉 NEW RECORD!  %s gets +%d bonus points!" % [GameState.players[_ranks[0]].player_name,
+			Balance.RECORD_BONUS], 18, UIKit.GOLD)
+		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_body.add_child(rec)
+	if _ranks.is_empty():
+		_body.add_child(UIKit.label("No winners this time!", 18))
+	Sfx.play("win")

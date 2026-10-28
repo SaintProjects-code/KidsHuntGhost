@@ -18,15 +18,16 @@ config/icon="res://icon.svg"
 [autoload]
 
 EventBus="*res://Global/EventBus.gd"
+Sfx="*res://Global/Sfx.gd"
 GameState="*res://Global/GameState.gd"
 SpiritsData="*res://Data/SpiritsData.gd"
 TurnSystem="*res://Systems/TurnSystem.gd"
 SaveManager="*res://Global/SaveManager.gd"
 UIManager="*res://Systems/UIManager.gd"
-SpaceResolver="*res://Systems/SpaceResolver.gd"
 CatchSystem="*res://Systems/CatchSystem.gd"
 SpiritsProgressionSystem="*res://Systems/SpiritsProgressionSystem.gd"
 BonusReward="*res://Systems/BonusReward.gd"
+CardSystem="*res://Systems/CardSystem.gd"
 MusicManager="*res://Global/MusicManager.gd"
 
 [display]

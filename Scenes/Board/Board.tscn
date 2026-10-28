@@ -226,12 +226,13 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_top = -104.0
-offset_right = 628.0
+offset_left = 16.0
+offset_right = 560.0
 offset_bottom = -20.0
 grow_vertical = 0
 theme_override_constants/separation = 14
 
-[node name="BagButton" type="Button" parent="BoardUI/Root/ActionBar"]
+[node name="TeamButton" type="Button" parent="BoardUI/Root/ActionBar"]
 custom_minimum_size = Vector2(70, 70)
 layout_mode = 2
 size_flags_vertical = 4
@@ -241,20 +242,7 @@ theme_override_styles/hover = SubResource("circ_hover")
 theme_override_styles/pressed = SubResource("circ_pressed")
 theme_override_styles/disabled = SubResource("circ_disabled")
 theme_override_styles/focus = SubResource("circ_focus")
-text = "BAG"
-clip_text = true
-
-[node name="PkmnButton" type="Button" parent="BoardUI/Root/ActionBar"]
-custom_minimum_size = Vector2(70, 70)
-layout_mode = 2
-size_flags_vertical = 4
-focus_mode = 0
-theme_override_styles/normal = SubResource("circ_normal")
-theme_override_styles/hover = SubResource("circ_hover")
-theme_override_styles/pressed = SubResource("circ_pressed")
-theme_override_styles/disabled = SubResource("circ_disabled")
-theme_override_styles/focus = SubResource("circ_focus")
-text = "SP"
+text = "TEAM"
 clip_text = true
 
 [node name="MapButton" type="Button" parent="BoardUI/Root/ActionBar"]
