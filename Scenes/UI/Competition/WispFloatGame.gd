@@ -5,9 +5,7 @@ extends CompGame
 ## SPD = how fast you rise, DEF = how quickly you shake off a bat. 20 seconds;
 ## most wisps wins.
 
-const LANE_H := 92.0
-const VIEW_W := 720.0
-const X := 90.0
+const X := 110.0
 const R := 16.0
 const TIME_LIMIT := 20.0
 const SCROLL := 180.0
@@ -15,7 +13,9 @@ const GRAVITY := 520.0
 
 func _init_game() -> void:
 	record_key = "wisp_float"
-	custom_minimum_size = Vector2(VIEW_W, LANE_H * lanes.size())
+	layout = Layout.ROWS
+	how_to = "HOLD your key to float up, let go to sink. Grab wisps, dodge the bats!"
+	custom_minimum_size = Vector2(640, 440)
 	for lane in lanes:
 		lane.merge({
 			"y": 0.5, "vy": 0.0, "score": 0, "items": [], "spawn": 0.4, "stun": 0.0,
@@ -25,9 +25,13 @@ func _init_game() -> void:
 			"skill": randf_range(0.55, 0.95), "hold": false, "think": 0.0,
 		})
 
-# Lane-local playfield (top and bottom margins), in pixels.
+# A lane's playfield: its top and bottom y (inside the lane card).
 func _field(i: int) -> Vector2:
-	return Vector2(i * LANE_H + 26.0, i * LANE_H + LANE_H - 10.0)
+	var r := lane_rect(i)
+	return Vector2(r.position.y + 34.0, r.end.y - 12.0)
+
+func keys_text(lane: Dictionary) -> String:
+	return "hold %s to float (or hold the mouse on your lane)" % Controls.key_name(lane["slot"], "action")
 
 func _tick(delta: float) -> void:
 	for i in lanes.size():
@@ -45,7 +49,7 @@ func _tick(delta: float) -> void:
 		lane["spawn"] -= delta
 		if lane["spawn"] <= 0.0:
 			lane["spawn"] = randf_range(0.45, 0.85)
-			lane["items"].append({"x": VIEW_W + 20.0, "y": randf_range(0.05, 0.95), "bat": randf() < 0.3 + t * 0.008})
+			lane["items"].append({"x": size.x + 20.0, "y": randf_range(0.05, 0.95), "bat": randf() < 0.3 + t * 0.008})
 		var me := Vector2(X, f.x + lane["y"] * h)
 		for it in lane["items"]:
 			it["x"] -= SCROLL * (1.0 + t * 0.02) * delta
@@ -116,7 +120,7 @@ func _draw_game() -> void:
 		var lane: Dictionary = lanes[i]
 		var f := _field(i)
 		var h := f.y - f.x
-		var card := Rect2(4, i * LANE_H + 3, size.x - 8, LANE_H - 6)
+		var card := lane_rect(i)
 		lane_card(lane, card, Color("070a24"), Color("1c1450"))
 		for k in 10:   # drifting stars
 			var sx := fposmod(k * 137.0 - t * (20 + k * 2), size.x - 20) + 10
@@ -147,7 +151,7 @@ func _draw_game() -> void:
 		var stunned: bool = lane["stun"] > 0.0
 		var tint := Color(1, 1, 1, 0.35 + 0.65 * float(int(t * 12) % 2)) if stunned else Color.WHITE
 		draw_spirit(lane, me, R, tint)
-		nameplate(lane, Vector2(12, i * LANE_H + 8), "✨ %d   HOLD to float" % lane["score"])
+		nameplate(lane, card.position + Vector2(10, 6), "✨ %d   HOLD to float" % lane["score"])
 	if running:
 		rrect(Rect2(size.x - 104, 8, 92, 22), Color(0.05, 0.04, 0.12, 0.7), 11)
 		text(Vector2(size.x - 104, 24), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)

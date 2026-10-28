@@ -1,7 +1,9 @@
 class_name CompGame
 extends Control
 ## Base for the competition minigames. Handles what every game shares:
-##   • one LANE per entrant (entrant dicts: idx, spirit, human, color, name, slot, tex)
+##   • one LANE per entrant (entrant dicts: idx, spirit, human, color, name, slot, tex),
+##     laid out as ROWS, side-by-side COLUMNS, or a 2×2 GRID (lane_rect)
+##   • a "how to play" card, then the 3-2-1-GO countdown, then the finish banner
 ##   • shared-keyboard input: each human plays on their Controls slot
 ##     (P1 W/ASD, P2 I/JKL, P3 ↑/←↓→, P4 Num8/456) or clicks their lane
 ##   • the 3-2-1-GO countdown (with beeps), the finish banner, sounds
@@ -12,6 +14,10 @@ extends Control
 signal finished(ranks: Array)
 
 const ORDINAL := ["1st", "2nd", "3rd", "4th", "5th", "6th"]
+enum Layout { ROWS, COLUMNS, GRID }
+const GAP := 10.0
+const INTRO_TIME := 2.6       # the how-to-play card stays this long
+const END_HOLD := 2.2         # the result banner stays this long
 const RECORDS_PATH := "user://comp_records.save"
 
 var lanes: Array = []          # one Dictionary per entrant (games add their own fields)
@@ -19,10 +25,14 @@ var t := 0.0                   # seconds since GO
 var running := false
 var ended := false
 var use_countdown := true
+var use_intro := true
+var layout := Layout.COLUMNS
+var how_to := ""               # one line shown on the intro card
 var record_key := ""           # "" = this game keeps no record
 var record_lower_better := false
 var record := 0.0              # the stored all-time best (0 = none yet)
 var result_value := 0.0        # this run's record-able score (set by the game)
+var _intro := INTRO_TIME
 var _countdown := 3.0
 var _last_beep := 4
 var _end_t := 0.0
@@ -42,10 +52,11 @@ func setup(entries: Array) -> void:
 	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
+	_init_game()
 	if not use_countdown:
 		_countdown = 0.0
-		running = true
-	_init_game()
+	if not use_intro or how_to == "":
+		_intro = 0.0
 	if record_key != "":
 		record = float(_load_records().get(record_key, 0.0))
 
@@ -55,6 +66,10 @@ func _init_game() -> void:
 	pass
 
 func _tick(_delta: float) -> void:
+	pass
+
+# Called once when play begins (games without a countdown).
+func _on_start() -> void:
 	pass
 
 func _draw_game() -> void:
@@ -79,11 +94,16 @@ func _process(delta: float) -> void:
 	if ended:
 		_end_t += delta
 		_overlay.queue_redraw()
-		if _end_t > 1.4:
+		if _end_t > END_HOLD:
 			_emitted = true
 			set_process(false)
 			_save_record_if_beaten()
 			finished.emit(ranks())
+		return
+	if _intro > 0.0:
+		_intro -= delta
+		_overlay.queue_redraw()
+		queue_redraw()
 		return
 	if _countdown > 0.0:
 		_countdown -= delta
@@ -96,6 +116,9 @@ func _process(delta: float) -> void:
 		queue_redraw()
 		_overlay.queue_redraw()
 		return
+	if not running:
+		running = true   # no countdown: play starts right after the intro
+		_on_start()
 	t += delta
 	_tick(delta)
 	queue_redraw()
@@ -141,27 +164,59 @@ func _unhandled_key_input(ev: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_on_action(lane, hit[1])
 
-# Clicking / tapping a lane = that lane's ACTION (lanes stack top to bottom).
+# Where lane `i` sits inside the game area.
+func lane_rect(i: int) -> Rect2:
+	var n := maxi(1, lanes.size())
+	match layout:
+		Layout.ROWS:
+			var h := (size.y - GAP * (n - 1)) / n
+			return Rect2(0, i * (h + GAP), size.x, h)
+		Layout.GRID:
+			var cols := 1 if n == 1 else 2
+			var rows := ceili(float(n) / cols)
+			var w := (size.x - GAP * (cols - 1)) / cols
+			var h := (size.y - GAP * (rows - 1)) / rows
+			return Rect2((i % cols) * (w + GAP), (i / cols) * (h + GAP), w, h)
+	var cw := (size.x - GAP * (n - 1)) / n
+	return Rect2(i * (cw + GAP), 0, cw, size.y)
+
+func lane_at(pos: Vector2) -> int:
+	for i in lanes.size():
+		if lane_rect(i).has_point(pos):
+			return i
+	return -1
+
+# Clicking / tapping a lane = that lane's ACTION.
 func _gui_input(ev: InputEvent) -> void:
 	var pressed: bool = (ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT) \
 		or (ev is InputEventScreenTouch and ev.pressed)
-	if not pressed or not running or lanes.is_empty():
+	if not pressed or not running:
 		return
-	var i := int(ev.position.y / (size.y / lanes.size()))
-	if i >= 0 and i < lanes.size() and lanes[i]["human"]:
+	var i := lane_at(ev.position)
+	if i >= 0 and lanes[i]["human"]:
 		_on_action(lanes[i], "action")
 
-func is_held(lane: Dictionary) -> bool:
-	if not lane["human"]:
+# Held input for a human lane: its key, or the mouse held down on the lane
+# (for "left"/"right": on that half of the lane).
+func is_held(lane: Dictionary, action: String = "action") -> bool:
+	if not lane["human"] or not running:
 		return false
-	if Controls.is_held(lane["slot"], "action"):
+	if Controls.is_held(lane["slot"], action):
 		return true
-	# mouse held over this lane
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		var r := lane_rect(lanes.find(lane))
 		var m := get_local_mouse_position()
-		var h := size.y / lanes.size()
-		return Rect2(0, lanes.find(lane) * h, size.x, h).has_point(m)
+		if not r.has_point(m):
+			return false
+		match action:
+			"left": return m.x < r.get_center().x
+			"right": return m.x >= r.get_center().x
+			_: return true
 	return false
+
+# -1 / 0 / +1 from the lane's held left/right.
+func steer(lane: Dictionary) -> float:
+	return (1.0 if is_held(lane, "right") else 0.0) - (1.0 if is_held(lane, "left") else 0.0)
 
 # "[W]" for humans, "(CPU)" otherwise.
 func key_hint(lane: Dictionary, action: String = "action") -> String:
@@ -269,7 +324,9 @@ func _draw_overlay() -> void:
 		PackedColorArray([dark, dark, clear, clear]))
 	o.draw_polygon(PackedVector2Array([Vector2(0, size.y - edge), Vector2(size.x, size.y - edge), size, Vector2(0, size.y)]),
 		PackedColorArray([clear, clear, dark, dark]))
-	if _countdown > 0.0:
+	if _intro > 0.0:
+		_draw_intro(font)
+	elif _countdown > 0.0:
 		var n := int(ceil(_countdown))
 		var frac: float = ceil(_countdown) - _countdown          # 0 → 1 within each second
 		var fs := int(64 + 40 * (1.0 - frac))
@@ -286,6 +343,28 @@ func _draw_overlay() -> void:
 		banner(font, result_text(), -10.0 * (1.0 - appear), 32, appear)
 		if beat_record():
 			banner(font, "🎉 NEW RECORD!  +%d pts" % Balance.RECORD_BONUS, 48.0, 24, appear)
+
+# The how-to-play card: the rule line plus every human's keys.
+func _draw_intro(font: Font) -> void:
+	var o := _overlay
+	var appear := clampf((INTRO_TIME - _intro) / 0.3, 0.0, 1.0)
+	var w := minf(size.x - 40.0, 640.0)
+	var lines: Array = []
+	for lane in lanes:
+		if lane["human"]:
+			lines.append("%s — %s" % [lane["name"], keys_text(lane)])
+	var h := 96.0 + lines.size() * 24.0
+	var r := Rect2((size.x - w) * 0.5, (size.y - h) * 0.5 + (1.0 - appear) * 20.0, w, h)
+	o.draw_style_box(UIKit.box(Color(0.06, 0.04, 0.14, 0.92 * appear), 18, 2, Color(UIKit.GOLD, 0.8 * appear)), r)
+	o.draw_string(font, r.position + Vector2(0, 36), "HOW TO PLAY", HORIZONTAL_ALIGNMENT_CENTER, w, 22, Color(UIKit.GOLD, appear))
+	o.draw_string(font, r.position + Vector2(0, 66), how_to, HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color(1, 1, 1, appear))
+	for k in lines.size():
+		o.draw_string(font, r.position + Vector2(0, 94 + k * 24), lines[k], HORIZONTAL_ALIGNMENT_CENTER, w, 15,
+			Color(0.75, 0.9, 1.0, appear))
+
+# The keys a human uses in this game (override for direction games).
+func keys_text(lane: Dictionary) -> String:
+	return "press %s (or click your area)" % Controls.key_name(lane["slot"], "action")
 
 func banner(font: Font, s: String, dy: float = 0.0, fs: int = 34, alpha: float = 1.0) -> void:
 	var o := _overlay

@@ -2,16 +2,17 @@ extends MenuWindow
 ## Competition tile, in three steps:
 ##   1) Selection — every player enters ONE spirit (CPUs pick the best one for
 ##      the announced event). Keys 1–6 pick for the first human.
-##   2) The event — a minigame (everyone plays at once on one keyboard, see
-##      Controls) or a stat contest with animated dice.
-##   3) Podium — top 3 earn points; beating a minigame record pays a bonus.
+##   2) The event, FULL SCREEN — a minigame (everyone plays at once on one
+##      keyboard, see Controls) or a stat contest (roll → perform → results).
+##   3) Podium — revealed 3rd → 2nd → 1st; top 3 earn points, and beating a
+##      minigame record pays a bonus.
 ## present(triggering_player_index); emits closed().
 
 signal closed()
 
 const GAMES := {
-	"tree_jump":  {"name": "🌳 Tree Jump",  "script": preload("res://Scenes/UI/Competition/TreeJumpGame.gd"),
-		"hint": "Hop the trees with your ACTION key! Light spirits (low DEF + HP) jump highest."},
+	"climb":      {"name": "🧗 Spirit Climb", "script": preload("res://Scenes/UI/Competition/ClimbGame.gd"),
+		"hint": "Bounce up the platforms, steering LEFT / RIGHT. Light spirits (low DEF + HP) bounce higher, SPD steers faster."},
 	"maze":       {"name": "🌀 Dark Maze",  "script": preload("res://Scenes/UI/Competition/DarkMazeGame.gd"),
 		"hint": "Pick LEFT / MIDDLE / RIGHT at each crossroad. SPD = walking speed, HP = trap tolerance. First out wins!"},
 	"ghost_snap": {"name": "📸 Ghost Snap", "script": preload("res://Scenes/UI/Competition/GhostSnapGame.gd"),
@@ -97,7 +98,7 @@ func _build_selection() -> void:
 	_hint.text = GAMES[_event]["hint"] if _is_game() else \
 		"Judged on %s ×2, plus stars and a die roll!" % CONTESTS[_event]["label"]
 	if _is_game():
-		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your lane)"
+		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your area)"
 	_next.text = "Start! ⏎"
 	UIKit.clear(_body)
 	var grid := GridContainer.new()
@@ -151,7 +152,7 @@ func _update_next() -> void:
 static func rating(event: String, s: Dictionary) -> float:
 	var g := func(k): return float(s.get(k, 0))
 	match event:
-		"tree_jump":  return 14.0 - g.call("def") - g.call("hp_stat")   # light = good
+		"climb":      return 14.0 - g.call("def") - g.call("hp_stat") + g.call("spd") * 0.5   # light + nimble
 		"maze":       return g.call("spd") * 1.5 + g.call("hp_stat") * 0.5
 		"ghost_snap": return g.call("spd") + g.call("hp_stat") * 0.6
 		"scare_off":  return g.call("atk") + g.call("def") * 0.6
@@ -185,9 +186,11 @@ func _unhandled_key_input(ev: InputEvent) -> void:
 func _start_event() -> void:
 	_phase = 2
 	_title.text = "%s!" % event_name(_event)
+	_hint.text = ""
 	_next.text = "Awards ▶"
 	_next.disabled = true
 	UIKit.clear(_body)
+	_set_fullscreen(true)
 	var entries: Array = []
 	var idxs: Array = _picks.keys()
 	idxs.sort()
@@ -200,25 +203,36 @@ func _start_event() -> void:
 		_game = preload("res://Scenes/UI/Competition/StatContestGame.gd").new()
 		_game.stat = _event
 		_game.label = CONTESTS[_event]["label"]
+		_game.event_name = CONTESTS[_event]["name"]
+	_game.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_game.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_game.setup(entries)
 	_game.finished.connect(func(r):
 		_ranks = r
 		_next.disabled = false)
 	_body.add_child(_game)
 
-# ─── Step 3: podium ───────────────────────────────────────────────────────────
+# The game area fills the whole screen while an event plays.
+func _set_fullscreen(on: bool) -> void:
+	var vp := get_viewport_rect().size
+	panel.custom_minimum_size = vp - Vector2(24, 24) if on else Vector2(700, 0)
+	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL if on else Control.SIZE_FILL
+
+# ─── Step 3: podium (revealed 3rd → 2nd → 1st) ────────────────────────────────
 func _show_podium() -> void:
 	_phase = 3
 	_title.text = "🏆 Winners!"
 	_hint.text = ""
 	_next.text = "OK ⏎"
+	_next.disabled = true
 	var record := _game.beat_record()
 	UIKit.clear(_body)
+	_set_fullscreen(false)
+	var rows: Array = []
 	for rank in mini(Balance.PODIUM_POINTS.size(), _ranks.size()):
 		var i: int = _ranks[rank]
 		var p: PlayerData = GameState.players[i]
 		var pts: int = Balance.PODIUM_POINTS[rank]
-		GameState.award_points(i, pts)
 		var row := UIKit.hbox(10)
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		row.add_child(UIKit.label(MEDALS[rank], 30))
@@ -228,14 +242,27 @@ func _show_podium() -> void:
 		var l := UIKit.label("%s's %s   +%d points!" % [p.player_name, _picks[i]["name"], pts], 18, p.color)
 		l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(l)
+		row.modulate.a = 0.0
 		_body.add_child(row)
-		Juice.slide_in(row, 30.0 + rank * 10.0, 0.3 + rank * 0.1)
+		rows.append([row, i, pts])
+	if _ranks.is_empty():
+		_body.add_child(UIKit.label("No winners this time!", 18))
+	# reveal from 3rd up to 1st, awarding as each appears
+	for k in range(rows.size() - 1, -1, -1):
+		await get_tree().create_timer(0.8).timeout
+		if not visible:
+			return
+		var row: Control = rows[k][0]
+		row.modulate.a = 1.0
+		Juice.pop(row, 1.12, 0.3)
+		Sfx.play("win" if k == 0 else "points")
+		GameState.award_points(rows[k][1], rows[k][2])
 	if record and not _ranks.is_empty():
+		await get_tree().create_timer(0.6).timeout
 		GameState.award_points(_ranks[0], Balance.RECORD_BONUS)
 		var rec := UIKit.label("🎉 NEW RECORD!  %s gets +%d bonus points!" % [GameState.players[_ranks[0]].player_name,
 			Balance.RECORD_BONUS], 18, UIKit.GOLD)
 		rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_body.add_child(rec)
-	if _ranks.is_empty():
-		_body.add_child(UIKit.label("No winners this time!", 18))
-	Sfx.play("win")
+		Juice.pop(rec)
+	_next.disabled = false

@@ -317,8 +317,15 @@ func _on_dev_battle_requested(kind: StringName, a: int, b: int) -> void:
 	UIManager.release_pause()
 
 # ─── Win ──────────────────────────────────────────────────────────────────────
-# Shown directly (not via UIManager) and held paused under the winner.
+# Shown directly (not via UIManager) and held paused under the winner. If the
+# winning points came mid-window (a podium, a battle), the win screen waits
+# until that window is closed so the two never overlap.
 func _on_game_won(idx: int) -> void:
+	UIManager.hold_pause()
+	await get_tree().process_frame
+	while UIManager.is_open():
+		await get_tree().process_frame
+	UIManager.close_overlay()
 	_win.show_win(idx)
 	_win.show()
-	UIManager.hold_pause()
+	Sfx.play("win")

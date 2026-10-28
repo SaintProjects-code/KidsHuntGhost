@@ -8,26 +8,29 @@ extends CompGame
 ## red spikes, grey arrow, gold star. First one out wins.
 
 var order: Array = []   # player indices in escape order
-var _grid: GridContainer
 
 func _init_game() -> void:
-	use_countdown = false
-	running = true
-	_grid = GridContainer.new()
-	_grid.columns = 2
-	_grid.add_theme_constant_override("h_separation", 10)
-	_grid.add_theme_constant_override("v_separation", 10)
-	add_child(_grid)
-	move_child(_grid, 0)   # banners draw above the panels
+	layout = Layout.GRID
+	how_to = "At each crossroad pick LEFT / MIDDLE / RIGHT. Read the hints in the lantern light!"
+	custom_minimum_size = Vector2(650, 440)
 	for lane in lanes:
 		var panel := MazePanel.new(lane, self)
 		panel.escaped.connect(_on_escaped)
-		_grid.add_child(panel)
+		add_child(panel)
+		move_child(panel, 0)   # banners draw above the panels
 		lane["panel"] = panel
-	custom_minimum_size = Vector2(650, 218 * ceili(lanes.size() / 2.0))
 
-func _tick(_delta: float) -> void:
-	_grid.size = size
+func keys_text(lane: Dictionary) -> String:
+	return "%s / %s / %s for left / middle / right (or click the buttons)" % [Controls.key_name(lane["slot"], "left"),
+		Controls.key_name(lane["slot"], "middle"), Controls.key_name(lane["slot"], "right")]
+
+# Panels fill the 2×2 grid, whatever the window size.
+func _process(delta: float) -> void:
+	for i in lanes.size():
+		var r := lane_rect(i)
+		lanes[i]["panel"].position = r.position
+		lanes[i]["panel"].size = r.size
+	super._process(delta)
 
 func _on_escaped(idx: int) -> void:
 	order.append(idx)
@@ -120,6 +123,9 @@ class MazePanel:
 			_buttons[d].visible = on and lane["human"]
 
 	func _process(delta: float) -> void:
+		if not game.running and phase != "out":
+			queue_redraw()
+			return   # wait for GO
 		_flash = maxf(0.0, _flash - delta * 2.5)
 		_shake = maxf(0.0, _shake - delta * 25.0)
 		for s in _sparkles:
