@@ -16,6 +16,10 @@ const MAX_PLAYERS := 4
 
 func _ready() -> void:
 	MusicManager.play_menu()
+	for spec in [[add_button, "+ Add Player", "secondary", "m"], [$GameSettings, "⚙ Game Settings", "secondary", "m"],
+			[$ConfirmButton, "▶ Start Game", "gold", "l"], [$SettingsPanel/Margin/Settings/DoneButton, "Done", "primary", "m"]]:
+		spec[0].text = spec[1]
+		UIKit.style_button(spec[0], spec[2], spec[3])
 	_setup_settings()
 	settings_panel.hide()
 	# The scene ships with one card; fill up to the minimum player count.
@@ -69,6 +73,7 @@ func _setup_card(card: Node, index: int) -> void:
 		card.set_meta("trainer_idx", index % TRAINERS.size())
 	var btn := card.find_child("character selection", true, false) as Button
 	if btn:
+		UIKit.style_button(btn, "secondary", "m")
 		# Re-bind cleanly each refresh so the press always targets THIS card.
 		for con in btn.pressed.get_connections():
 			btn.pressed.disconnect(con["callable"])

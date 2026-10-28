@@ -133,12 +133,7 @@ func _build() -> void:
 	_chart.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(_chart)
 
-	var close := Button.new()
-	close.text = "Close"
-	close.focus_mode = Control.FOCUS_NONE
-	close.custom_minimum_size = Vector2(0, 40)
-	close.pressed.connect(func(): closed.emit())
-	col.add_child(close)
+	col.add_child(_button("Close", func(): closed.emit(), 40))
 
 func _make_stat_row(key: String) -> Control:
 	var row := HBoxContainer.new()

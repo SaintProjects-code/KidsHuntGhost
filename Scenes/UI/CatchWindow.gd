@@ -120,7 +120,7 @@ func _enter_intro() -> void:
 		lead.get("name", "?"), CatchSystem.duel_power(lead), (" %+d type" % edge) if edge != 0 else "",
 		_spirit.get("name", "?"), CatchSystem.duel_power(_spirit), int(round(CatchSystem.duel_chance(lead, _spirit) * 100))]
 	_odds.text += "\nLose and it runs away. Win and you get %d throws (+%d each)." % [Balance.CATCH_THROWS, Balance.DUEL_BONUS]
-	_main_btn.text = "1 · 👻 Spook Duel ⏎"
+	_main_btn.text = "1 · 👻 Spook Duel  [Space]"
 	_main_btn.disabled = _cpu
 	_leave_btn.text = "2 · Leave"
 	_leave_btn.disabled = _cpu
@@ -133,7 +133,7 @@ func _enter_throw_phase() -> void:
 	_duel_row.modulate.a = 0.35
 	_jar_row.show()
 	_die.show()
-	_main_btn.text = "🫙 Throw! ⏎"
+	_main_btn.text = "🫙 Throw!  [Space]"
 	_leave_btn.text = "Leave"
 	_refresh_throw()
 

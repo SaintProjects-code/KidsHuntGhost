@@ -99,7 +99,7 @@ func _build_selection() -> void:
 		"Judged on %s ×2, plus stars and a die roll!" % CONTESTS[_event]["label"]
 	if _is_game():
 		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your area)"
-	_next.text = "Start! ⏎"
+	_next.text = "Start!  [Space]"
 	UIKit.clear(_body)
 	var grid := GridContainer.new()
 	grid.columns = 2   # wide instead of tall, so Start stays on screen
@@ -223,7 +223,7 @@ func _show_podium() -> void:
 	_phase = 3
 	_title.text = "🏆 Winners!"
 	_hint.text = ""
-	_next.text = "OK ⏎"
+	_next.text = "OK  [Space]"
 	_next.disabled = true
 	var record := _game.beat_record()
 	UIKit.clear(_body)

@@ -58,10 +58,14 @@ func _title_label(text: String, size: int = 26) -> Label:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
 
-func _button(text: String, cb: Callable, min_h: int = 44) -> Button:
+# A themed button. Its look comes from the label (Cancel / Close → dark,
+# Quit → red, everything else → purple) unless `kind` is given; `min_h`
+# picks the size (≤34 small, ≤46 medium, else large).
+func _button(text: String, cb: Callable, min_h: int = 44, kind: String = "") -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(0, min_h)
-	b.pressed.connect(cb)
+	UIKit.style_button(b, kind if kind != "" else UIKit.kind_for(text), UIKit.size_for(min_h))
+	b.pressed.connect(func():
+		Sfx.play("click")
+		cb.call())
 	return b

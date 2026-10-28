@@ -77,7 +77,7 @@ func _ready() -> void:
 	_build_fly_button()
 	TurnSystem.cpu_turn_override = _cpu_pre_roll
 	info_label.add_theme_stylebox_override("normal", UIKit.box(Color(UIKit.NIGHT, 0.92), 8, 3, UIKit.GOLD, Vector2(12, 6)))
-	_gold_border(roll_button)
+	_style_board_buttons()
 	SaveManager.board_state_provider = _save_state
 	var saved := SaveManager.take_pending_board_state()
 	if saved.is_empty():
@@ -91,14 +91,31 @@ func _exit_tree() -> void:
 	SaveManager.board_state_provider = Callable()
 	TurnSystem.stop()
 
-func _gold_border(btn: Button) -> void:
-	for st in ["normal", "hover", "pressed", "disabled"]:
-		var base: StyleBox = btn.get_theme_stylebox(st)
-		var nb: StyleBox = base.duplicate() if base != null else StyleBoxFlat.new()
-		if nb is StyleBoxFlat:
-			nb.set_border_width_all(3)
-			nb.border_color = UIKit.GOLD
-		btn.add_theme_stylebox_override(st, nb)
+# The board chrome uses the same themed buttons as every window: one height
+# for the whole action bar, gold for the main action.
+func _style_board_buttons() -> void:
+	var bar := roll_button.get_parent()
+	var specs := [
+		[roll_button, "🎲 Roll", "gold", 150], [end_turn_button, "End Turn", "primary", 150],
+		[bar.get_node("TeamButton"), "👥 Team", "secondary", 110], [bar.get_node("MapButton"), "🗺 Map", "secondary", 100],
+	]
+	for sp in specs:
+		var b: Button = sp[0]
+		b.text = sp[1]
+		b.clip_text = false
+		b.custom_minimum_size = Vector2(sp[3], 54)
+		UIKit.style_button(b, sp[2], "l")
+	var util := $BoardUI/Root/UtilRow
+	for pair in [["LogButton", "📜 Log"], ["DevButton", "⚡ Dev"]]:
+		var b: Button = util.get_node(pair[0])
+		b.text = pair[1]
+		b.clip_text = false
+		b.custom_minimum_size = Vector2(84, 34)
+		UIKit.style_button(b, "secondary", "s")
+	var settings: Button = $TopUI/SettingsButton
+	settings.text = "⚙ Settings"
+	UIKit.style_button(settings, "secondary", "s")
+	UIKit.style_button(event_ok, "primary", "m")
 
 func _deal_starting_cards() -> void:
 	for i in GameState.players.size():
@@ -303,8 +320,8 @@ func _on_dice_rolled(total: int, faces: Array) -> void:
 func _build_fly_button() -> void:
 	fly_button = Button.new()
 	fly_button.text = "✈ Fly"
-	fly_button.focus_mode = Control.FOCUS_NONE
-	fly_button.custom_minimum_size = Vector2(110, 84)
+	fly_button.custom_minimum_size = Vector2(110, 54)
+	UIKit.style_button(fly_button, "gold", "l")
 	fly_button.pressed.connect(_on_fly_pressed)
 	fly_button.hide()
 	var bar := roll_button.get_parent()
@@ -723,8 +740,7 @@ func _show_choice(title: String, labels: Array) -> int:
 	for i in labels.size():
 		var b := Button.new()
 		b.text = "%d · %s" % [i + 1, labels[i]] if labels.size() > 1 else String(labels[i])
-		b.focus_mode = Control.FOCUS_NONE
-		b.custom_minimum_size = Vector2(0, 44)
+		UIKit.style_button(b, UIKit.kind_for(String(labels[i])), "m")
 		b.pressed.connect(func(): _choice_selected.emit(i))
 		choice_buttons.add_child(b)
 	choice_panel.show()

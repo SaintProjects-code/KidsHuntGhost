@@ -13,13 +13,26 @@ func _ready() -> void:
 	$MultiplayerMenuButton.hide()
 	$StartingScreenButton.show()
 	$MainMenuButton.hide()
+	_style_buttons()
 	if SaveManager.has_save():
 		var cont := Button.new()
 		cont.text = "▶ Continue"
-		cont.focus_mode = Control.FOCUS_NONE
+		UIKit.style_button(cont, "gold", "l")
 		cont.pressed.connect(_on_continue_pressed)
 		$MainMenuButton.add_child(cont)
 		$MainMenuButton.move_child(cont, 0)
+
+func _style_buttons() -> void:
+	for spec in [["StartingScreenButton/StartGamebutton", "▶ Start", "gold", "l"],
+			["MainMenuButton/AdventureMode", "Adventure", "primary", "l"],
+			["MainMenuButton/Multiplayer", "Multiplayer", "primary", "l"],
+			["MainMenuButton/Setting", "⚙ Settings", "secondary", "m"],
+			["MultiplayerMenuButton/Online", "Online", "primary", "m"],
+			["MultiplayerMenuButton/Local", "Local", "primary", "m"],
+			["DevButton", "⚡ Dev", "secondary", "s"]]:
+		var b: Button = get_node(spec[0])
+		b.text = spec[1]
+		UIKit.style_button(b, spec[2], spec[3])
 
 func _on_start_game_pressed() -> void:
 	Sfx.play("click")

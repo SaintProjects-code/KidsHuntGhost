@@ -79,18 +79,66 @@ static func set_hp(bar: ProgressBar, hp_now: int, hp_max: int) -> void:
 	bar.value = hp_now
 	bar.add_theme_stylebox_override("fill", box(hp_color(float(hp_now) / float(maxi(1, hp_max))), 4))
 
-# Compact purple button for dense rows (the theme's padding is too chunky).
-static func small_button(text: String, cb: Callable, font_size: int = 14) -> Button:
+# ── Buttons ───────────────────────────────────────────────────────────────────
+# One look for every button in the game: a rounded "3D" pill (thicker bottom
+# edge) in the game's palette. kind: primary (purple) · secondary (dark, for
+# Cancel / Close / Leave) · gold (big moments: Roll, Fly, Trade) · danger (Quit).
+# size: s / m / l.
+
+const BUTTON_KINDS := {
+	"primary":   [Color(0.46, 0.36, 0.86), Color(0.58, 0.48, 0.97), Color(0.36, 0.27, 0.72), Color(1.0, 0.85, 0.35, 0.85)],
+	"secondary": [Color(0.15, 0.12, 0.28), Color(0.22, 0.18, 0.4), Color(0.1, 0.08, 0.2), Color(0.6, 0.5, 1.0, 0.7)],
+	"gold":      [Color(0.86, 0.62, 0.12), Color(0.96, 0.74, 0.24), Color(0.7, 0.48, 0.08), Color(1.0, 0.95, 0.75, 0.9)],
+	"danger":    [Color(0.6, 0.18, 0.25), Color(0.74, 0.26, 0.32), Color(0.44, 0.12, 0.18), Color(1.0, 0.65, 0.65, 0.8)],
+}
+const BUTTON_SIZES := {
+	"s": {"font": 13, "h": 30, "pad": 10, "r": 9},
+	"m": {"font": 16, "h": 40, "pad": 16, "r": 12},
+	"l": {"font": 20, "h": 54, "pad": 22, "r": 16},
+}
+
+static func style_button(b: Button, kind: String = "primary", size: String = "m") -> Button:
+	var c: Array = BUTTON_KINDS.get(kind, BUTTON_KINDS["primary"])
+	var z: Dictionary = BUTTON_SIZES.get(size, BUTTON_SIZES["m"])
+	var states := {"normal": c[0], "hover": c[1], "pressed": c[2], "disabled": Color(0.3, 0.28, 0.4, 0.75)}
+	for st in states:
+		var sb := box(states[st], z["r"], 2, c[3] if st != "disabled" else Color(1, 1, 1, 0.12), Vector2(z["pad"], 4))
+		sb.border_width_bottom = 2 if st == "pressed" else 5   # pressed = pushed in
+		sb.border_color = c[3] if st != "disabled" else Color(1, 1, 1, 0.12)
+		if st != "pressed":
+			sb.shadow_color = Color(0, 0, 0, 0.3)
+			sb.shadow_size = 3
+			sb.shadow_offset = Vector2(0, 2)
+		sb.content_margin_top = 6 if st == "pressed" else 4
+		b.add_theme_stylebox_override(st, sb)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	b.add_theme_font_size_override("font_size", z["font"])
+	b.add_theme_color_override("font_color", Color.WHITE if kind != "gold" else Color(0.18, 0.1, 0.02))
+	b.add_theme_color_override("font_hover_color", Color.WHITE if kind != "gold" else Color(0.1, 0.05, 0.0))
+	b.add_theme_color_override("font_pressed_color", Color(1, 1, 1, 0.85) if kind != "gold" else Color(0.2, 0.12, 0.02))
+	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.4))
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size.y = maxf(b.custom_minimum_size.y, z["h"])
+	return b
+
+# Pick a kind from the label, so Cancel / Close / Quit read right everywhere.
+static func kind_for(text: String) -> String:
+	var t := text.to_lower()
+	if t.contains("quit"):
+		return "danger"
+	for w in ["cancel", "close", "leave", "back", "keep", "skip", "not today", "walk away"]:
+		if t.contains(w):
+			return "secondary"
+	return "primary"
+
+static func size_for(min_h: int) -> String:
+	return "s" if min_h <= 34 else ("m" if min_h <= 46 else "l")
+
+# Compact button for dense rows (jar pickers, team cards, shop rows).
+static func small_button(text: String, cb: Callable, _font_size: int = 14) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", font_size)
-	var states := {"normal": PURPLE, "hover": Color(0.651, 0.565, 1.0),
-		"pressed": Color(0.435, 0.337, 0.847), "disabled": Color(0.396, 0.388, 0.471)}
-	for state in states:
-		var sb := box(states[state], 7, 0, PURPLE_DARK, Vector2(10, 3))
-		sb.border_width_bottom = 2
-		b.add_theme_stylebox_override(state, sb)
+	style_button(b, kind_for(text), "s")
 	b.pressed.connect(func():
 		Sfx.play("click")
 		cb.call())

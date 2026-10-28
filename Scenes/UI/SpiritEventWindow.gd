@@ -82,7 +82,7 @@ func _ready() -> void:
 	bottom.add_child(_choices_box)
 	_result = UIKit.wrap_label("", 18, 720)
 	col.add_child(_result)
-	_ok = _button("OK ⏎", func(): closed.emit(), 40)
+	_ok = _button("OK  [Space]", func(): closed.emit(), 40)
 	_ok.hide()
 	col.add_child(_ok)
 	hide()
@@ -160,7 +160,7 @@ func _show_page() -> void:
 	Juice.slide_in(_situation, 12.0, 0.2)
 	UIKit.clear(_choices_box)
 	if _page < _pages.size() - 1:
-		_choices_box.add_child(_button("Next ▶ ⏎", _next_page, 44))
+		_choices_box.add_child(_button("Next ▶  [Space]", _next_page, 44))
 	else:
 		_build_options()
 

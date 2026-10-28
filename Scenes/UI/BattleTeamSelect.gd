@@ -65,7 +65,7 @@ func _ready() -> void:
 	col.add_child(_cards_row)
 	_start = _button("", _on_start, 36)
 	col.add_child(_start)
-	var cancel := _button("Back out", _cancel, 24)
+	var cancel := _button("Cancel", _cancel, 30)
 	cancel.add_theme_font_size_override("font_size", 13)
 	col.add_child(cancel)
 	hide()
@@ -135,7 +135,7 @@ func _refresh() -> void:
 			card.add_child(_row_content("#%d" % (_opp_team.find(mon) + 1), mon, -1, false, true))
 			_opp_list.add_child(card)
 		_start.disabled = _selected.is_empty()
-		_start.text = "Start Battle (%d) ⏎" % _selected.size() if not _start.disabled else "Select at least 1 spirit…"
+		_start.text = "Start Battle (%d)  [Space]" % _selected.size() if not _start.disabled else "Select at least 1 spirit…"
 	_slots_row.visible = not _pvp
 	if not _pvp:
 		_refresh_slots()

@@ -22,6 +22,12 @@ var _saved_pos: Vector2 = Vector2.ZERO
 var _saved_zoom: Vector2 = Vector2.ONE
 
 func _ready() -> void:
+	for pair in [["ViewMapButton", "🗺 View Map", "secondary"], ["CloseButton", "Back to Game", "primary"],
+			["QuitButton", "Quit to Menu", "danger"]]:
+		var b: Button = menu.get_node("Margin/VBox/" + pair[0])
+		b.text = pair[1]
+		UIKit.style_button(b, pair[2], "m")
+	UIKit.style_button(back_button, "primary", "m")
 	menu.hide()
 	view_hint.hide()
 	back_button.hide()
