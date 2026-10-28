@@ -104,7 +104,8 @@ func _succeed(player_idx: int, spirit: Dictionary) -> void:
 		p.pc.append(spirit)
 	# SpiritsProgressionSystem subscribes and handles duplicates / stars
 	EventBus.catch_succeeded.emit(player_idx, spirit)
-	GameState.award_points(player_idx, Balance.PTS_CATCH)
+	if Balance.PTS_CATCH > 0:
+		GameState.award_points(player_idx, Balance.PTS_CATCH)
 	p.inventory.gold += Balance.GOLD_CATCH
 	EventBus.log_entry.emit(player_idx, "%s caught %s! +%d gold." % [
 		p.player_name, spirit.get("name", "?"), Balance.GOLD_CATCH], "#f0c36a")

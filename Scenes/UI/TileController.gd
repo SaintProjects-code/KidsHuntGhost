@@ -106,9 +106,10 @@ func _run_trainer_battle(idx: int) -> void:
 	var won = await _npc_battle(idx, foe_team, String(t["name"]), t.get("portrait", ["acetrainer"]), "trainer")
 	if won == true:
 		p.inventory.gold += int(t.get("gold", 15))
-		GameState.award_points(idx, int(t.get("pts", 1)))
+		var pts: int = int(t.get("pts", 1)) * Balance.PTS_TRAINER_MULT
+		GameState.award_points(idx, pts)
 		EventBus.log_entry.emit(idx, "%s beat %s! +%d pts, +%d gold." % [p.player_name, t["name"],
-			int(t.get("pts", 1)), int(t.get("gold", 15))], "#ffd24d")
+			pts, int(t.get("gold", 15))], "#ffd24d")
 
 # ─── ITEM ─────────────────────────────────────────────────────────────────────
 func _run_item(idx: int) -> void:

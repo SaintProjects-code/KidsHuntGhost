@@ -4,7 +4,7 @@ extends Node
 var players: Array[PlayerData] = []
 var current_player_index: int = 0
 var turn_count: int = 0
-var win_threshold: int = 30
+var win_threshold: int = 40          # tested best: points, wardens and Champion all win often
 var infinite_points: bool = false   # setup setting: points never win — only the trail does
 var active_map: int = 1
 var winner_index: int = -1          # set once someone wins
@@ -57,7 +57,7 @@ func from_dict(d: Dictionary) -> void:
 		players.append(PlayerData.from_dict(pd))
 	current_player_index = d.get("current", 0)
 	turn_count = d.get("turn", 0)
-	win_threshold = d.get("win_threshold", 30)
+	win_threshold = d.get("win_threshold", 40)
 	infinite_points = d.get("infinite", false)
 	active_map = d.get("map", 1)
 	dev_mode = d.get("dev", false)

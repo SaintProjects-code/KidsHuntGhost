@@ -2,13 +2,15 @@ class_name Balance
 ## Every tuning number in one place, so balance passes don't mean hunting
 ## through a dozen scripts. Tweak here; nothing else needs to change.
 
-# ── Points (first to WIN_POINTS wins, unless "No pts" is on) ──────────────────
-const PTS_CATCH := 1
-const PTS_GYM := 3
-const PTS_PVP_WIN := 4
-const PTS_ELITE_WIN := 5
-const PTS_CHAMPION := 10
-const PODIUM_POINTS := [3, 2, 1]        # competition 1st / 2nd / 3rd
+# ── Points (first to the setup's win target wins, unless "No pts" is on) ─────
+# static var (not const) so test runs can try other values.
+static var PTS_CATCH := 1
+static var PTS_GYM := 3
+static var PTS_PVP_WIN := 4
+static var PTS_ELITE_WIN := 5
+static var PTS_CHAMPION := 10
+static var PTS_TRAINER_MULT := 1        # × each trainer's listed points
+static var PODIUM_POINTS := [3, 2, 1]   # competition 1st / 2nd / 3rd
 const RECORD_BONUS := 2                 # beating a minigame's all-time record
 const ELITE_WINS_TO_WIN := 2
 
