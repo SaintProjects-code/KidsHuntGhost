@@ -129,8 +129,21 @@
     const box = $("view");
     box.replaceChildren();
     if (v.title) box.append(el("div", "title", v.title));
-    if (v.img) { const im = el("img", "hero"); im.src = v.img; im.alt = ""; box.append(im); }
-    for (const line of v.lines || []) {
+    const lines = (v.lines || []).slice();
+    if (v.img) {
+      // the picture sits beside the spirit's first info block (its stats)
+      const row = el("div", "profile");
+      const im = el("img", "hero"); im.src = v.img; im.alt = ""; row.append(im);
+      if (lines.length && typeof lines[0] === "object") {
+        const first = lines.shift();
+        const item = el("div", "item");
+        item.append(el("div", "head", first.t || ""));
+        if (first.d) item.append(el("div", "desc", first.d));
+        row.append(item);
+      }
+      box.append(row);
+    }
+    for (const line of lines) {
       if (line && typeof line === "object") {
         const item = el("div", "item");
         item.append(el("div", "head", line.t || ""));

@@ -41,7 +41,7 @@ func present(a: int, b: int) -> void:
 	_pick_b = {}
 	var pb: PlayerData = GameState.players[b]
 	_title.text = "🔁 %s  ⇄  %s" % [GameState.players[a].player_name, pb.player_name]
-	_note.text = "Pick what you give and what you want — %s says yes if it's a fair deal." % pb.player_name \
+	_note.text = "Make a fair offer — %s decides." % pb.player_name \
 		if pb.is_cpu else "Each player picks one thing to offer."
 	_note.remove_theme_color_override("font_color")
 	_rebuild()

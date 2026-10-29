@@ -18,7 +18,7 @@ func _ready() -> void:
 	_row = UIKit.hbox(10)
 	_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_row)
-	col.add_child(_button("OK  [Space]", func(): closed.emit()))
+	col.add_child(_button("OK", func(): closed.emit()))
 	hide()
 
 func present(title: String, text: String, cards: Array) -> void:

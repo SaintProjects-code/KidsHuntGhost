@@ -6,7 +6,7 @@ extends MenuWindow
 
 signal finished(player_won: bool)
 
-const CARD_SIZE := Vector2(150, 142)   # fixed slot so cards can animate freely
+const CARD_SIZE := Vector2(150, 150)   # fixed slot so cards can animate freely
 const TRAINER_W := 96.0
 const LUNGE := 26.0
 const HAND_CARD := Vector2(62, 84)
@@ -58,6 +58,8 @@ var _skip_btn: Button
 var _continue_btn: Button
 var _speed_btn: Button
 var _auto_btn: Button
+var _team_voters: HBoxContainer
+var _opp_voters: HBoxContainer
 var _auto := false                    # rounds play by themselves (never picks your cards)
 var _detached := false
 var _opening_pending := false
@@ -79,6 +81,7 @@ func _ready() -> void:
 	_opp_row = opp_side["cards"]
 	_opp_disc = opp_side["disc"]
 	_opp_name_lbl = opp_side["name"]
+	_opp_voters = opp_side["voters"]
 
 	var vs := UIKit.label("VS", 20, UIKit.GOLD)
 	vs.custom_minimum_size = Vector2(TRAINER_W, 0)
@@ -89,6 +92,7 @@ func _ready() -> void:
 	_team_row = team_side["cards"]
 	_team_disc = team_side["disc"]
 	_team_name_lbl = team_side["name"]
+	_team_voters = team_side["voters"]
 
 	# bottom strip: log | your tactic cards | buttons
 	var bottom := UIKit.hbox(12)
@@ -106,7 +110,7 @@ func _ready() -> void:
 	var hand_col := UIKit.vbox(2)
 	hand_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bottom.add_child(hand_col)
-	var hand_hint := UIKit.label("Your 2 tactics — click (or 1-2) to play next round", 11)
+	var hand_hint := UIKit.label("Tactics", 11)
 	hand_hint.modulate = Color(1, 1, 1, 0.65)
 	hand_col.add_child(hand_hint)
 	_hand_box = UIKit.hbox(4)
@@ -118,11 +122,11 @@ func _ready() -> void:
 	bottom.add_child(btns)
 	var brow := UIKit.hbox(8)
 	btns.add_child(brow)
-	_next_btn = _small("Next Round  [Space]", 110, func(): _on_next())
+	_next_btn = _small("Next Round", 110, func(): _on_next())
 	brow.add_child(_next_btn)
 	_skip_btn = _small("Skip", 70, func(): _on_skip())
 	brow.add_child(_skip_btn)
-	_continue_btn = _small("Continue  [Space]", 110, func(): finished.emit(_won))
+	_continue_btn = _small("Continue", 110, func(): finished.emit(_won))
 	_continue_btn.hide()
 	brow.add_child(_continue_btn)
 	var arow := UIKit.hbox(8)
@@ -163,11 +167,15 @@ func _make_team_row(parent: Control, is_player: bool) -> Dictionary:
 	nm.modulate = Color(1, 1, 1, 0.75)
 	nm.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	tcol.add_child(nm)
+	var voters := UIKit.hbox(2)   # 🗳 portraits of players who voted for this side
+	voters.alignment = BoxContainer.ALIGNMENT_CENTER
+	voters.custom_minimum_size = Vector2(0, 24)
+	tcol.add_child(voters)
 	var cards := UIKit.hbox(10)
 	cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cards.alignment = BoxContainer.ALIGNMENT_CENTER
 	h.add_child(cards)
-	return {"cards": cards, "disc": disc, "name": nm}
+	return {"cards": cards, "disc": disc, "name": nm, "voters": voters}
 
 # Fit the window to the game view AND keep it centred. A CenterContainer can't
 # lift an oversized child above the top edge, so the panel is placed by hand.
@@ -205,7 +213,8 @@ func _build_cards() -> void:
 	for m in _opp:
 		_opp_cards.append(_make_card(m, false))
 
-# Name banner, sprite, HP bar, stat line. The card lives inside a fixed-size
+# Name banner, sprite, then HP bar (numbers inside), charge bar (one segment per
+# charge the move needs), and the live stats. The card lives inside a fixed-size
 # slot so its lunge/shake animations can move it without the row fighting back.
 func _make_card(mon: Dictionary, is_player: bool) -> Dictionary:
 	var slot := Control.new()
@@ -237,13 +246,20 @@ func _make_card(mon: Dictionary, is_player: bool) -> Dictionary:
 	sprite.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vb.add_child(sprite)
 
-	var hp := UIKit.hp_bar(10)
+	var hp := UIKit.hp_bar(15)
 	vb.add_child(hp)
+	var hp_text := UIKit.label("", 11, Color.WHITE)
+	hp_text.add_theme_color_override("font_outline_color", Color.BLACK)
+	hp_text.add_theme_constant_override("outline_size", 3)
+	hp_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hp_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hp_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hp.add_child(hp_text)
 
-	var info := UIKit.hbox(4)
-	vb.add_child(info)
-	var hp_text := UIKit.label("", 10, Color(0.12, 0.25, 0.1))
-	info.add_child(hp_text)
+	var charge := ChargeBar.new()
+	charge.tooltip_text = "%s fires when the bar is full" % mv["name"]
+	vb.add_child(charge)
+
 	var stats := RichTextLabel.new()
 	stats.bbcode_enabled = true
 	stats.fit_content = false               # a long buffed line must never grow the card
@@ -252,9 +268,9 @@ func _make_card(mon: Dictionary, is_player: bool) -> Dictionary:
 	stats.scroll_active = false
 	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stats.custom_minimum_size = Vector2(0, 14)
-	stats.add_theme_font_size_override("normal_font_size", 10)
+	stats.add_theme_font_size_override("normal_font_size", 11)
 	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	info.add_child(stats)
+	vb.add_child(stats)
 
 	# status badge ("SLP 2"…) pinned top-right, on the slot so it never dims
 	var status_bg := UIKit.box(Color(0.5, 0.5, 0.5), 6, 1, Color(0, 0, 0, 0.6))
@@ -271,7 +287,7 @@ func _make_card(mon: Dictionary, is_player: bool) -> Dictionary:
 	status.hide()
 	slot.add_child(status)
 
-	return {"slot": slot, "card": card, "bg": bg, "hp": hp, "hp_text": hp_text,
+	return {"slot": slot, "card": card, "bg": bg, "hp": hp, "hp_text": hp_text, "charge": charge,
 		"stats": stats, "status": status, "status_bg": status_bg}
 
 func _refresh() -> void:
@@ -282,7 +298,7 @@ func _refresh() -> void:
 # red when debuffed, plain otherwise.
 func _stat_line(mon: Dictionary) -> String:
 	var parts: Array = []
-	for pair in [["atk", "A"], ["def", "D"], ["spd", "S"]]:
+	for pair in [["atk", "ATK "], ["def", "DEF "], ["spd", "SPD "]]:
 		var cur: int = int(mon.get(pair[0], 1))
 		var base: int = int(mon.get("_base_" + pair[0], cur))
 		if cur > base:
@@ -301,8 +317,9 @@ func _refresh_side(team: Array, cards: Array, active: int) -> void:
 		var hp_max: int = mon.get("hp", 1)
 		UIKit.set_hp(c.hp, hp_now, hp_max)
 		var cost := int(SpiritsData.move_of(SpiritsData.move_key(mon)).get("charge", 3))
-		(c.hp_text as Label).text = "%d/%d ⚡%d/%d" % [hp_now, hp_max, mini(int(mon.get("_charge", 0)), cost), cost]
-		(c.stats as RichTextLabel).text = _stat_line(mon)
+		(c.hp_text as Label).text = "%d / %d" % [hp_now, hp_max]
+		(c.charge as ChargeBar).set_gauge(mini(int(mon.get("_charge", 0)), cost), cost)
+		(c.stats as RichTextLabel).text = "[center]%s[/center]" % _stat_line(mon)
 		# a fainted spirit's card leaves the row once its faint has played out
 		(c.slot as Control).visible = not mon.get("_gone", false)
 		var st: Dictionary = mon.get("_status", {})
@@ -399,38 +416,58 @@ func _float_on(mon: Dictionary, text: String, color: Color) -> void:
 # damage"), then fades. A newer banner replaces the old one.
 var _banner: Control
 
-func _tactic_banner(icon: String, headline: String, sub: String, color: Color) -> void:
+# A played card / card effect pops up in the empty space on the RIGHT of the
+# battle window. side: 1 = your side (it slides up from the bottom), -1 = the
+# enemy's (slides down from the top), 0 = neither (slides in from the right).
+# It holds for a moment, then leaves the way it came. `key` shows the card itself.
+func _tactic_banner(icon: String, headline: String, sub: String, color: Color, side := 0, key := "") -> void:
 	if _quiet():
 		return
 	if is_instance_valid(_banner):
 		_banner.queue_free()
 	var box := PanelContainer.new()
-	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.04, 0.14, 0.94), 16, 3, color, Vector2(22, 12)))
+	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.04, 0.14, 0.95), 14, 3, color, Vector2(14, 10)))
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var row := UIKit.hbox(14)
-	box.add_child(row)
-	row.add_child(UIKit.label(icon, 40))
-	var text := UIKit.vbox(2)
-	row.add_child(text)
-	text.add_child(UIKit.label(headline, 24, color))
+	var col := UIKit.vbox(6)
+	box.add_child(col)
+	if key != "":
+		var cv := CardView.new(key, Vector2(96, 128))
+		cv.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cv.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		col.add_child(cv)
+	else:
+		var ic := UIKit.label(icon, 34)
+		ic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(ic)
+	var head := UIKit.wrap_label(headline, 17, 190)
+	head.add_theme_color_override("font_color", color)
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(head)
 	if sub != "":
-		text.add_child(UIKit.label(sub, 15))
+		var sl := UIKit.wrap_label(sub, 13, 190)
+		sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(sl)
 	add_child(box)
 	_banner = box
-	var vp := get_viewport_rect().size
 	box.reset_size()
-	var size_now := box.get_combined_minimum_size()
-	box.size = size_now
-	box.pivot_offset = size_now * 0.5
-	box.position = Vector2((vp.x - size_now.x) * 0.5, vp.y * 0.30 - size_now.y * 0.5)
-	box.scale = Vector2(0.6, 0.6)
+	var bsize := box.get_combined_minimum_size()
+	box.size = bsize
+	# the right edge of the battle window, level with the VS line
+	var pr := Rect2(panel.position, panel.size * panel.scale)
+	var rest := Vector2(pr.end.x - bsize.x - 18, pr.position.y + pr.size.y * 0.42 - bsize.y * 0.5)
+	var vp := get_viewport_rect().size
+	rest.x = minf(rest.x, vp.x - bsize.x - 8)
+	rest.y = clampf(rest.y, 8, vp.y - bsize.y - 8)
+	var away := rest + Vector2(0, vp.y * 0.6) if side > 0 else (rest - Vector2(0, vp.y * 0.6) if side < 0 else rest + Vector2(bsize.x + 40, 0))
+	box.position = away
 	box.modulate.a = 0.0
 	var tw := box.create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(box, "scale", Vector2.ONE, 0.18 / _speed).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tw.tween_property(box, "modulate:a", 1.0, 0.12 / _speed)
-	tw.chain().tween_interval(1.1 / _speed)
-	tw.chain().tween_property(box, "modulate:a", 0.0, 0.3 / _speed)
+	tw.tween_property(box, "position", rest, 0.28 / _speed).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(box, "modulate:a", 1.0, 0.15 / _speed)
+	tw.chain().tween_interval(1.2 / _speed)
+	tw.chain().tween_property(box, "position", away, 0.25 / _speed).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(box, "modulate:a", 0.0, 0.25 / _speed)
 	tw.chain().tween_callback(box.queue_free)
 	Sfx.play("card", 0.9)
 
@@ -514,3 +551,32 @@ class TrainerDisc:
 			var ts := tex.get_size()
 			var s := (r * 1.5) / maxf(ts.x, ts.y)
 			draw_texture_rect(tex, Rect2(ctr - ts * s * 0.5, ts * s), false)
+
+# The move's charge gauge: one segment per charge it needs; filled segments
+# glow gold, and a full gauge (move fires next attack) pulses.
+class ChargeBar:
+	extends Control
+	var charge := 0
+	var cost := 3
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(0, 9)
+
+	func set_gauge(c: int, total: int) -> void:
+		if c != charge or total != cost:
+			charge = c
+			cost = maxi(1, total)
+			queue_redraw()
+
+	func _draw() -> void:
+		var gap := 3.0
+		var w := (size.x - gap * (cost - 1)) / float(cost)
+		var ready := charge >= cost - 1   # one more step fires it
+		for k in cost:
+			var r := Rect2(k * (w + gap), 0, w, size.y)
+			var filled := k < charge
+			var col := Color("ffd24d") if filled else Color(0, 0, 0, 0.45)
+			if filled and ready:
+				col = Color("ffe98a")
+			draw_style_box(UIKit.box(col, 3, 1, Color(1, 1, 1, 0.25)), r)
+

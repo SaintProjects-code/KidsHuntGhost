@@ -83,6 +83,7 @@ func present(setup: Dictionary) -> void:
 	_opp_armed = ""
 	_votes = {}
 	_vote_paid = {}
+	_show_votes()
 	_attacking = false
 	_played = [false, false]
 	var atk_mod: int = setup.get("atk_mod", 0)
@@ -193,8 +194,10 @@ func _arm(key: String, mine: bool) -> void:
 	if not _busy and not _played[side]:
 		_play_now(mine)
 	elif _attacking or _played[side]:
-		_tactic_banner(CardsData.card(key).get("icon", "🃏"), "%s is ready" % CardsData.card_name(key),
-			"plays at the start of the next round", Color("8fd6ff"))
+		# a phone player's card stays secret until it's played
+		var secret := Remote.has_phone(_hand_owner if mine else _opp_owner)
+		_tactic_banner("🃏", "A card is ready" if secret else "%s is ready" % CardsData.card_name(key),
+			"plays next round", Color("8fd6ff"), 1 if mine else -1, "" if secret else key)
 	# otherwise the round in progress picks it up just before the attacks
 
 # Between rounds: play the armed card straight away.
@@ -270,7 +273,7 @@ func _play_tactic(key: String, is_me: bool) -> void:
 	var info := CardsData.card(key)
 	_tactic_banner(String(info.get("icon", "🃏")), "%s used %s!" % [
 		(_team_name_lbl.text if is_me else _opp_name_lbl.text).capitalize(), info.get("name", key)],
-		String(info.get("desc", "")), Color("7be0a0") if is_me else Color("ff9a7a"))
+		"", Color("7be0a0") if is_me else Color("ff9a7a"), 1 if is_me else -1, key)
 	match key:
 		"spirit_shield": me["_r_shield"] = true
 		"battle_cry":
@@ -643,15 +646,34 @@ func spectator_view(idx: int) -> Dictionary:
 	if _round_num >= VOTE_ROUNDS:
 		return {"title": "🗳 Voting closed", "lines": ["%s vs %s" % names]}
 	return {"title": "🗳 Who wins this battle?", "lines": ["Votes close at round %d. Right guess = +1 card (★ if your hand is full)." % VOTE_ROUNDS],
-		"buttons": [{"label": "🟢 " + names[0], "gold": true}, {"label": "🔴 " + names[1], "gold": true}],
+		"buttons": [{"label": "🟢 " + names[0], "gold": true, "desc": _voters_of(0)}, {"label": "🔴 " + names[1], "gold": true, "desc": _voters_of(1)}],
 		"_actions": [_vote.bind(idx, 0), _vote.bind(idx, 1)]}
+
+func _voters_of(side: int) -> String:
+	var who: Array = _votes.keys().filter(func(i): return int(_votes[i]) == side and i < GameState.players.size()) \
+		.map(func(i): return GameState.players[i].player_name)
+	return ("🗳 " + ", ".join(who)) if not who.is_empty() else ""
 
 func _vote(idx: int, side: int) -> void:
 	if _over or _round_num >= VOTE_ROUNDS or _votes.has(idx):
 		return
 	_votes[idx] = side
+	_show_votes()
 	Sfx.play("pop")
 	_logln("[color=#c8a8ff]🗳 %s votes![/color]" % GameState.players[idx].player_name)
+
+# A small trainer portrait for every vote, under the side it backs.
+func _show_votes() -> void:
+	for box in [_team_voters, _opp_voters]:
+		UIKit.clear(box)
+	for idx in _votes:
+		if idx >= GameState.players.size():
+			continue
+		var p: PlayerData = GameState.players[idx]
+		var pic := UIKit.sprite(GameData.trainer_texture(GameData.player_trainer(p)), Vector2(24, 24))
+		pic.tooltip_text = "%s votes for this side" % p.player_name
+		pic.modulate = p.color.lightened(0.4)
+		(_team_voters if int(_votes[idx]) == 0 else _opp_voters).add_child(pic)
 
 # Right guesses: a random card, or a star on a spirit when the hand is full.
 func _pay_votes(left_won: bool) -> void:

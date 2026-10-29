@@ -21,6 +21,7 @@ var _view_mode: bool = false
 var _saved_pos: Vector2 = Vector2.ZERO
 var _saved_zoom: Vector2 = Vector2.ONE
 var _phone_held := {}            # 📱 arrows held on the current player's phone (see Remote)
+var _hidden_popups: Array = []   # board popups (a route choice…) tucked away while viewing the map
 
 func _ready() -> void:
 	for pair in [["ViewMapButton", "🗺 View Map", "secondary"], ["CloseButton", "Back to Game", "primary"],
@@ -77,6 +78,14 @@ func _on_view_map_pressed() -> void:
 	if hud != null:
 		hud.hide()
 	info_label.hide()
+	# a pending choice (which route?) waits off-screen while you look around
+	_hidden_popups.clear()
+	var scene := get_tree().current_scene
+	for path in ["BoardUI/Root/ChoicePanel", "BoardUI/Root/EventPanel"]:
+		var pop := scene.get_node_or_null(path) as Control if scene else null
+		if pop and pop.visible:
+			pop.hide()
+			_hidden_popups.append(pop)
 	view_hint.show()
 	back_button.show()
 	zoom_label.show()
@@ -127,6 +136,10 @@ func _exit_view() -> void:
 	if hud != null:
 		hud.show()
 	info_label.show()
+	for pop in _hidden_popups:
+		if is_instance_valid(pop):
+			pop.show()
+	_hidden_popups.clear()
 	# straight back to the game — no settings menu; stay paused only if an
 	# event flow is still holding the game.
 	menu.hide()

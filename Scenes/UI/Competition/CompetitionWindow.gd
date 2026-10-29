@@ -105,12 +105,12 @@ func _on_next() -> void:
 func _build_selection() -> void:
 	_title.text = "🏅 %s — pick your spirit!" % event_name(_event)
 	_hint.text = GAMES[_event]["hint"] if _is_game() else \
-		"Judged on %s ×2, plus stars and a die roll!" % CONTESTS[_event]["label"]
+		"%s ×2 + stars + 🎲" % CONTESTS[_event]["label"]
 	if _event == "beauty":
-		_hint.text = "Three judges each love one stat — a well-rounded spirit shines! Plus stars and a die roll."
+		_hint.text = "3 judges, each loves one stat · + stars + 🎲"
 	if _is_game():
 		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your area)"
-	_next.text = "Start!  [Space]"
+	_next.text = "Start!"
 	UIKit.clear(_body)
 	var grid := GridContainer.new()
 	grid.columns = 2   # wide instead of tall, so Start stays on screen
@@ -169,7 +169,7 @@ func remote_view(idx: int) -> Dictionary:
 	if not _next.disabled:
 		buttons.append({"label": "▶ Start!", "gold": true})
 		actions.append(_on_next)
-	return {"screen": "buttons", "title": _title.text, "lines": [_hint.text.get_slice("\n", 0), "★★★ = a great pick for this event, ★ = a poor one."],
+	return {"screen": "buttons", "title": _title.text, "lines": [_hint.text.get_slice("\n", 0), "★★★ = great pick"],
 		"buttons": buttons, "_actions": actions}
 
 func _on_chip_picked(chip, i: int) -> void:
@@ -290,7 +290,7 @@ func _show_podium() -> void:
 	_phase = 3
 	_title.text = "🏆 Winners!"
 	_hint.text = ""
-	_next.text = "OK  [Space]"
+	_next.text = "OK"
 	_next.disabled = true
 	var record := _game.beat_record()
 	UIKit.clear(_body)

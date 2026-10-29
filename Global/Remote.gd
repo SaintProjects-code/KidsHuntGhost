@@ -385,7 +385,12 @@ func _game_view(scene: Node, idx: int) -> Dictionary:
 	for path in ["BoardUI/Root/ChoicePanel", "BoardUI/Root/EventPanel"]:
 		var panel := scene.get_node_or_null(path) as Control
 		if panel and panel.visible:
-			return _mirror(panel, idx)
+			var v := _mirror(panel, idx)
+			# choosing a route: peek at the map first, then come back to choose
+			if path.ends_with("ChoicePanel") and pm and v.get("screen") == "buttons":
+				v["buttons"].append({"label": "🗺 Look at the map", "desc": "Hold the arrows to look around, then come back to choose"})
+				v["_actions"].append(func(): pm._on_view_map_pressed())
+			return v
 	var view := _mirror(scene, idx, false)
 	var info := scene.get_node_or_null("BoardUI/Root/InfoLabel") as Label
 	view["title"] = "🎲 Your turn!"
@@ -455,7 +460,7 @@ func _mirror(root: Node, _idx: int, with_text := true) -> Dictionary:
 			if not with_text or used.has(n):
 				continue
 			var s := String(n.text).strip_edges()
-			if s == "" or n.get_parent() is BaseButton:
+			if s == "" or _inside_button(n):
 				continue
 			if title == "":
 				title = s.left(300)
@@ -511,6 +516,8 @@ func _entry_of(b: BaseButton, root: Node) -> Dictionary:
 	if s == "":
 		return {}
 	var e := {"label": s, "gold": "Roll" in s or "Catch" in s or s.begins_with("End Turn")}
+	if b.has_meta("phone_spirit"):
+		e["img"] = sprite_url(b.get_meta("phone_spirit"), 44)
 	var tip := String(b.tooltip_text).strip_edges()
 	if tip != "" and not tip.begins_with(s):
 		e["desc"] = tip.left(300)
@@ -521,6 +528,11 @@ func _label_of(b: BaseButton) -> String:
 		var key := String(b.key)
 		return ("🃏 " + CardsData.card_name(key) + (" ✓" if b.armed else "")) if key != "" else ""
 	var s := String(b.get("text") if "text" in b else "").replace("\n", " ").strip_edges()
+	if s == "":
+		# a "rich" button draws its text with child labels (spirit picks…)
+		var parts: Array = _find_all(b, func(x): return x is Label and x.is_visible_in_tree() and String(x.text).strip_edges() != "") \
+			.map(func(l): return String(l.text).strip_edges())
+		s = " · ".join(parts)
 	if s == "":
 		s = String(b.tooltip_text).get_slice("\n", 0).strip_edges()
 	if b.toggle_mode:
@@ -540,7 +552,8 @@ func press_action(b: BaseButton) -> Callable:
 func _go(id: String, page: Dictionary) -> Callable:
 	return func(): _page[id] = page
 
-func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
+# `close` (from the TV's Team window) replaces the team page's Back button.
+func _idle_view(idx: int, extra: Dictionary, close := Callable()) -> Dictionary:
 	var id: String = GameState.players[idx].remote_id
 	var page: Dictionary = _page.get(id, {"p": "main"})
 	var p: PlayerData = GameState.players[idx]
@@ -630,8 +643,14 @@ func _idle_view(idx: int, extra: Dictionary) -> Dictionary:
 			buttons.append({"label": "👻 My team"})
 			actions.append(_go(id, {"p": "team"}))
 	if String(page["p"]) != "main":
-		buttons.append({"label": "◀ Back"})
-		actions.append(_go(id, {"p": "team"} if page["p"] == "mon" else ({"p": "hand"} if page["p"] == "card" else {"p": "main"})))
+		if close.is_valid() and page["p"] == "team":
+			buttons.append({"label": "✔ Close"})
+			actions.append(func():
+				_page[id] = {"p": "main"}
+				close.call())
+		else:
+			buttons.append({"label": "◀ Back"})
+			actions.append(_go(id, {"p": "team"} if page["p"] == "mon" else ({"p": "hand"} if page["p"] == "card" else {"p": "main"})))
 		if not extra.is_empty():
 			lines.push_front("🗳 " + String(extra.get("title", "")).trim_prefix("🗳 "))
 	var view := {"screen": "buttons", "title": title, "lines": lines, "buttons": buttons, "_actions": actions}
@@ -666,6 +685,14 @@ func _move_mon(idx: int, i: int, dir: int, id: String) -> void:
 	_page[id] = {"p": "mon", "i": j}
 	EventBus.log_entry.emit(idx, "%s's lead is now %s." % [GameState.players[idx].player_name, team[0]["name"]], "#a9b0c4")
 
+func _inside_button(n: Node) -> bool:
+	var up := n.get_parent()
+	while up != null:
+		if up is BaseButton:
+			return true
+		up = up.get_parent()
+	return false
+
 # The board's pause / View Map overlay (null off the board).
 func _pause_menu() -> Node:
 	var scene := get_tree().current_scene
@@ -697,6 +724,14 @@ func sprite_url(s: Dictionary, px := 56) -> String:
 func _spirit_desc(m: Dictionary) -> String:
 	return "ATK %d · DEF %d · SPD %d · ✦ %s" % [int(m.get("atk", 0)), int(m.get("def", 0)), int(m.get("spd", 0)),
 		SpiritsData.move_of(SpiritsData.move_key(m))["name"]]
+
+# The TV's Team window on its owner's phone: the phone's own team pages
+# (pictures, stats, moves, reorder) with Close instead of Back.
+func team_view(idx: int, close: Callable) -> Dictionary:
+	var id: String = GameState.players[idx].remote_id
+	if not String(_page.get(id, {}).get("p", "")) in ["team", "mon"]:
+		_page[id] = {"p": "team"}
+	return _idle_view(idx, {}, close)
 
 # Helpers: depth-first search of the scene tree.
 func _find(root: Node, pred: Callable) -> Node:

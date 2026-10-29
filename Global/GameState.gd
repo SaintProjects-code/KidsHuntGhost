@@ -7,6 +7,10 @@ var turn_count: int = 0
 var win_threshold: int = 40          # tested best: points, wardens and Champion all win often
 var infinite_points: bool = false   # setup "No pts": only the Spirit Lord wins (beat 2 Haunted Four in a row to face him)
 var active_map: int = 1
+var battle_size: int = 3:          # 3v3 / 4v4 / 6v6, chosen in Game Settings
+	set(v):
+		battle_size = v if v in [3, 4, 6] else 3
+		Balance.BATTLE_PICK_MAX = battle_size
 var winner_index: int = -1          # set once someone wins
 var dev_mode: bool = false          # only for games started from the menu's DEV button
 
@@ -50,7 +54,7 @@ func to_dict() -> Dictionary:
 	return {
 		"players": ps, "current": current_player_index, "turn": turn_count,
 		"win_threshold": win_threshold, "infinite": infinite_points,
-		"map": active_map, "dev": dev_mode,
+		"map": active_map, "dev": dev_mode, "battle_size": battle_size,
 	}
 
 func from_dict(d: Dictionary) -> void:
@@ -62,4 +66,5 @@ func from_dict(d: Dictionary) -> void:
 	win_threshold = d.get("win_threshold", 40)
 	infinite_points = d.get("infinite", false)
 	active_map = d.get("map", 1)
+	battle_size = int(d.get("battle_size", 3))
 	dev_mode = d.get("dev", false)

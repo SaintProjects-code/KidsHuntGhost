@@ -13,10 +13,6 @@ func _ready() -> void:
 	var col := _init_window(680, 0)
 	_title = _title_label("", 28)
 	col.add_child(_title)
-	var hint := UIKit.label("▲▼ reorder team · Stats to inspect", 15)
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.modulate = Color(1, 1, 1, 0.7)
-	col.add_child(hint)
 	_cards_box = GridContainer.new()   # 2 × 3: the team caps at 6
 	_cards_box.columns = 2
 	_cards_box.add_theme_constant_override("h_separation", 8)
@@ -24,6 +20,12 @@ func _ready() -> void:
 	col.add_child(_cards_box)
 	col.add_child(_button("Close", func(): UIManager.close_overlay()))
 	hide()
+
+# 📱 On the owner's phone this is the phone's own team page (Remote.team_view).
+func remote_view(idx: int) -> Dictionary:
+	if idx != _idx or not Remote.has_phone(idx):
+		return {}
+	return Remote.team_view(idx, func(): UIManager.close_overlay())
 
 func present(player_index: int) -> void:
 	_idx = player_index

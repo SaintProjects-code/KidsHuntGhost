@@ -31,34 +31,41 @@ def S(*names):               # shorthand for a list of tile types
 E, I, C, W, G, P, X, B, R = "EVENT", "ITEM", "COMPETITION", "WISP", "GHOST", "PHANTOM", "CLASH", "BATTLE", "WARDEN"
 
 MAPS = {
-# ─── Map 2: Crossroads — a small window-shaped board. Every road meets the
-# centre town, so players keep running into each other (lots of ⚔ Clash).
+# ─── Map 2: Hollow Coast — a small REGION in the style of a classic overworld:
+# towns spread around a lake, bending routes along the coasts, a forest
+# shortcut and a north pass. Routes are short and every road leads back to
+# Cobweb City in the middle (five roads meet there), so players keep
+# crossing paths instead of wandering alone.
 2: {
-    "title": "Crossroads",
-    "size": (112, 84),
-    "nodes": {"A": (12, 70), "B": (12, 12), "C": (52, 41), "D": (92, 12), "E": (92, 70),
-              "J1": (12, 41), "J2": (92, 41), "J3": (52, 12), "J4": (52, 70),
-              "VEnter": (106, 66), "VEnd": (106, 18)},
+    "title": "Hollow Coast",
+    "size": (120, 94),
+    "nodes": {"A": (16, 74), "B": (14, 30), "C": (58, 40), "D": (100, 16), "E": (98, 70),
+              "J1": (36, 58), "J2": (78, 56), "J3": (40, 14), "J4": (76, 26),
+              "VEnter": (40, 88), "VEnd": (66, 88)},
     "cities": ["A", "B", "C", "D", "E"],
     "names": {"A": "Ashen Hollow", "B": "Boo Bayou", "C": "Cobweb City", "D": "Dusk Den", "E": "Echo End",
-              "J1": "West Road", "J2": "East Road", "J3": "North Road", "J4": "South Road",
+              "J1": "Mossy Fork", "J2": "Lantern Bridge", "J3": "North Pass", "J4": "Crow Hill",
               "VEnter": "Spectral Trail", "VEnd": "Spectral Peak"},
     "routes": [
-        ("A", "J1", [], S(W, X, E, W)),
-        ("J1", "B", [], S(W, I, C)),
-        ("B", "J3", [], S(W, E, X, W)),
-        ("J3", "D", [], S(G, I, C, G)),
-        ("D", "J2", [], S(G, E, G)),
-        ("J2", "E", [], S(G, X, I, G)),
-        ("E", "J4", [], S(G, C, E, G)),
-        ("J4", "A", [], S(W, I, X, W)),
-        ("J1", "C", [], S(E, X, G, I)),
-        ("C", "J2", [], S(I, C, X, G)),
-        ("J3", "C", [], S(X, G, E)),
-        ("C", "J4", [], S(E, G, X)),
+        # west coast and the north pass
+        ("A", "B", [(8, 62), (8, 42)], S(W, E, X, I, W)),
+        ("B", "J3", [(24, 16)], S(G, I, C, G)),
+        ("J3", "D", [(60, 8), (84, 10)], S(G, E, X, I, G)),
+        ("J3", "C", [(46, 26)], S(X, E, I)),
+        # east side
+        ("D", "J4", [(92, 24)], S(W, C, W)),
+        ("J4", "C", [], S(I, X, E)),
+        ("J4", "E", [(110, 34), (110, 56)], S(G, I, E, C, G)),
+        ("E", "J2", [(88, 62)], S(W, X, I)),
+        ("J2", "C", [(68, 48)], S(E, G, X)),
+        # the south road round the lake, and the forest shortcut
+        ("J2", "A", [(70, 78), (36, 80)], S(C, W, E, X, I)),
+        ("A", "J1", [(26, 66)], S(I, W, X)),
+        ("J1", "C", [(46, 46)], S(G, C, X)),
+        ("J1", "B", [(30, 44), (22, 36)], S(E, G, W, X)),
         ("VEnter", "VEnd", [], S(I, R, I, R, R)),
     ],
-    "ponds": [(24, 20, 14, 10), (64, 52, 16, 9)],
+    "ponds": [(46, 56, 20, 12), (60, 17, 12, 7)],
     "seed": 2,
 },
 # ─── Map 3: Festival Grounds — a figure-8 race track. Two loops cross at

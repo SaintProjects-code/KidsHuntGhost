@@ -146,6 +146,16 @@ func _setup_settings() -> void:
 	map_option.select(clampi(GameState.active_map - 1, 0, GameData.MAPS.size() - 1))
 	map_option.tooltip_text = GameData.map_info(GameState.active_map)["blurb"]
 	map_option.item_selected.connect(_on_map_selected)
+	# Battle size: spirits per side (beside the map pick, so no new row).
+	var size_opt := OptionButton.new()
+	for n in [3, 4, 6]:
+		size_opt.add_item("%dv%d" % [n, n], n)
+	size_opt.select([3, 4, 6].find(GameState.battle_size))
+	size_opt.tooltip_text = "Spirits per side in every battle"
+	size_opt.focus_mode = Control.FOCUS_NONE
+	size_opt.item_selected.connect(func(i): GameState.battle_size = size_opt.get_item_id(i))
+	map_option.get_parent().add_child(UIKit.label("Battles", 15))
+	map_option.get_parent().add_child(size_opt)
 	# Points to win.
 	win_slider.min_value = 10
 	win_slider.max_value = 50
@@ -308,24 +318,22 @@ func _refresh_phones() -> void:
 	_phone_chip.text = ("Room %s · %d phone%s" % [Remote.code, online, "" if online == 1 else "s"]) if Remote.code != "" else ""
 	if Remote.code != "":
 		_phone_status.text = "Room code:  %s" % Remote.code
-		_phone_steps.text = "1.  On each phone's browser open:   %s\n2.  Type the room code  %s  and your name, then tap Join!" % [
-			Remote.phone_url(), Remote.code]
+		_phone_steps.text = "Phones open  %s  and type the code." % Remote.phone_url()
 		if Remote.is_local():
 			var st: Dictionary = Remote.local_stats()
 			if int(st["https"]) > 0:
-				_phone_steps.text += "\n⚠ A phone tried https:// — type the address starting with  http://"
+				_phone_steps.text += "\n⚠ Use http:// (not https)"
 			if int(st["loads"]) == 0:
-				_phone_steps.text += "\nNo phone has reached this computer yet. Same Wi-Fi? Firewall allowed (🛡 below)?"
+				_phone_steps.text += "\nNo phone connected yet — same Wi-Fi? Firewall (🛡)?"
 				var others: Array = Remote.other_urls()
 				if not others.is_empty():
 					_phone_steps.text += "\nOr try:  " + "   ".join(others)
 			else:
-				_phone_steps.text += "\n✅ The phone page has opened %d time%s (last from %s)." % [
-					st["loads"], "" if int(st["loads"]) == 1 else "s", st["visitor"]]
+				pass
 	else:
 		var status := Remote.status_text()
 		_phone_status.text = ""
-		_phone_steps.text = "Type this computer's IP above (already filled in) and press Connect." if status == "off" else status
+		_phone_steps.text = "Press Connect." if status == "off" else status
 	var lines: Array = []
 	for id in Remote.phones:
 		var card := _card_of(id)

@@ -28,10 +28,10 @@ const GOLD_PVP_TAKE := 15               # the PvP winner takes this much from th
 # Stronger ghosts are out of reach of the free die alone: stage 2 needs 2+
 # dice, stage 3 needs 3+, legendaries 3+ (and really 4–5) — so Lanterns
 # matter more and more as the hunt moves to Phantom tiles.
-const CATCH_TARGET := {1: 6, 2: 9, 3: 13}   # by spirit stage
+const CATCH_TARGET := {1: 4, 2: 7, 3: 11}   # by spirit stage (1 die = 50% on a stage 1)
 const LEGEND_TARGET := 15
 const CATCH_LURE_BONUS := 2             # a Spooky Lure drew it in: +2 to the roll
-const CATCH_FAIL_PENALTY := 2           # target rises after a miss
+const CATCH_FAIL_PENALTY := 1           # target rises after a miss
 const CATCH_THROWS := 2                 # tries per ghost, then it flees
 const START_LANTERNS := 2               # Spirit Lanterns dealt to every player
 # Catching levels your lead up: ½ star (a full star for stage 2+ ghosts).
@@ -47,7 +47,7 @@ const SHOP_CARD_OFFERS := 4
 const FAST_MODE_TURN := 24              # from this turn everyone rolls 2 dice
 const FLY_BADGES := 3                   # badges needed to fly / enter the Spectral Trail
 const TEAM_MAX := 6
-const BATTLE_PICK_MAX := 3              # 3v3 battles
+static var BATTLE_PICK_MAX := 3         # spirits per side in a battle: 3, 4 or 6 (Game Settings → GameState.battle_size)
 
 # ── Spectral Trail ────────────────────────────────────────────────────────────
 # The Haunted Four scale with how far PAST the entry requirement you are:
@@ -63,3 +63,13 @@ const PVP_WIN_STARS := 1.0              # the PvP winner's lead
 const PVP_STEAL_CARDS := 1              # cards the PvP winner takes from the loser
 const FATIGUE_START := 15
 const MAX_ROUNDS := 60
+
+# ── battle pacing ─────────────────────────────────────────────────────────────
+# Damage per ATK point (DamageCalculator). Tuned so a spirit usually lasts long
+# enough to fire its charge move at least once (moves cost 1–4 charge).
+static var DAMAGE_PER_ATK := 15.0
+# The charge gauge also fills by 1 when a spirit takes a hit and survives.
+static var CHARGE_ON_HIT := true
+# Charge a spirit already has when it first takes the field.
+static var START_CHARGE := 1
+

@@ -84,8 +84,7 @@ func present(player: PlayerData, vs_label: String, opp_team: Array = []) -> void
 	_selected.clear()
 	_cards = BattleSetup.cpu_cards(player)   # pre-pick the 2 best; click to change
 	_title_lbl.text = "⚔ Choose Your Battle Team"
-	_hint_lbl.text = "Press 1–6 or click a spirit (up to %d) · pick %d tactic cards · Space to start" % [
-		Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]
+	_hint_lbl.text = "Pick up to %d spirits and %d cards" % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]
 	_your_head.text = "YOUR TEAM"
 	_vs_lbl.text = vs_label
 	_refresh()
@@ -99,8 +98,7 @@ func present_pvp(a: PlayerData, b: PlayerData) -> void:
 	_cards = BattleSetup.cpu_cards(a)
 	_cards_b = BattleSetup.cpu_cards(b)
 	_title_lbl.text = "⚔ Pick Your Teams"
-	_hint_lbl.text = "Both players — click your own spirits (up to %d each). %s can also use 1–6." % [
-		Balance.BATTLE_PICK_MAX, a.player_name]
+	_hint_lbl.text = "Each player picks up to %d spirits" % Balance.BATTLE_PICK_MAX
 	_refresh()
 
 func _unhandled_key_input(ev: InputEvent) -> void:
@@ -135,7 +133,7 @@ func _refresh() -> void:
 			card.add_child(_row_content("#%d" % (_opp_team.find(mon) + 1), mon, -1, false, true))
 			_opp_list.add_child(card)
 		_start.disabled = _selected.is_empty()
-		_start.text = "Start Battle (%d)  [Space]" % _selected.size() if not _start.disabled else "Select at least 1 spirit…"
+		_start.text = "Start Battle (%d)" % _selected.size() if not _start.disabled else "Select at least 1 spirit…"
 	_slots_row.visible = not _pvp
 	if not _pvp:
 		_refresh_slots()
@@ -220,7 +218,7 @@ func _refresh_slots() -> void:
 # One player's tactic cards: click to bring / leave (up to BATTLE_CARDS).
 func _card_picker(p: PlayerData, picked: Array) -> Control:
 	var box := UIKit.vbox(2)
-	box.add_child(UIKit.label("%s brings %d/%d tactic cards:" % [p.player_name, picked.size(), BattleSetup.BATTLE_CARDS], 12, UIKit.GOLD))
+	box.add_child(UIKit.label("🃏 %d/%d" % [picked.size(), BattleSetup.BATTLE_CARDS], 12, UIKit.GOLD))
 	var row := UIKit.hbox(4)
 	box.add_child(row)
 	var tactics: Array = p.inventory.cards_of_kind("tactic")
@@ -283,7 +281,7 @@ func remote_view(idx: int) -> Dictionary:
 	buttons.append({"label": "Cancel"})
 	actions.append(_cancel)
 	return {"screen": "buttons", "title": _title_lbl.text,
-		"lines": ["Pick up to %d spirits (in battle order) and %d tactic cards." % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]],
+		"lines": ["Pick up to %d spirits (in order) and %d cards" % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]],
 		"buttons": buttons, "_actions": actions}
 
 func _on_toggle(i: int, side: int) -> void:

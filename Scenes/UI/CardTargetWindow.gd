@@ -7,6 +7,7 @@ signal chose(target)
 
 var _title: Label
 var _grid: GridContainer
+var remote_owner := -1           # 📱 whose card this is: their phone picks the spirit
 
 func _ready() -> void:
 	var col := _init_window(640, 0)
@@ -22,6 +23,7 @@ func _ready() -> void:
 
 func present(p: PlayerData, key: String) -> void:
 	_title.text = "%s — on which spirit?" % CardsData.card_name(key)
+	remote_owner = GameState.players.find(p)
 	UIKit.clear(_grid)
 	for i in p.team.size():
 		_grid.add_child(_spirit_row(p.team[i], key, i))
@@ -32,6 +34,7 @@ func _spirit_row(mon: Dictionary, key: String, i: int) -> Control:
 	b.custom_minimum_size = Vector2(300, 64)
 	b.disabled = not CardSystem.can_target(key, mon)
 	b.pressed.connect(func(): chose.emit(mon))
+	b.set_meta("phone_spirit", mon)
 	var row := UIKit.hbox(8)
 	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 8

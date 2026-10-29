@@ -50,8 +50,11 @@ var _cache: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 
+const START_VOLUME := 0.25   # the whole game (menus + board) opens at 25%
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # plays while events pause the board
+	AudioServer.set_bus_volume_db(0, linear_to_db(START_VOLUME))
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
 		p.bus = &"Master"

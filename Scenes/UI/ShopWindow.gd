@@ -21,11 +21,11 @@ func _ready() -> void:
 	_gold_lbl = UIKit.label("", 18, UIKit.GOLD)
 	_gold_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(_gold_lbl)
-	col.add_child(_heading("— 🏮 Lanterns (catching cards) —"))
+	col.add_child(_heading("🏮 Lanterns"))
 	_lanterns = UIKit.hbox(10)
 	_lanterns.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_lanterns)
-	col.add_child(_heading("— ✨ Special cards (this visit only) —"))
+	col.add_child(_heading("✨ Today's cards"))
 	_rack = UIKit.hbox(8)
 	_rack.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(_rack)

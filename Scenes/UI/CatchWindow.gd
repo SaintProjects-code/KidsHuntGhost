@@ -68,7 +68,7 @@ func _ready() -> void:
 	var actions := UIKit.hbox(10)
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
 	col.add_child(actions)
-	_roll_btn = _button("🎲 Roll!  [Space]", _roll, 48, "gold")
+	_roll_btn = _button("🎲 Roll!", _roll, 48, "gold")
 	_roll_btn.custom_minimum_size.x = 220
 	actions.add_child(_roll_btn)
 	_leave_btn = _button("Leave", func(): _finish("left"), 48)
@@ -124,7 +124,7 @@ func _refresh() -> void:
 	_odds.text = "✨ Soul Lantern — a sure catch!" if CatchSystem.is_sure(_picked) else \
 		"Tap Lanterns for more dice  ·  Roll %d %s  →  %d%% chance" % [dice, "die" if dice == 1 else "dice",
 			CatchSystem.chance(_spirit, _picked)]
-	_roll_btn.text = ("✨ Catch!  [Space]" if CatchSystem.is_sure(_picked) else "🎲 Roll %d!  [Space]" % dice)
+	_roll_btn.text = ("✨ Catch!" if CatchSystem.is_sure(_picked) else "🎲 Roll %d!" % dice)
 	_roll_btn.disabled = _cpu or _busy or _over
 	_leave_btn.disabled = _cpu or _busy or _over
 
@@ -210,7 +210,7 @@ func _on_failed(idx: int, s: Dictionary) -> void:
 		await get_tree().create_timer(1.3).timeout
 		_finish("fled")
 		return
-	_result.text = "So close! It's warier now — the target is +%d. One more try!" % Balance.CATCH_FAIL_PENALTY
+	_result.text = "Missed! Target +%d — one more try." % Balance.CATCH_FAIL_PENALTY
 	_refresh()
 
 func _finish(outcome: String) -> void:

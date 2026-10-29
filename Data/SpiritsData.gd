@@ -122,35 +122,37 @@ const ABILITY_DATA := {
 # round it attacks; when full it uses the move INSTEAD of a normal hit, then
 # starts charging again. Effects live in BattleRules._use_move.
 #   charge: rounds to fill   power: hit multiplier (0 = no direct hit)
+# Signature moves: "charge" = attacks (or hits taken) to fill the gauge, 1–4.
+# Power scales with charge time: a 4-charge move hits hardest.
 const MOVES := {
 	# Fire — burst damage
-	"ember_burst":  {"name": "Ember Burst",  "type": "Fire", "charge": 2, "power": 1.5, "desc": "Hit ×1.5 and burn the target"},
-	"inferno":      {"name": "Inferno",      "type": "Fire", "charge": 3, "power": 2.3, "desc": "Huge hit ×2.3"},
-	"heat_wave":    {"name": "Heat Wave",    "type": "Fire", "charge": 3, "power": 0.8, "desc": "Hit EVERY enemy ×0.8"},
+	"ember_burst":  {"name": "Ember Burst",  "type": "Fire", "charge": 2, "power": 1.6, "desc": "Hit ×1.6 and burn the target"},
+	"inferno":      {"name": "Inferno",      "type": "Fire", "charge": 4, "power": 2.8, "desc": "Huge hit ×2.8"},
+	"heat_wave":    {"name": "Heat Wave",    "type": "Fire", "charge": 4, "power": 1.0, "desc": "Hit EVERY enemy ×1.0"},
 	# Water — sustain and defence
-	"tidal_guard":  {"name": "Tidal Guard",  "type": "Water", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; halve the next hit it takes"},
-	"soak":         {"name": "Soak",         "type": "Water", "charge": 2, "power": 1.0, "desc": "Hit ×1.0; target SPD −2"},
-	"whirlpool":    {"name": "Whirlpool",    "type": "Water", "charge": 3, "power": 1.3, "desc": "Hit ×1.3 and heal 25% max HP"},
+	"tidal_guard":  {"name": "Tidal Guard",  "type": "Water", "charge": 2, "power": 0.9, "desc": "Hit ×0.9; halve the next hit it takes"},
+	"soak":         {"name": "Soak",         "type": "Water", "charge": 2, "power": 1.1, "desc": "Hit ×1.1; target SPD −2"},
+	"whirlpool":    {"name": "Whirlpool",    "type": "Water", "charge": 3, "power": 1.2, "desc": "Hit ×1.2 and heal 25% max HP"},
 	# Grass — drain, poison, team healing
-	"vine_drain":   {"name": "Vine Drain",   "type": "Grass", "charge": 2, "power": 1.1, "desc": "Hit ×1.1, heal half the damage"},
+	"vine_drain":   {"name": "Vine Drain",   "type": "Grass", "charge": 2, "power": 1.2, "desc": "Hit ×1.2, heal half the damage"},
 	"spore_cloud":  {"name": "Spore Cloud",  "type": "Grass", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; poison AND sleep the target"},
-	"bloom":        {"name": "Bloom",        "type": "Grass", "charge": 3, "power": 0.0, "desc": "Heal the whole team 35 HP"},
+	"bloom":        {"name": "Bloom",        "type": "Grass", "charge": 4, "power": 0.0, "desc": "Heal the whole team 50 HP"},
 	# Electric — speed and spread
-	"spark_rush":   {"name": "Spark Rush",   "type": "Electric", "charge": 1, "power": 1.1, "desc": "Quick hit ×1.1; self SPD +1"},
-	"chain_bolt":   {"name": "Chain Bolt",   "type": "Electric", "charge": 3, "power": 0.7, "desc": "Hit up to 3 enemies ×0.7"},
-	"thunderclap":  {"name": "Thunderclap",  "type": "Electric", "charge": 2, "power": 1.2, "desc": "Hit ×1.2; stun the target"},
+	"spark_rush":   {"name": "Spark Rush",   "type": "Electric", "charge": 1, "power": 1.2, "desc": "Quick hit ×1.2; self SPD +1"},
+	"chain_bolt":   {"name": "Chain Bolt",   "type": "Electric", "charge": 3, "power": 0.8, "desc": "Hit up to 3 enemies ×0.8"},
+	"thunderclap":  {"name": "Thunderclap",  "type": "Electric", "charge": 2, "power": 1.3, "desc": "Hit ×1.3; stun the target"},
 	# Psychic — control
-	"mind_blast":   {"name": "Mind Blast",   "type": "Psychic", "charge": 2, "power": 1.3, "desc": "Hit ×1.3 that ignores DEF"},
-	"hex_sleep":    {"name": "Hex Sleep",    "type": "Psychic", "charge": 3, "power": 0.5, "desc": "Hit ×0.5; target sleeps 2 rounds"},
+	"mind_blast":   {"name": "Mind Blast",   "type": "Psychic", "charge": 2, "power": 1.4, "desc": "Hit ×1.4 that ignores DEF"},
+	"hex_sleep":    {"name": "Hex Sleep",    "type": "Psychic", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; target sleeps 2 rounds"},
 	"calm_mind":    {"name": "Calm Mind",    "type": "Psychic", "charge": 2, "power": 0.0, "desc": "Self ATK +1, DEF +1, cure status"},
 	# Fighting — raw power and toughness
-	"haymaker":     {"name": "Haymaker",     "type": "Fighting", "charge": 3, "power": 2.2, "desc": "Hit ×2.2; self DEF −1"},
-	"iron_guard":   {"name": "Iron Guard",   "type": "Fighting", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; self DEF +2"},
-	"combo_strike": {"name": "Combo Strike", "type": "Fighting", "charge": 2, "power": 0.7, "desc": "Hit twice ×0.7"},
+	"haymaker":     {"name": "Haymaker",     "type": "Fighting", "charge": 4, "power": 2.6, "desc": "Hit ×2.6; self DEF −1"},
+	"iron_guard":   {"name": "Iron Guard",   "type": "Fighting", "charge": 2, "power": 0.9, "desc": "Hit ×0.9; self DEF +2"},
+	"combo_strike": {"name": "Combo Strike", "type": "Fighting", "charge": 2, "power": 0.8, "desc": "Hit twice ×0.8"},
 	# Dark — debuffs and finishing
-	"shadow_sneak": {"name": "Shadow Sneak", "type": "Dark", "charge": 2, "power": 1.2, "desc": "Hit ×1.2; ×2 if the target is below half HP"},
-	"curse":        {"name": "Curse",        "type": "Dark", "charge": 3, "power": 0.5, "desc": "Hit ×0.5; target is poisoned 4 rounds"},
-	"dread":        {"name": "Dread",        "type": "Dark", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; target ATK −2"},
+	"shadow_sneak": {"name": "Shadow Sneak", "type": "Dark", "charge": 2, "power": 1.3, "desc": "Hit ×1.3; ×2 if the target is below half HP"},
+	"curse":        {"name": "Curse",        "type": "Dark", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; target is poisoned 4 rounds"},
+	"dread":        {"name": "Dread",        "type": "Dark", "charge": 2, "power": 0.9, "desc": "Hit ×0.9; target ATK −2"},
 }
 
 const TYPE_ABILITY_POOLS := {

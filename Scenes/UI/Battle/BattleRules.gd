@@ -253,6 +253,9 @@ func _on_entry(is_me: bool) -> void:
 	if idx >= mine.size():
 		return
 	var m: Dictionary = mine[idx]
+	m["_fought"] = true   # (battle copy) it took the field — for balance checks
+	if not m.has("_charge"):
+		m["_charge"] = mini(_move_cost(m) - 1, Balance.START_CHARGE)
 	_charm_entry(is_me)
 	if m.get("_spikes_pending", false):
 		m.erase("_spikes_pending")
@@ -719,17 +722,22 @@ func _move_cost(m: Dictionary) -> int:
 # of the normal hit.
 func _attack_or_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 	att["_charge"] = int(att.get("_charge", 0)) + 1
+	var hp_before := int(def_.get("current_hp", 0))
 	if int(att["_charge"]) >= _move_cost(att):
 		att["_charge"] = 0
 		await _use_move(att, def_, is_me)
 	else:
 		await _strike(att, def_, is_me)
+	# taking a hit builds the defender's gauge too (never past "ready")
+	if Balance.CHARGE_ON_HIT and _alive(def_) and int(def_.get("current_hp", 0)) < hp_before:
+		def_["_charge"] = mini(_move_cost(def_) - 1, int(def_.get("_charge", 0)) + 1)
 
 func _use_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 	var key := SpiritsData.move_key(att)
 	var mv := SpiritsData.move_of(key)
 	var boost := 1.3 if _has(att, "overcharge") else 1.0
 	var power: float = float(mv.get("power", 1.0)) * boost
+	att["_moves_used"] = int(att.get("_moves_used", 0)) + 1
 	var c := _card_of(att)
 	if not _quiet():
 		Sfx.play("crit", 0.8)
@@ -759,7 +767,7 @@ func _use_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 			_heal_mon(att, maxi(1, (before - int(def_.get("current_hp", 0))) / 2))
 		"bloom":
 			for a in _side_of(att).filter(_alive):
-				_heal_mon(a, int(35 * boost))
+				_heal_mon(a, int(50 * boost))
 			if not _quiet():
 				Sfx.play("heal")
 			_logln("🌸 The whole team blooms back to health!")
