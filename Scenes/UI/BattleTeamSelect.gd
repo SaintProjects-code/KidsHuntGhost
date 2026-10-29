@@ -84,7 +84,7 @@ func present(player: PlayerData, vs_label: String, opp_team: Array = []) -> void
 	_selected.clear()
 	_cards = BattleSetup.cpu_cards(player)   # pre-pick the 2 best; click to change
 	_title_lbl.text = "⚔ Choose Your Battle Team"
-	_hint_lbl.text = "Pick up to %d spirits and %d cards" % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]
+	_hint_lbl.text = "Pick 1–%d spirits and %d cards" % [Balance.BATTLE_PICK_MAX, BattleSetup.BATTLE_CARDS]
 	_your_head.text = "YOUR TEAM"
 	_vs_lbl.text = vs_label
 	_refresh()
@@ -98,7 +98,7 @@ func present_pvp(a: PlayerData, b: PlayerData) -> void:
 	_cards = BattleSetup.cpu_cards(a)
 	_cards_b = BattleSetup.cpu_cards(b)
 	_title_lbl.text = "⚔ Pick Your Teams"
-	_hint_lbl.text = "Each player picks up to %d spirits" % Balance.BATTLE_PICK_MAX
+	_hint_lbl.text = "Each player picks 1–%d spirits" % Balance.BATTLE_PICK_MAX
 	_refresh()
 
 func _unhandled_key_input(ev: InputEvent) -> void:

@@ -159,6 +159,7 @@ func _spawn_hud() -> void:
 	add_child(enc)
 	var tiles: CanvasLayer = preload("res://Scenes/UI/TileController.gd").new()
 	add_child(tiles)
+	add_child(preload("res://Scenes/Board/CpuPace.gd").new())   # CPU turns play at 2x
 
 # Camera follows whoever's turn it is (manual panning lives in View Map mode).
 func _process(delta: float) -> void:

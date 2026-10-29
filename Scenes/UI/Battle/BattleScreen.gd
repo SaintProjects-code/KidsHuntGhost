@@ -265,6 +265,7 @@ func _play_tactic(key: String, is_me: bool) -> void:
 	var me: Dictionary = mine[_active if is_me else _opp_active]
 	var foe: Dictionary = theirs[_opp_active if is_me else _active]
 	_use_card(_hand if is_me else _opp_hand, _hand_src if is_me else _opp_src, _hand_owner if is_me else _opp_owner, key)
+	_auto_ramp()   # that may have been the last card: no more choices, speed up
 	if not _quiet():
 		Sfx.play("card")
 		Juice.pop(_card_of(me), 1.12)
@@ -306,6 +307,31 @@ func _play_tactic(key: String, is_me: bool) -> void:
 				me["charm"] = key   # on the battle copy: it ends with the battle
 				_charm_entry(is_me)
 	await _beat(0.45)
+
+# Long fights speed themselves up: 2x once every human side has played all its
+# cards (nothing left to decide) or from round RAMP_2X, 3x from RAMP_3X. Never
+# slower than the speed the player picked.
+const RAMP_2X := 7
+const RAMP_3X := 14
+
+func _auto_ramp() -> void:
+	var want := 1.0
+	if _round_num >= RAMP_3X:
+		want = 3.0
+	elif _round_num >= RAMP_2X or _humans_out_of_cards():
+		want = 2.0
+	if want > _speed:
+		_speed = want
+		_speed_btn.text = "%dx" % int(_speed)
+
+func _humans_out_of_cards() -> bool:
+	var sides: Array = []
+	if _human:
+		sides.append([_hand, _armed])
+	if _opp_human:
+		sides.append([_opp_hand, _opp_armed])
+	return not sides.is_empty() and sides.all(func(s): return String(s[1]) == "" and \
+		not (s[0] as Array).any(func(k): return CardsData.kind_of(k) == "tactic"))
 
 # Swap the lead with the healthiest living ally waiting behind it.
 func _switch_lead(is_me: bool) -> void:
@@ -413,6 +439,7 @@ func _round() -> void:
 		return
 	_busy = true
 	_round_num += 1
+	_auto_ramp()
 	_logln("[color=#a89ae0]— Round %d —[/color]" % _round_num)
 	# tactic cards come first (Purify can cure before statuses tick)
 	var picks := _choose_cards()

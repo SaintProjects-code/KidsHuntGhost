@@ -522,7 +522,7 @@ func _on_auto_toggle() -> void:
 
 # Battle speed: 1x ⇄ 3x (the label shows the current speed).
 func _on_speed_toggle() -> void:
-	_speed = 3.0 if _speed == 1.0 else 1.0
+	_speed = {1.0: 2.0, 2.0: 3.0}.get(_speed, 1.0)   # 1x → 2x → 3x → 1x
 	_speed_btn.text = "%dx" % int(_speed)
 	Sfx.play("click")
 
