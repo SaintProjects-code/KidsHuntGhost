@@ -172,12 +172,17 @@ static func gym_trainer(type: String) -> Array:
 # (tuned so a game runs ~10–15 rounds on the small boards); start_team =
 # spirits each player starts with (the starter + random stage-1 spirits).
 const MAPS := {
-	1: {"name": "Haunted Valley",   "scene": "res://Scenes/Board/Map1.tscn", "target": 40, "start_team": 1,
+	1: {"name": "Haunted Valley",   "scene": "res://Scenes/Board/Map1.tscn", "target": 30, "start_team": 1,
 		"blurb": "The full adventure: 8 towns, long roads."},
-	2: {"name": "Crossroads",       "scene": "res://Scenes/Board/Map2.tscn", "target": 30, "start_team": 1,
+	2: {"name": "Crossroads",       "scene": "res://Scenes/Board/Map2.tscn", "target": 30, "start_team": 1, "view_3d": true,
 		"blurb": "Small and fast — every road meets in the middle. Lots of ⚔ Clash."},
-	3: {"name": "Festival Grounds", "scene": "res://Scenes/Board/Map3.tscn", "target": 40, "start_team": 1,
-		"blurb": "A figure-8 race track packed with 🏅 competitions."},
+	# Haunted Valley's layout in 3D: the first three towns stay villages, the
+	# rest are built up as cities. (Festival Grounds, Map3.tscn, is unlisted.)
+	3: {"name": "Haunted Valley 3D", "scene": "res://Scenes/Board/Map1.tscn", "target": 30, "start_team": 1,
+		"view_3d": true, "villages": ["A", "B", "C"],
+		"landing_shows": true,   # a bush rustles by Ghost / Event / Item / Clash tiles and something pops out
+		"avenues": {"D": 14, "G": 16, "H": 14, "E": 5, "F": 6},   # tiles of paved street leading into each city
+		"blurb": "The full adventure in 3D: three villages, then five big cities."},
 	4: {"name": "Spirit Colosseum", "scene": "res://Scenes/Board/Map4.tscn", "target": 25, "start_team": 3,
 		"blurb": "A round battle arena — start with 3 spirits, 3v3 fights everywhere."},
 }
@@ -211,14 +216,18 @@ static func challenge_tier(badges: int) -> int:
 	return clampi(badges - 1, 1, 3)
 
 # Tier for the Spectral Trail's wardens and the Champion (see Balance).
+# Measured from the chosen entry requirement, so the trail is as hard on
+# arrival whether it opens at 1 badge or 8.
 static func trail_tier(badges: int) -> int:
 	var offset: int = Balance.TRAIL_BADGE_OFFSET.get(GameState.players.size(), 2)
-	return clampi(badges - offset, 1, 3)
+	return clampi(badges - GameState.trail_badges + Balance.FLY_BADGES - offset, 1, 3)
 
 # Build a DESIGNED team from entries that are either a plain name (random
-# ability) or {name, ability, ability2?, stars?}. NPC teams GROW with the tier:
-#   tier 1 — one ability each; listed stars −1 (a "★1 threat" starts at ★0)
-#   tier 2 — second abilities unlock; listed stars as written
+# ability) or {name, ability, ability2?, stars?}. Spirits have ONE ability, so
+# "ability2" is ignored (kept in the rosters in case that rule changes back).
+# NPC teams GROW with the tier:
+#   tier 1 — listed stars −1 (a "★1 threat" starts at ★0)
+#   tier 2 — listed stars as written
 #   tier 3 — everyone +1 star on top (capped at 3)
 # Plain members get tier − 1 stars.
 # Rosters hold 4; the NPC counter-picks 3 of them once it sees your team
@@ -236,8 +245,6 @@ static func build_team(entries: Array, tier: int) -> Array:
 			if not s.is_empty():
 				if e.has("ability"):
 					s["ability"] = String(e["ability"])
-				if e.has("ability2") and tier >= 2:
-					s["ability2"] = String(e["ability2"])
 				base_stars = int(e.get("stars", 0))
 		if s.is_empty():
 			continue

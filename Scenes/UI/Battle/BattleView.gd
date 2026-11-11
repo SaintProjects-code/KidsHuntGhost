@@ -404,12 +404,60 @@ func _anim_shake(mon: Dictionary) -> void:
 		tw.tween_property(c, "position:x", off, 0.035 / _speed)
 	Juice.flash(c, Color(2.2, 2.2, 2.2), 0.2 / _speed)
 
+# Charged (special) move: a thick bright-yellow border pulses round the card
+# with a tag naming the move ("✦ Thunderclap!"), then fades. It sits on the
+# card's slot, above the card, so it stands out from the plain gold border of
+# the active fighter. Runs alongside the move; doesn't hold the battle up.
+const SPECIAL_YELLOW := Color("ffe94d")
+const SPECIAL_PULSES := 3
+
+func _flash_special(mon: Dictionary, move_name: String) -> void:
+	var c := _card_of(mon)
+	if _quiet() or c == null:
+		return
+	var slot := c.get_parent() as Control
+	for old in slot.get_children():   # a back-to-back special restarts the flash
+		if old.has_meta("special_fx"):
+			old.queue_free()
+	var ring := Panel.new()
+	ring.set_meta("special_fx", true)
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ring.offset_left = -3
+	ring.offset_top = -3
+	ring.offset_right = 3
+	ring.offset_bottom = 3
+	var sb := UIKit.box(Color.TRANSPARENT, 11, 6, SPECIAL_YELLOW)
+	sb.shadow_color = Color(SPECIAL_YELLOW, 0.75)
+	sb.shadow_size = 14
+	ring.add_theme_stylebox_override("panel", sb)
+	slot.add_child(ring)
+	var tag := UIKit.label("✦ %s!" % move_name, 13, Color("3a2a00"))
+	tag.set_meta("special_fx", true)
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag.add_theme_stylebox_override("normal", UIKit.box(SPECIAL_YELLOW, 6, 2, Color("3a2a00"), Vector2(6, 1)))
+	tag.position = Vector2(-6, -12)
+	tag.rotation = deg_to_rad(-6.0)
+	slot.add_child(tag)
+	Juice.pop(tag, 1.3, 0.25 / _speed)
+	var pulse := 0.22 / _speed
+	var tw := ring.create_tween()
+	for i in SPECIAL_PULSES:
+		tw.tween_property(ring, "modulate:a", 0.35, pulse)
+		tw.tween_property(ring, "modulate:a", 1.0, pulse)
+	tw.tween_property(ring, "modulate:a", 0.0, pulse)
+	tw.parallel().tween_property(tag, "modulate:a", 0.0, pulse)
+	tw.tween_callback(func():
+		ring.queue_free()
+		tag.queue_free())
+
 # A number that floats up off a spirit's card ("-34", "+20").
 func _float_on(mon: Dictionary, text: String, color: Color) -> void:
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
-	Juice.float_text(c.get_parent(), Vector2(CARD_SIZE.x * 0.5, 30), text, color, 24)
+	# rises from just above the card, clear of the name banner
+	Juice.float_text(c.get_parent(), Vector2(CARD_SIZE.x * 0.5, -12), text, color, 24)
 
 # A tactic card banner: slides in over the battle when a card is played and
 # again when its effect kicks in ("🛡 Spirit Shield! — Wispy takes half

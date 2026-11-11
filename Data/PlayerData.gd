@@ -95,6 +95,9 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.extra_die = d.get("extra_die", false)
 	p.lure = d.get("lure", false)
 	p.salt = d.get("salt", false)
+	# old saves: spirits could stack a 2nd ability; now each has one
+	for mon in p.team + p.pc:
+		mon.erase("ability2")
 	# old saves: charms used to be worn by spirits; now they're cards again
 	for mon in p.team + p.pc:
 		if mon.has("charm"):

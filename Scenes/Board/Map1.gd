@@ -77,11 +77,12 @@ var NAMES := {
 # SPACE_TYPE_NAMES below). The list runs from the "from" node toward the "to"
 # node. Any space with no type listed falls back to DEFAULT_SPACE_TYPE.
 # Every route carries 1 EVENT and 1 COMPETITION tile (plus its ghost/ITEM tiles;
-# the long J5→E scenic road keeps a 2nd EVENT). Six ⚔ CLASH tiles are spread
+# the long J5→E scenic road keeps a 2nd EVENT). Ten ⚔ CLASH tiles are spread
+# (four were Events until the playtest found Clash too rare: 6 of 121 tiles)
 # over the busy roads: land on one and challenge another player.
 var ROUTES := [
 	{ "from": "A", "to": "J1", "corners": [], "spaces": 4,
-		"types": [&"WISP", &"EVENT", &"WISP", &"ITEM"] },
+		"types": [&"WISP", &"EVENT", &"WISP", &"WISP"] },
 	{ "from": "B", "to": "J3", "corners": [], "spaces": 4,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP"] },
 	{ "from": "C", "to": "H", "corners": [], "spaces": 6,
@@ -89,7 +90,7 @@ var ROUTES := [
 	{ "from": "C", "to": "J5", "corners": [], "spaces": 2,
 		"types": [&"EVENT", &"COMPETITION"] },
 	{ "from": "E", "to": "D", "corners": [Vector2i(46, 66),Vector2i(46, 35)], "spaces": 5,
-		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"ITEM", &"GHOST"] },
+		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"GHOST", &"GHOST"] },
 	{ "from": "H", "to": "J8", "corners": [], "spaces": 4,
 		"types": [&"GHOST", &"EVENT", &"GHOST", &"ITEM"] },
 	{ "from": "D", "to": "J6", "corners": [], "spaces": 6,
@@ -103,19 +104,19 @@ var ROUTES := [
 	{ "from": "J1", "to": "J2", "corners": [Vector2i(7, 43),Vector2i(7, 21)], "spaces": 5, "name_of": "J1",
 		"types": [&"EVENT", &"WISP", &"CLASH", &"ITEM", &"WISP"] },
 	{ "from": "J1", "to": "J2", "corners": [], "spaces": 4, "name_of": "J2",
-		"types": [&"EVENT", &"WISP", &"EVENT", &"EVENT"] },
+		"types": [&"CLASH", &"WISP", &"EVENT", &"CLASH"] },
 	{ "from": "J2", "to": "B", "corners": [], "spaces": 5,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"ITEM", &"WISP"] },
 
 	{ "from": "J3", "to": "J4", "corners": [Vector2i(28, -21),Vector2i(61, -22)], "spaces": 5, "name_of": "J3",
 		"types": [&"WISP", &"EVENT", &"CLASH", &"ITEM", &"WISP"] },
 	{ "from": "J3", "to": "J4", "corners": [], "spaces": 5, "name_of": "J4",
-		"types": [&"ITEM", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
+		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 	{ "from": "J4", "to": "C", "corners": [], "spaces": 5,
 		"types": [&"WISP", &"EVENT", &"COMPETITION", &"WISP", &"WISP"] },
 
 	{ "from": "J5", "to": "E", "corners": [Vector2i(42, -1),Vector2i(42, 10),Vector2i(30, 10)], "spaces": 10,
-		"types": [&"EVENT", &"GHOST", &"COMPETITION", &"ITEM", &"GHOST", &"CLASH", &"EVENT", &"GHOST", &"GHOST", &"GHOST"] },
+		"types": [&"CLASH", &"GHOST", &"COMPETITION", &"ITEM", &"GHOST", &"CLASH", &"EVENT", &"GHOST", &"GHOST", &"GHOST"] },
 	{ "from": "J5", "to": "D", "corners": [Vector2i(85, 12),Vector2i(65, 13)], "spaces": 6,
 		"types": [&"GHOST", &"COMPETITION", &"ITEM", &"EVENT", &"GHOST", &"GHOST"] },
 
@@ -127,11 +128,11 @@ var ROUTES := [
 		"types": [&"PHANTOM", &"EVENT", &"PHANTOM", &"ITEM", &"PHANTOM"] },
 
 	{ "from": "J8", "to": "J9", "corners": [], "spaces": 6, "name_of": "J8",
-		"types": [&"GHOST", &"CLASH", &"ITEM", &"EVENT", &"GHOST", &"PHANTOM"] },
+		"types": [&"GHOST", &"CLASH", &"GHOST", &"EVENT", &"GHOST", &"PHANTOM"] },
 	{ "from": "J8", "to": "J9", "corners": [Vector2i(132, 7),Vector2i(132, 54)], "spaces": 6, "name_of": "J9",
 		"types": [&"GHOST", &"EVENT", &"COMPETITION", &"ITEM", &"PHANTOM", &"PHANTOM"] },
 	{ "from": "J9", "to": "G", "corners": [], "spaces": 5,
-		"types": [&"PHANTOM", &"EVENT", &"EVENT", &"ITEM", &"PHANTOM"] },
+		"types": [&"PHANTOM", &"EVENT", &"CLASH", &"ITEM", &"PHANTOM"] },
 
 	# The Spectral Trail: a dead-end climb. Each WARDEN tile is a fight against
 	# one of the Haunted Four (or Spirit Lord Vesper).
@@ -159,11 +160,12 @@ const LABEL_OUTLINE_COLOR := Color(0, 0, 0, 0.9)
 
 # The kinds of tile a space can be. The KEY is the type the game logic reacts
 # to; the VALUE is the short white name drawn on the tile.
-# Three ghost tiles, weakest to strongest: Wisp, Ghost, Phantom.
+# The three catch tiles (weakest to strongest: WISP, GHOST, PHANTOM) all read
+# "Ghost"; their colour is what shows how strong the spirits are.
 const SPACE_TYPE_NAMES := {
-	&"WISP":        "Wisp",
+	&"WISP":        "Ghost",
 	&"GHOST":       "Ghost",
-	&"PHANTOM":     "Phantom",
+	&"PHANTOM":     "Ghost",
 	&"EVENT":       "Event",
 	&"ITEM":        "Item",
 	&"COMPETITION": "Comp",

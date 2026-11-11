@@ -10,14 +10,15 @@ static func new_bias() -> Dictionary:
 static func _has_badge(p: PlayerData, city: String) -> bool:
 	return p.progress.badges.get(GameData.gym_for_city(city).get("badge", ""), false)
 
-# A gym is worth trying with 4+ spirits whose best stars can match its tier
-# (gyms grow with your badges — don't grind a full-strength gym with rookies).
+# A gym is worth trying with 3+ spirits (a full 3v3 side) whose best stars can
+# match its tier (gyms grow with your badges — don't grind a full-strength gym
+# with rookies). It used to wait for 4+, which left badges rare all game.
 static func ready_for_gym(p: PlayerData) -> bool:
-	return p.team.size() >= 4 and top_stars(p) >= (GameData.challenge_tier(p.progress.badge_count()) - 1) * 2.0
+	return p.team.size() >= 3 and top_stars(p) >= (GameData.challenge_tier(p.progress.badge_count()) - 1) * 2.0
 
 # The trail needs the badges AND a seasoned squad (otherwise it's a loss loop).
 static func ready_for_trail(p: PlayerData) -> bool:
-	return p.progress.badge_count() >= Balance.FLY_BADGES and p.team.size() >= Balance.BATTLE_PICK_MAX \
+	return p.progress.badge_count() >= GameState.trail_badges and p.team.size() >= Balance.BATTLE_PICK_MAX \
 		and top_stars(p) >= GameData.trail_tier(p.progress.badge_count()) * 2.0 + 2.0
 
 # Total stars of the best four spirits.

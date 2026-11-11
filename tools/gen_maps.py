@@ -50,12 +50,12 @@ MAPS = {
         # west coast and the north pass
         ("A", "B", [(8, 62), (8, 42)], S(W, E, X, I, W)),
         ("B", "J3", [(24, 16)], S(G, I, C, G)),
-        ("J3", "D", [(60, 8), (84, 10)], S(G, E, X, I, G)),
+        ("J3", "D", [(60, 8), (84, 10)], S(G, E, X, I, P)),
         ("J3", "C", [(46, 26)], S(X, E, I)),
         # east side
         ("D", "J4", [(92, 24)], S(W, C, W)),
         ("J4", "C", [], S(I, X, E)),
-        ("J4", "E", [(110, 34), (110, 56)], S(G, I, E, C, G)),
+        ("J4", "E", [(110, 34), (110, 56)], S(P, I, E, C, P)),   # Phantoms out east (was Ghosts: the map had none)
         ("E", "J2", [(88, 62)], S(W, X, I)),
         ("J2", "C", [(68, 48)], S(E, G, X)),
         # the south road round the lake, and the forest shortcut
@@ -113,10 +113,10 @@ MAPS = {
         ("B", "E", "ring", S(W, B, E, X, B, G)),
         ("E", "D", "ring", S(G, B, X, I, B, W)),
         ("D", "A", "ring", S(W, B, E, X, B, G)),
-        ("A", "C", [], S(B, I, X)),
-        ("B", "C", [], S(B, E, X)),
+        ("A", "C", [], S(G, I, X)),   # three spokes open on a catch tile (were Battle:
+        ("B", "C", [], S(G, E, X)),   # only 8 of 40 tiles could grow a team)
         ("E", "C", [], S(B, I, X)),
-        ("D", "C", [], S(B, E, X)),
+        ("D", "C", [], S(P, E, X)),
         ("VEnter", "VEnd", [], S(R, I, R, R)),
     ],
     "ponds": [],

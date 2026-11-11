@@ -1,7 +1,8 @@
 extends CanvasLayer
-## Runs wild-ghost encounters. A wild ghost is never fought: the catch window
-## runs the Lantern dice roll. Only spirits that pick a fight in an event get a
-## real battle (then, unless they belong to a trainer, a catch roll).
+## Runs wild-ghost encounters. The catch window runs the Lantern dice roll, and
+## also offers a 1v1 fight with your lead: win it and you get to roll to catch,
+## lose it and the ghost gets away. Spirits that pick a fight in an event get a
+## full team battle (then, unless they belong to a trainer, a catch roll).
 ## Listens for EventBus.wild_encounter_started; emits encounter_finished.
 
 var _hunt: Control
@@ -32,18 +33,30 @@ func _on_started(idx: int, spirit: Dictionary) -> void:
 	UIManager.release_pause()
 	EventBus.encounter_finished.emit()
 
-func _hunt_it(idx: int, spirit: Dictionary, spooked: bool) -> void:
-	_hunt.present(idx, spirit, spooked)
+func _hunt_it(idx: int, spirit: Dictionary, already_fought: bool) -> void:
+	_hunt.present(idx, spirit, already_fought)
 	UIManager.open(_hunt)
-	await _hunt.done
+	var outcome: String = await _hunt.done
+	if outcome == "fight" and await _fight_with_lead(idx, spirit):
+		await _hunt_it(idx, spirit, true)
 
 # Team + card select (humans) and a battle vs one event spirit. True on a win.
 func _fight(idx: int, spirit: Dictionary) -> bool:
-	var p: PlayerData = GameState.players[idx]
 	var pick := await BattleSetup.pick_for(_select, idx, "vs %s" % spirit.get("name", "?"), [spirit])
 	if pick.is_empty():
 		return false
-	var setup := BattleSetup.vs_npc(idx, pick["team"], pick["cards"], [spirit], "%s attacks!" % spirit.get("name", "?"), [], "wild")
+	return await _battle_spirit(idx, pick["team"], pick["cards"], spirit, "%s attacks!" % spirit.get("name", "?"))
+
+# 1v1, straight into battle: the first spirit on the team that can still fight,
+# carrying the same two tactic cards the team screen would have pre-picked.
+func _fight_with_lead(idx: int, spirit: Dictionary) -> bool:
+	var p: PlayerData = GameState.players[idx]
+	return await _battle_spirit(idx, p.living_team().slice(0, 1), BattleSetup.cpu_cards(p), spirit,
+		"Wild %s!" % spirit.get("name", "?"))
+
+func _battle_spirit(idx: int, team: Array, cards: Array, spirit: Dictionary, title: String) -> bool:
+	var p: PlayerData = GameState.players[idx]
+	var setup := BattleSetup.vs_npc(idx, team, cards, [spirit], title, [], "wild")
 	var won := await BattleSetup.run(_battle, setup, idx)
 	EventBus.log_entry.emit(idx, "%s %s a wild battle vs %s!" % [p.player_name, "won" if won else "lost",
 		spirit.get("name", "?")], "#9fff9f" if won else "#ff9f9f")

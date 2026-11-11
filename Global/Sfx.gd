@@ -50,7 +50,7 @@ var _cache: Dictionary = {}
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 
-const START_VOLUME := 0.25   # the whole game (menus + board) opens at 25%
+const START_VOLUME := 0.10   # the whole game (menus + board) opens at 10%
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS   # plays while events pause the board

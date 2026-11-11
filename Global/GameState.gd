@@ -4,13 +4,18 @@ extends Node
 var players: Array[PlayerData] = []
 var current_player_index: int = 0
 var turn_count: int = 0
-var win_threshold: int = 40          # tested best: points, wardens and Champion all win often
+var win_threshold: int = 30          # 40 made full games drag (playtest: ~22 pts by turn 43)
 var infinite_points: bool = false   # setup "No pts": only the Spirit Lord wins (beat 2 Haunted Four in a row to face him)
 var active_map: int = 1
 var battle_size: int = 3:          # 3v3 / 4v4 / 6v6, chosen in Game Settings
 	set(v):
 		battle_size = v if v in [3, 4, 6] else 3
 		Balance.BATTLE_PICK_MAX = battle_size
+# Badges needed to enter the Spectral Trail (the Haunted Four) and to Fly,
+# chosen in Game Settings.
+var trail_badges: int = Balance.FLY_BADGES:
+	set(v):
+		trail_badges = clampi(v, 1, 8)
 var winner_index: int = -1          # set once someone wins
 var dev_mode: bool = false          # only for games started from the menu's DEV button
 
@@ -54,7 +59,7 @@ func to_dict() -> Dictionary:
 	return {
 		"players": ps, "current": current_player_index, "turn": turn_count,
 		"win_threshold": win_threshold, "infinite": infinite_points,
-		"map": active_map, "dev": dev_mode, "battle_size": battle_size,
+		"map": active_map, "dev": dev_mode, "battle_size": battle_size, "trail_badges": trail_badges,
 	}
 
 func from_dict(d: Dictionary) -> void:
@@ -63,8 +68,9 @@ func from_dict(d: Dictionary) -> void:
 		players.append(PlayerData.from_dict(pd))
 	current_player_index = d.get("current", 0)
 	turn_count = d.get("turn", 0)
-	win_threshold = d.get("win_threshold", 40)
+	win_threshold = d.get("win_threshold", 30)
 	infinite_points = d.get("infinite", false)
 	active_map = d.get("map", 1)
 	battle_size = int(d.get("battle_size", 3))
+	trail_badges = int(d.get("trail_badges", Balance.FLY_BADGES))   # older saves: the old fixed 3
 	dev_mode = d.get("dev", false)

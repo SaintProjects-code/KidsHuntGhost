@@ -275,33 +275,51 @@ func _play_tactic(key: String, is_me: bool) -> void:
 	_tactic_banner(String(info.get("icon", "🃏")), "%s used %s!" % [
 		(_team_name_lbl.text if is_me else _opp_name_lbl.text).capitalize(), info.get("name", key)],
 		"", Color("7be0a0") if is_me else Color("ff9a7a"), 1 if is_me else -1, key)
+	# Card balance pass: the weak five were redesigned (Haste, Switcheroo here;
+	# Moon Berry, War Drum, Last Trophy in BattleRules) and the rest got ~25%
+	# more effect. The old numbers are noted beside each.
 	match key:
-		"spirit_shield": me["_r_shield"] = true
-		"battle_cry":
-			_buff(me, "atk", 3)
+		"spirit_shield": me["_r_shield"] = true   # 40% damage taken (BattleRules)
+		"battle_cry":   # (was +3)
+			_buff(me, "atk", CRY_ATK)
 			me["_r_cry"] = true
-		"haste": me["_r_haste"] = true
-		"fury": me["_r_fury"] = true
-		"hold_on": me["_r_hold"] = true
-		"mirror_veil": me["_r_mirror"] = true
-		"ecto_patch": _heal_mon(me, 60)
-		"purify":
+		"haste":   # (redesign: also team SPD +1 for the battle)
+			me["_r_haste"] = true
+			for a in mine.filter(_alive):
+				_buff(a, "spd", 1)
+		"fury":   # (now with +1 ATK this round)
+			me["_r_fury"] = true
+			_buff(me, "atk", 1)
+			me["_r_fury_atk"] = true
+		"hold_on":   # (now also heals 10%)
+			me["_r_hold"] = true
+			_heal_mon(me, int(me.get("hp", 1)) / 10)
+		"mirror_veil": me["_r_mirror"] = true   # bounces 60% (BattleRules)
+		"ecto_patch": _heal_mon(me, 75)   # (was 60)
+		"purify":   # (now immune next round too)
 			me.erase("_status")
 			me["_r_immune"] = true
-		"boo":
+			me["_immune_next"] = true
+		"boo":   # (now also enemy lead SPD −1)
 			foe["_r_boo"] = true
+			_buff(foe, "spd", -1)
 			_anim_shake(foe)
 			if not _quiet():
 				Sfx.play("boo")
-		"soul_siphon":
-			_chip(foe, 40)
-			_heal_mon(me, 40)
-		"rally":
+		"soul_siphon":   # (was 40)
+			_chip(foe, 50)
+			_heal_mon(me, 50)
+		"rally":   # (now also heals the team 10 HP)
 			for a in mine.filter(_alive):
 				_buff(a, "atk", 1)
 				_buff(a, "def", 1)
-		"switcheroo":
+				_heal_mon(a, 10)
+		"switcheroo":   # (redesign: the ally that swaps in heals 25%)
 			await _switch_lead(is_me)
+			var side: Array = _team if is_me else _opp
+			var now: int = _active if is_me else _opp_active
+			if now < side.size() and _alive(side[now]):
+				_heal_mon(side[now], int(side[now].get("hp", 1)) / 4)
 		_:
 			if CardsData.is_charm(key):
 				me["charm"] = key   # on the battle copy: it ends with the battle
@@ -351,12 +369,19 @@ func _switch_lead(is_me: bool) -> void:
 	_logln("%s swaps in for %s!" % [_who(side[active]), _who(lead)])
 	await _on_entry(is_me)
 
+const CRY_ATK := 4   # Battle Cry's one-round ATK boost (was 3)
+
 func _clear_round_flags() -> void:
 	for m in _team + _opp:
 		if m.get("_r_cry", false):
-			_buff(m, "atk", -3)
-		for f in ["_r_shield", "_r_shield_logged", "_r_cry", "_r_haste", "_r_fury", "_r_hold", "_r_mirror", "_r_immune", "_r_boo"]:
+			_buff(m, "atk", -CRY_ATK)
+		if m.get("_r_fury_atk", false):
+			_buff(m, "atk", -1)
+		for f in ["_r_shield", "_r_shield_logged", "_r_cry", "_r_haste", "_r_fury", "_r_fury_atk", "_r_hold", "_r_mirror", "_r_immune", "_r_boo"]:
 			m.erase(f)
+		if m.get("_immune_next", false):   # Purify covers the following round too
+			m.erase("_immune_next")
+			m["_r_immune"] = true
 
 # ---------------- flow ----------------
 

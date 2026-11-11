@@ -31,7 +31,7 @@ func present(player_index: int, city: String) -> void:
 		_buttons.add_child(got)
 	options.append(["🛒 Shop", "shop"])
 	options.append(["📦 Spirit Box", "pc"])
-	if p.progress.badge_count() >= Balance.FLY_BADGES:
+	if p.progress.badge_count() >= GameState.trail_badges:
 		options.append(["🌫 Spectral Trail", "trail"])
 	options.append(["Leave", "leave"])
 	for i in options.size():

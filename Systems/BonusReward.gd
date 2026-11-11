@@ -4,16 +4,14 @@ extends Node
 ##
 ## Each spirit tracks a bonus level ("_bonus_lvl") that climbs 1 → 2 → 3, and
 ## each level grants a fixed reward:
-##   1) swap the spirit's ability for a new random one (from its type pool)
+##   1) swap the spirit's ability for a new one (from its type pool)
 ##   2) +2 to a stat (player-chosen for humans, random for CPUs)
-##   3) add a SECOND ability that stacks — a spirit holds at most two
+##   3) swap the ability again — a spirit only ever has ONE ability (and one move)
 ##
 ## How many bonuses one 3-star grants:
 ##   • has an evolution        → 1 bonus, then evolve (stats/abilities carry over)
 ##   • no evo, never rewarded  → 2 bonuses (a basic with nowhere to grow)
 ##   • no evo, already rewarded → 1 bonus (a fully-evolved final form)
-
-const MAX_ABILITIES := 2
 
 var _win: Control
 
@@ -42,24 +40,17 @@ func _grant_one(player_idx: int, spirit: Dictionary) -> void:
 	spirit["_bonus_lvl"] = lvl
 	var human: bool = not GameState.players[player_idx].is_cpu
 	match lvl:
-		1:
-			await _reward_ability(player_idx, spirit, lvl, true, human)
 		2:
 			await _reward_stat(player_idx, spirit, lvl, human)
 		_:
-			await _reward_ability(player_idx, spirit, lvl, false, human)
+			await _reward_ability(player_idx, spirit, lvl, human)   # levels 1 and 3
 
 # ── rewards ───────────────────────────────────────────────────────────────────
 
-# lvl 1 replaces the primary ability; lvl 3 adds a second (stacking, cap 2).
-func _reward_ability(player_idx: int, spirit: Dictionary, lvl: int, replace: bool, human: bool) -> void:
+# Swap the spirit's one ability for a new one (or keep it).
+func _reward_ability(player_idx: int, spirit: Dictionary, lvl: int, human: bool) -> void:
 	var a1 := String(spirit.get("ability", ""))
-	var a2 := String(spirit.get("ability2", ""))
-	var held: Array = []
-	if a1 != "":
-		held.append(a1)
-	if a2 != "":
-		held.append(a2)
+	var held: Array = [a1] if a1 != "" else []
 	var ptype := String(spirit.get("type", ""))
 	var ptype2 := String(spirit.get("type2", ""))   # duals draw from both pools
 	var new_ab: String
@@ -68,7 +59,7 @@ func _reward_ability(player_idx: int, spirit: Dictionary, lvl: int, replace: boo
 		var options: Array = SpiritsData.ability_options(ptype, held, 4, ptype2)
 		if options.is_empty():
 			return
-		_win.present_ability(spirit, lvl, options, a1 if replace else "")
+		_win.present_ability(spirit, lvl, options, a1)
 		_win.show()
 		new_ab = await _win.chose_ability
 		_win.hide()
@@ -79,14 +70,10 @@ func _reward_ability(player_idx: int, spirit: Dictionary, lvl: int, replace: boo
 		EventBus.emit_signal("log_entry", player_idx,
 			"%s kept its ability." % spirit.get("name", "?"), "#7fe0d0")
 		return
-	if replace or a1 == "":
-		spirit["ability"] = new_ab   # lvl 1: swap the primary ability
-	else:
-		spirit["ability2"] = new_ab  # lvl 3: stack a second ability (cap 2)
-	EventBus.emit_signal("log_entry", player_idx, "%s %s: %s" % [
-		spirit.get("name", "?"),
-		"swapped ability" if replace else "learned a 2nd ability",
-		SpiritsData.ability_of(new_ab).get("name", new_ab)], "#7fe0d0")
+	spirit["ability"] = new_ab
+	spirit.erase("ability2")
+	EventBus.emit_signal("log_entry", player_idx, "%s swapped ability: %s" % [
+		spirit.get("name", "?"), SpiritsData.ability_of(new_ab).get("name", new_ab)], "#7fe0d0")
 	EventBus.emit_signal("star_awarded", player_idx, spirit)
 
 func _reward_stat(player_idx: int, spirit: Dictionary, lvl: int, human: bool) -> void:

@@ -5,7 +5,7 @@ class_name Balance
 # ── Points (first to the setup's win target wins, unless "No pts" is on) ─────
 # static var (not const) so test runs can try other values.
 static var PTS_CATCH := 1
-static var PTS_GYM := 3
+static var PTS_GYM := 4                  # (5 let one player snowball in the playtest)
 static var PTS_PVP_WIN := 3
 static var PTS_ELITE_WIN := 5
 static var PTS_CHAMPION := 10
@@ -44,16 +44,17 @@ const START_CARDS := 2                  # dealt to every player at setup
 const SHOP_CARD_OFFERS := 4
 
 # ── Board ─────────────────────────────────────────────────────────────────────
-const FAST_MODE_TURN := 24              # from this turn everyone rolls 2 dice
-const FLY_BADGES := 3                   # badges needed to fly / enter the Spectral Trail
+const FAST_MODE_TURN := 16              # from this turn everyone rolls 2 dice
+const FLY_BADGES := 3                   # default badges to fly / enter the Spectral Trail (Game Settings → GameState.trail_badges)
 const TEAM_MAX := 6
 static var BATTLE_PICK_MAX := 3         # spirits per side in a battle: 3, 4 or 6 (Game Settings → GameState.battle_size)
 
 # ── Spectral Trail ────────────────────────────────────────────────────────────
 # The Haunted Four scale with how far PAST the entry requirement you are:
-# entering with 3 badges meets their tier-1 teams, 5+ badges their full
-# strength. With fewer players everyone collects more badges before reaching
-# the trail, so small games get a bigger offset (weaker phantoms).
+# entering with the required badges meets their tier-1 teams, 2+ more badges
+# their full strength. With fewer players everyone collects more badges before
+# reaching the trail, so small games get a bigger offset (weaker phantoms).
+# The offsets are written for the default requirement of 3 (see trail_tier).
 const TRAIL_BADGE_OFFSET := {1: 3, 2: 3, 3: 2, 4: 2}   # by player count
 
 # ── Battles ───────────────────────────────────────────────────────────────────

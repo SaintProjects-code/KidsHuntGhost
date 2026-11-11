@@ -44,8 +44,24 @@ const CONTEST_CHANCE := 0.3   # how often the event is a quick stat contest
 static var dev_forced_event := ""
 
 var _title: Label
-var _hint: Label
+var _hint: Label     # what to do (one or two short sentences)
+var _tip: Label      # which stats help
 var _body: VBoxContainer
+
+# Each keyboard player's keys: the ACTION key, then LEFT / MIDDLE / RIGHT.
+const SLOT_KEYS := ["W · A S D", "I · J K L", "↑ · ← ↓ →", "Num8 · 4 5 6"]
+
+# Split a game's hint into "what to do" and the stat tips (the sentences with
+# an "=" in them, like "SPD = lift").
+static func _split_hint(text: String) -> Array:
+	var how: Array = []
+	var tips: Array = []
+	for part in text.split(". "):
+		var p := String(part).strip_edges().trim_suffix(".")
+		if p == "":
+			continue
+		(tips if "=" in p else how).append(p)
+	return [". ".join(how) + ".", ("💡 " + ". ".join(tips)) if not tips.is_empty() else ""]
 var _next: Button
 var _phase := 0       # 1 = selection, 2 = event, 3 = podium
 var _event := ""      # a GAMES or CONTESTS key
@@ -58,9 +74,13 @@ func _ready() -> void:
 	var col := _init_window(700, 0)
 	_title = _title_label("🏅 Competition!", 26)
 	col.add_child(_title)
-	_hint = UIKit.wrap_label("", 14, 660)
-	_hint.modulate = Color(1, 1, 1, 0.85)
+	# what to do, big enough to read from the couch; the stat tip smaller below
+	_hint = UIKit.wrap_label("", 20, 660)
+	_hint.add_theme_color_override("font_color", Color.WHITE)
 	col.add_child(_hint)
+	_tip = UIKit.wrap_label("", 14, 660)
+	_tip.modulate = Color(1, 1, 1, 0.7)
+	col.add_child(_tip)
 	_body = UIKit.vbox(8)
 	col.add_child(_body)
 	_next = _button("Start!", _on_next)
@@ -87,10 +107,10 @@ func _is_game() -> bool:
 # All-CPU game: nobody can press the buttons, so the window drives itself.
 func run_cpu_auto() -> void:
 	while visible and _phase < 3:
-		await get_tree().create_timer(1.0).timeout
+		await get_tree().create_timer(0.6).timeout
 		if visible and not _next.disabled:
 			_on_next()
-	await get_tree().create_timer(2.5).timeout
+	await get_tree().create_timer(1.2).timeout
 	if visible and _phase == 3:
 		_on_next()
 
@@ -104,12 +124,17 @@ func _on_next() -> void:
 # ─── Step 1: every player picks a spirit ──────────────────────────────────────
 func _build_selection() -> void:
 	_title.text = "🏅 %s — pick your spirit!" % event_name(_event)
-	_hint.text = GAMES[_event]["hint"] if _is_game() else \
-		"%s ×2 + stars + 🎲" % CONTESTS[_event]["label"]
-	if _event == "beauty":
-		_hint.text = "3 judges, each loves one stat · + stars + 🎲"
 	if _is_game():
-		_hint.text += "\nKeys — P1 W · ASD   P2 I · JKL   P3 ↑ · ←↓→   P4 Num8 · 456   (or click your area)"
+		var parts := _split_hint(String(GAMES[_event]["hint"]))
+		_hint.text = parts[0]
+		_tip.text = parts[1]
+	elif _event == "beauty":
+		_hint.text = "Pick your most charming spirit!"
+		_tip.text = "💡 3 judges each love one stat · stars and a dice roll help too"
+	else:
+		_hint.text = "Pick your spirit with the best %s!" % CONTESTS[_event]["label"]
+		_tip.text = "💡 %s counts double · stars and a dice roll help too" % CONTESTS[_event]["label"]
+	_tip.visible = _tip.text != ""
 	_next.text = "Start!"
 	UIKit.clear(_body)
 	var grid := GridContainer.new()
@@ -126,7 +151,9 @@ func _build_selection() -> void:
 		right.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(right)
 		var slot := Controls.slot_of(i)
-		right.add_child(UIKit.label(p.player_name + ("  (P%d keys)" % (slot + 1) if not p.is_cpu and slot >= 0 and _is_game() else ""), 16, p.color))
+		right.add_child(UIKit.label(p.player_name, 16, p.color))
+		if not p.is_cpu and slot >= 0 and slot < SLOT_KEYS.size() and _is_game():
+			right.add_child(UIKit.label("⌨ %s   (or click your area)" % SLOT_KEYS[slot], 13, Color(1, 1, 1, 0.75)))
 		var chips_row := GridContainer.new()   # 2 rows × 3: a team of 6 stays compact
 		chips_row.columns = 3
 		chips_row.add_theme_constant_override("h_separation", 8)
@@ -254,6 +281,7 @@ func _start_event() -> void:
 	_phase = 2
 	_title.text = "%s!" % event_name(_event)
 	_hint.text = ""
+	_tip.hide()
 	_next.text = "Awards ▶"
 	_next.disabled = true
 	UIKit.clear(_body)
@@ -290,6 +318,7 @@ func _show_podium() -> void:
 	_phase = 3
 	_title.text = "🏆 Winners!"
 	_hint.text = ""
+	_tip.hide()
 	_next.text = "OK"
 	_next.disabled = true
 	var record := _game.beat_record()
@@ -314,9 +343,9 @@ func _show_podium() -> void:
 		rows.append([row, i, pts])
 	if _ranks.is_empty():
 		_body.add_child(UIKit.label("No winners this time!", 18))
-	# reveal from 3rd up to 1st, awarding as each appears
+	# reveal from 3rd up to 1st, awarding as each appears (kept brisk)
 	for k in range(rows.size() - 1, -1, -1):
-		await get_tree().create_timer(0.8).timeout
+		await get_tree().create_timer(0.35).timeout
 		if not visible:
 			return
 		var row: Control = rows[k][0]
@@ -325,7 +354,7 @@ func _show_podium() -> void:
 		Sfx.play("win" if k == 0 else "points")
 		GameState.award_points(rows[k][1], rows[k][2])
 	if record and not _ranks.is_empty():
-		await get_tree().create_timer(0.6).timeout
+		await get_tree().create_timer(0.3).timeout
 		GameState.award_points(_ranks[0], Balance.RECORD_BONUS)
 		var rec := UIKit.label("🎉 NEW RECORD!  %s gets +%d bonus points!" % [GameState.players[_ranks[0]].player_name,
 			Balance.RECORD_BONUS], 18, UIKit.GOLD)

@@ -9,14 +9,21 @@ const STATUS_NAMES := {
 	"burn": "burned", "confuse": "confused",
 }
 
+# Balance numbers used in more than one place (balance pass: Wish 20 → 15,
+# Healer 40 → 30; both won ~59% of simulated battles).
+const WISH_HEAL := 15
+const HEALER_HEAL := 30
+
 var _star_credits: Dictionary = {}   # index into the caller's team -> stars earned
 var _ko_stars: Dictionary = {}       # same key -> KO stars this battle (capped)
 
 # ---------------- small helpers ----------------
 
-# Spirits can hold up to TWO abilities ("ability" / "ability2").
+# A spirit has ONE ability (plus its one charged move). Slot 1 is kept so the
+# ability checks below read the same, but it's always empty; an "ability2"
+# left on an old save is ignored.
 func _ability_slot(mon: Dictionary, slot: int) -> String:
-	return String(mon.get("ability" if slot == 0 else "ability2", ""))
+	return String(mon.get("ability", "")) if slot == 0 else ""
 
 func _has(mon: Dictionary, ability: String) -> bool:
 	return _ability_slot(mon, 0) == ability or _ability_slot(mon, 1) == ability
@@ -126,10 +133,10 @@ func _apply_match_start() -> void:
 
 func _match_start_ability(m: Dictionary, mine: Array, theirs: Array, ab: String) -> void:
 	match ab:
-		"intimidate":
-			for o in theirs:
+		"intimidate":   # (was: whole enemy team — balance sim 58% win rate)
+			for o in theirs.slice(0, 2):
 				_buff(o, "atk", -1)
-			await _ability_line("Match Start", m, "Intimidate", "enemy team ATK −1")
+			await _ability_line("Match Start", m, "Intimidate", "first two enemies ATK −1")
 		"screech":
 			_buff(theirs[0], "def", -2)
 			await _ability_line("Match Start", m, "Screech", "%s DEF −2" % _who(theirs[0]))
@@ -137,19 +144,19 @@ func _match_start_ability(m: Dictionary, mine: Array, theirs: Array, ab: String)
 			for a in mine:
 				_buff(a, "atk", 1)
 			await _ability_line("Match Start", m, "Drought", "team ATK +1")
-		"tailwind":
+		"tailwind":   # (was +3)
 			for a in mine:
-				_buff(a, "spd", 3)
-			await _ability_line("Match Start", m, "Tailwind", "team SPD +3")
-		"speed_boost":
+				_buff(a, "spd", 2)
+			await _ability_line("Match Start", m, "Tailwind", "team SPD +2")
+		"speed_boost":   # (was team ATK and SPD +1)
 			for a in mine:
-				_buff(a, "atk", 1)
 				_buff(a, "spd", 1)
-			await _ability_line("Match Start", m, "Speed Boost", "team ATK/SPD +1")
-		"reflect":
+			_buff(m, "atk", 1)
+			await _ability_line("Match Start", m, "Speed Boost", "team SPD +1, self ATK +1")
+		"reflect":   # (was +2)
 			for a in mine:
-				_buff(a, "def", 2)
-			await _ability_line("Match Start", m, "Reflect", "team DEF +2")
+				_buff(a, "def", 1)
+			await _ability_line("Match Start", m, "Reflect", "team DEF +1")
 		"veteran":
 			if float(m.get("stars", 0)) >= 1.0:
 				_buff(m, "atk", 2)
@@ -169,39 +176,38 @@ func _match_start_ability(m: Dictionary, mine: Array, theirs: Array, ab: String)
 				var hit: int = maxi(1, int(m.get("atk", 1)) * 12)
 				_chip(target, hit)
 				await _ability_line("Match Start", m, "Sniper", "snipes %s for %d" % [_who(target), hit])
-		"spikes":
+		"spikes":   # (damage raised 30 → 45, see _on_entry)
 			for o in theirs:
 				o["_spikes_pending"] = true
 			await _ability_line("Match Start", m, "Spikes", "set on the enemy team")
-		"focus_energy":
+		"focus_energy":   # (buffed: now also ATK +1)
 			m["_charge"] = maxi(0, _move_cost(m) - 1)
-			await _ability_line("Match Start", m, "Focus Energy", "its move is almost ready!")
-		"fire_bond":
+			_buff(m, "atk", 1)
+			await _ability_line("Match Start", m, "Focus Energy", "its move is almost ready! ATK +1")
+		"fire_bond":   # (was team DEF +1)
 			_buff(m, "atk", _count_type(mine, "Fire"))
-			for a in mine:
-				_buff(a, "def", 1)
-			await _ability_line("Match Start", m, "Fire Bond", "self ATK up, team DEF +1")
-		"water_bond":
+			_buff(m, "def", 1)
+			await _ability_line("Match Start", m, "Fire Bond", "self ATK up, self DEF +1")
+		"water_bond":   # (was team DEF +3 — balance sim 77% win rate)
 			_buff(m, "atk", _count_type(mine, "Water"))
 			for a in mine:
-				_buff(a, "def", 3)
-			await _ability_line("Match Start", m, "Water Bond", "self ATK up, team DEF +3")
+				_buff(a, "def", 1)
+			await _ability_line("Match Start", m, "Water Bond", "self ATK up, team DEF +1")
 		"grass_bond":
 			_buff(m, "atk", _count_type(mine, "Grass"))
 			for a in mine:
 				a["hp"] = int(a.get("hp", 60)) + 30
 				_heal_mon(a, 30)
 			await _ability_line("Match Start", m, "Grass Bond", "self ATK up, team +30 HP")
-		"electric_bond":
+		"electric_bond":   # (was team SPD +3)
 			_buff(m, "atk", _count_type(mine, "Electric"))
 			for a in mine:
-				_buff(a, "spd", 3)
-			await _ability_line("Match Start", m, "Electric Bond", "self ATK up, team SPD +3")
-		"fighting_bond":
+				_buff(a, "spd", 1)
+			await _ability_line("Match Start", m, "Electric Bond", "self ATK up, team SPD +1")
+		"fighting_bond":   # (was team DEF +1)
 			_buff(m, "atk", _count_type(mine, "Fighting"))
-			for a in mine:
-				_buff(a, "def", 1)
-			await _ability_line("Match Start", m, "Fighting Bond", "self ATK up, team DEF +1")
+			_buff(m, "def", 1)
+			await _ability_line("Match Start", m, "Fighting Bond", "self ATK up, self DEF +1")
 		"psychic_bond":
 			_buff(m, "atk", _count_type(mine, "Psychic"))
 			for a in mine:
@@ -212,10 +218,12 @@ func _match_start_ability(m: Dictionary, mine: Array, theirs: Array, ab: String)
 			for o in theirs:
 				_buff(o, "def", -2)
 			await _ability_line("Match Start", m, "Dark Bond", "self ATK up, enemy DEF −2")
-		"mayhem":
+		"mayhem":   # (buffed: now also enemy team SPD −1)
 			theirs.shuffle()   # scramble the enemy line-up — their lead can change
+			for o in theirs:
+				_buff(o, "spd", -1)
 			_build_cards()
-			await _ability_line("Match Start", m, "Mayhem", "scrambles the enemy line-up!")
+			await _ability_line("Match Start", m, "Mayhem", "scrambles the enemy line-up! Enemy SPD −1")
 		"mind_hold":
 			var targets: Array = theirs.filter(_alive)
 			targets.shuffle()
@@ -234,7 +242,7 @@ func _u_turn(mine: Array, theirs: Array) -> void:
 	if mine.size() < 2 or not _has(mine[0], "u_turn"):
 		return
 	var m: Dictionary = mine[0]
-	var hit: int = maxi(1, int(DamageCalculator.calculate(m, theirs[0]) * 0.4))
+	var hit: int = maxi(1, int(DamageCalculator.calculate(m, theirs[0]) * 0.7))   # U-Turn (was 0.4)
 	_chip(theirs[0], hit)
 	mine.remove_at(0)
 	mine.append(m)
@@ -259,9 +267,9 @@ func _on_entry(is_me: bool) -> void:
 	_charm_entry(is_me)
 	if m.get("_spikes_pending", false):
 		m.erase("_spikes_pending")
-		_chip(m, 30)
+		_chip(m, 45)
 		_anim_shake(m)
-		_logln("%s is hurt by Spikes! -30 HP." % _who(m))
+		_logln("%s is hurt by Spikes! -45 HP." % _who(m))
 		await _beat(0.45)
 	for slot in 2:
 		await _entry_ability(m, mine, theirs, their_idx, _ability_slot(m, slot))
@@ -277,22 +285,27 @@ func _charm_entry(is_me: bool) -> void:
 		return
 	var m: Dictionary = mine[idx]
 	match _charm(m):
-		"brave_ribbon":
-			_buff(m, "atk", 1)
-			_logln("%s's Brave Ribbon! ATK +1." % _who(m))
-		"guard_pin":
-			_buff(m, "def", 1)
-			_logln("%s's Guard Pin! DEF +1." % _who(m))
-		"war_drum":
+		"brave_ribbon":   # (now +2 the first time, then +1)
+			var first_r: bool = not m.get("_ribbon_used", false)
+			m["_ribbon_used"] = true
+			_buff(m, "atk", 2 if first_r else 1)
+			_logln("%s's Brave Ribbon! ATK +%d." % [_who(m), 2 if first_r else 1])
+		"guard_pin":   # (now +2 the first time, then +1)
+			var first_p: bool = not m.get("_pin_used", false)
+			m["_pin_used"] = true
+			_buff(m, "def", 2 if first_p else 1)
+			_logln("%s's Guard Pin! DEF +%d." % [_who(m), 2 if first_p else 1])
+		"war_drum":   # (redesign: 70% ATK, was 40%)
 			if their_idx < theirs.size():
-				var hit: int = maxi(1, int(DamageCalculator.calculate(m, theirs[their_idx]) * 0.4))
+				var hit: int = maxi(1, int(DamageCalculator.calculate(m, theirs[their_idx]) * 0.7))
 				_chip(theirs[their_idx], hit)
 				_logln("%s's War Drum! Free hit for %d." % [_who(m), hit])
-		"last_trophy":
-			if mine.filter(_alive).size() <= 1:
-				_buff(m, "atk", 1)
-				m["_trophy_on"] = true
-				_logln("%s raises the Last Trophy! ATK +1, but it takes more damage." % _who(m))
+		"last_trophy":   # (redesign: +2 ATK +2 DEF, no longer takes extra damage)
+			if mine.filter(_alive).size() <= 1 and not m.get("_trophy_used", false):
+				m["_trophy_used"] = true
+				_buff(m, "atk", 2)
+				_buff(m, "def", 2)
+				_logln("%s raises the Last Trophy! ATK +2, DEF +2!" % _who(m))
 
 func _entry_ability(m: Dictionary, mine: Array, theirs: Array, their_idx: int, ab: String) -> void:
 	match ab:
@@ -316,10 +329,10 @@ func _entry_ability(m: Dictionary, mine: Array, theirs: Array, their_idx: int, a
 			if not m.get("_hyp_used", false) and their_idx < theirs.size():
 				m["_hyp_used"] = true
 				await _apply_status(theirs[their_idx], "sleep", 2, m)
-		"encore":
+		"encore":   # (was 3 rounds)
 			if their_idx < theirs.size():
-				theirs[their_idx]["_suppressed"] = 3
-				await _ability_note(m, "%s's %s! %s's ability is suppressed for 3 rounds." % [
+				theirs[their_idx]["_suppressed"] = 5
+				await _ability_note(m, "%s's %s! %s's ability is suppressed for 5 rounds." % [
 					_who(m), _abn("Encore"), _who(theirs[their_idx])])
 
 # ---------------- status effects ----------------
@@ -415,21 +428,21 @@ func _round_start_abilities(m: Dictionary, foe: Dictionary, slot: int) -> void:
 				var amount: int = int(m.get("hp", 1) * 0.3)
 				_heal_mon(m, amount)
 				await _ability_line("Round Start", m, "Regenerator", "heals %d HP" % amount)
-		"wish":
+		"wish":   # (was 20 HP)
 			if _needs_healing(_side_of(m)):
 				for a in _side_of(m).filter(_alive):
-					_heal_mon(a, 20)
-				await _ability_line("Round Start", m, "Wish", "team heals 20 HP")
-		"drain_punch":
-			var hit: int = maxi(1, int(m.get("atk", 1)) * 25 / 4)
+					_heal_mon(a, WISH_HEAL)
+				await _ability_line("Round Start", m, "Wish", "team heals %d HP" % WISH_HEAL)
+		"drain_punch":   # (was 25% ATK — balance sim 73% win rate)
+			var hit: int = maxi(1, int(m.get("atk", 1)) * 15 / 4)
 			_chip(foe, hit)
 			_heal_mon(m, hit)
 			await _ability_line("Round Start", m, "Drain Punch", "deals %d and heals %d" % [hit, hit])
 		"electric_field":
-			# 50% ATK to TWO random living opponents — bench included
+			# 30% ATK to TWO random living opponents — bench included (was 50%)
 			var foes: Array = _foes_of(m).filter(_alive)
 			foes.shuffle()
-			var zap: int = maxi(1, int(m.get("atk", 1)) * 25 / 2)
+			var zap: int = maxi(1, int(m.get("atk", 1)) * 15 / 2)
 			var hit_names: Array = []
 			for t in foes.slice(0, 2):
 				_chip(t, zap)
@@ -437,11 +450,11 @@ func _round_start_abilities(m: Dictionary, foe: Dictionary, slot: int) -> void:
 				hit_names.append(_who(t))
 			if not hit_names.is_empty():
 				await _ability_line("Round Start", m, "Electric Field", "zaps %s for %d each" % [", ".join(hit_names), zap])
-		"medic":
-			if not m.get("_medic_used", false) and randf() < 0.3:
+		"medic":   # (was a 30% chance, revive to 25%)
+			if not m.get("_medic_used", false) and randf() < 0.5:
 				for a in _side_of(m):
 					if not _alive(a):
-						a["current_hp"] = int(a.get("hp", 1) * 0.25)
+						a["current_hp"] = int(a.get("hp", 1) * 0.35)
 						a.erase("_gone")
 						m["_medic_used"] = true
 						await _ability_line("Round Start", m, "Medic", "revives %s" % _who(a))
@@ -458,12 +471,12 @@ func _bench_round_abilities(side: Array, active: int) -> void:
 		if j == active or not _alive(b) or b.get("_taunted", false):
 			continue
 		if _has(b, "healer") and _alive(lead) and int(lead["current_hp"]) < int(lead.get("hp", 1)):
-			_heal_mon(lead, 40)
-			await _ability_line("Round Start", b, "Healer", "restores 40 HP to %s" % _who(lead))
+			_heal_mon(lead, HEALER_HEAL)
+			await _ability_line("Round Start", b, "Healer", "restores %d HP to %s" % [HEALER_HEAL, _who(lead)])
 		if _has(b, "wish") and _needs_healing(side):
 			for a in side.filter(_alive):
-				_heal_mon(a, 20)
-			await _ability_line("Round Start", b, "Wish", "team heals 20 HP")
+				_heal_mon(a, WISH_HEAL)
+			await _ability_line("Round Start", b, "Wish", "team heals %d HP" % WISH_HEAL)
 
 # A revived ally is stranded behind the active index; move it to just behind
 # the current fighter so it steps up next.
@@ -508,7 +521,8 @@ func _helping_hand(side: Array, active: int) -> void:
 			b["_hh_used"] = true
 			side[active] = b
 			side[j] = lead
-			await _ability_line("Passive", b, "Helping Hand", "steps in for %s" % _who(lead))
+			_buff(b, "def", 2)   # (buffed: now steps in braced, DEF +2)
+			await _ability_line("Passive", b, "Helping Hand", "steps in for %s, DEF +2" % _who(lead))
 			_build_cards()
 			await _on_entry(side == _team)
 			return
@@ -527,7 +541,7 @@ func _strike(att: Dictionary, def_: Dictionary, attacker_is_me: bool, mult: floa
 				await _ability_note(b, "%s's %s! It shields %s and takes the hit!" % [_who(b), _abn("Bodyguard"), _who(def_)])
 				def_ = b
 				break
-	var item_mult := 1.2 if _charm(att) == "power_band" else 1.0
+	var item_mult := 1.25 if _charm(att) == "power_band" else 1.0   # (was 1.2)
 	if _has(att, "reckless"):
 		item_mult *= 1.25
 	var target_stats: Dictionary = {"type": def_.get("type", ""), "def": 0} if ignore_def else def_
@@ -555,7 +569,7 @@ func _strike(att: Dictionary, def_: Dictionary, attacker_is_me: bool, mult: floa
 	_logln("%s hits %s for %d!%s" % [_who(att), _who(def_), final, eff])
 	await _beat(0.5)
 	if def_.get("_r_mirror", false) and _alive(att):
-		var back := maxi(1, final / 2)
+		var back := maxi(1, final * 6 / 10)   # Mirror Veil (was half)
 		att["current_hp"] = maxi(0, int(att["current_hp"]) - back)
 		_anim_shake(att)
 		_float_on(att, "-%d" % back, UIKit.BAD)
@@ -575,7 +589,7 @@ func _damage_taken_mult(def_: Dictionary) -> float:
 	var m := 1.0
 	var ratio := float(def_.get("current_hp", 0)) / float(maxi(1, def_.get("hp", 1)))
 	if _charm(def_) == "ghost_cloak":
-		m *= 0.85
+		m *= 0.8   # (was 0.85)
 	if _has(def_, "thick_fat"):
 		m *= 0.8
 	if _has(def_, "reckless"):
@@ -583,16 +597,14 @@ func _damage_taken_mult(def_: Dictionary) -> float:
 	if _has(def_, "grit") and ratio < 0.3:
 		m *= 0.7
 	if _has(def_, "bulwark") and ratio > 0.5:
-		m *= 0.8
+		m *= 0.65   # (was 0.8)
 	if _has(def_, "battle_armor") and _round_num <= 2:
 		m *= 0.5
 	if _has(def_, "multiscale") and ratio >= 1.0 and not def_.get("_ms_used", false):
 		m *= 0.5
 		def_["_ms_used"] = true
-	if def_.get("_trophy_on", false):
-		m *= 1.2
 	if def_.get("_r_shield", false):
-		m *= 0.5
+		m *= 0.4   # Spirit Shield (was 0.5)
 	if def_.get("_guard_next", false):
 		m *= 0.5
 		def_.erase("_guard_next")
@@ -606,8 +618,8 @@ func _log_reductions(def_: Dictionary) -> void:
 		await _passive_once(def_, "battle_armor", "×0.5 in early rounds")
 	if def_.get("_r_shield", false) and not def_.get("_r_shield_logged", false):
 		def_["_r_shield_logged"] = true
-		_logln("🛡 The Spirit Shield halves the blow!")
-		_tactic_banner("🛡", "Spirit Shield!", "%s takes half damage" % def_.get("name", "?"), Color("8fd6ff"))
+		_logln("🛡 The Spirit Shield blocks most of the blow!")
+		_tactic_banner("🛡", "Spirit Shield!", "%s takes only 40%% damage" % def_.get("name", "?"), Color("8fd6ff"))
 
 # Lucky Scarf / Sturdy / Anger Point / Hold On! keep a spirit at 1 HP.
 func _survive_lethal(def_: Dictionary) -> void:
@@ -618,7 +630,7 @@ func _survive_lethal(def_: Dictionary) -> void:
 		await _beat(0.4)
 	elif _charm(def_) == "lucky_scarf" and not def_.get("_sash_used", false):
 		def_["_sash_used"] = true
-		def_["current_hp"] = 1
+		def_["current_hp"] = maxi(1, int(def_.get("hp", 1)) * 15 / 100)   # (was 1 HP)
 		_logln("%s hangs on with its Lucky Scarf!" % _who(def_))
 		await _beat(0.45)
 	elif _has(def_, "sturdy") and not def_.get("_sturdy_used", false):
@@ -633,29 +645,32 @@ func _survive_lethal(def_: Dictionary) -> void:
 
 func _on_hit_effects(att: Dictionary, def_: Dictionary, final: int) -> void:
 	if _charm(att) == "echo_bell":
-		var sip: int = maxi(1, final / 10)
+		var sip: int = maxi(1, final * 15 / 100)   # Echo Bell (was 10%)
 		_heal_mon(att, sip)
 		_logln("%s's Echo Bell restores %d HP." % [_who(att), sip])
 	if _charm(def_) == "spiky_helm":
-		_chip(att, 15)
-		_logln("%s is hurt by the Spiky Helm! -15 HP." % _who(att))
+		_chip(att, 20)   # (was 15)
+		_logln("%s is hurt by the Spiky Helm! -20 HP." % _who(att))
 	if _has(att, "thief") and int(att.get("_thief_stacks", 0)) < 3:
 		att["_thief_stacks"] = int(att.get("_thief_stacks", 0)) + 1
 		_buff(att, "atk", 1)
 		_buff(def_, "atk", -1)
 		await _ability_note(att, "%s steals power — %s! ATK +1." % [_who(att), _abn("Thief")])
-	if _has(def_, "counter") and final >= 50 and _alive(def_):
-		var payback: int = int(final * 0.4)
+	if _has(def_, "counter") and final >= 30 and _alive(def_):   # (was 50+ for 40%)
+		var payback: int = int(final * 0.5)
 		att["current_hp"] = maxi(0, int(att.get("current_hp", 0)) - payback)
 		_anim_shake(att)
 		_float_on(att, "-%d" % payback, UIKit.BAD)
 		await _ability_note(def_, "%s Counters for %d!" % [_who(def_), payback])
 	# contact statuses punish the attacker
 	if _alive(def_):
-		if _has(def_, "static") and randf() < 0.3:
+		if _has(def_, "static") and randf() < 0.5:   # (was 30%)
 			await _apply_status(att, "stun", 1, def_)
-		if _has(def_, "poison_point"):
-			await _apply_status(att, "poison", 3, def_)
+		if _has(def_, "poison_point"):   # (buffed: 4 rounds, and the first hit saps ATK)
+			await _apply_status(att, "poison", 4, def_)
+			if not att.get("_pp_sapped", false):
+				att["_pp_sapped"] = true
+				_buff(att, "atk", -1)
 		if _has(def_, "flame_body"):
 			await _apply_status(att, "burn", 3, def_)
 		if _has(def_, "spore"):
@@ -666,23 +681,23 @@ func _threshold_abilities(def_: Dictionary) -> void:
 	var ratio := float(def_["current_hp"]) / float(maxi(1, def_.get("hp", 1)))
 	if _charm(def_) == "moon_berry" and ratio < 0.5 and not def_.get("_berry_used", false):
 		def_["_berry_used"] = true
-		_heal_mon(def_, int(def_.get("hp", 1) * 0.3))
+		_heal_mon(def_, int(def_.get("hp", 1) * 0.5))   # Moon Berry (redesign: was 30%)
 		_logln("%s munches its Moon Berry — HP restored!" % _who(def_))
 	if _has(def_, "blaze") and ratio < 0.33 and not def_.get("_blaze_used", false):
 		def_["_blaze_used"] = true
-		_buff(def_, "atk", 4)
-		_buff(def_, "spd", 2)
-		await _ability_note(def_, "%s's %s ignites! ATK +4, SPD +2!" % [_who(def_), _abn("Blaze")])
+		_buff(def_, "atk", 3)   # (was ATK +4, SPD +2)
+		_buff(def_, "spd", 1)
+		await _ability_note(def_, "%s's %s ignites! ATK +3, SPD +1!" % [_who(def_), _abn("Blaze")])
 	if _has(def_, "overgrow") and ratio < 0.5 and not def_.get("_overgrow_used", false):
 		def_["_overgrow_used"] = true
-		_buff(def_, "atk", 2)
-		_buff(def_, "def", 1)
-		await _ability_note(def_, "%s's %s surges! ATK +2, DEF +1!" % [_who(def_), _abn("Overgrow")])
+		_buff(def_, "atk", 3)   # (was ATK +2, DEF +1)
+		_buff(def_, "def", 2)
+		await _ability_note(def_, "%s's %s surges! ATK +3, DEF +2!" % [_who(def_), _abn("Overgrow")])
 
 func _on_ko(att: Dictionary, def_: Dictionary, attacker_is_me: bool) -> void:
 	if _charm(def_) == "phoenix_feather" and not def_.get("_phoenix_used", false):
 		def_["_phoenix_used"] = true
-		def_["current_hp"] = maxi(1, int(def_.get("hp", 1) * 0.25))
+		def_["current_hp"] = maxi(1, int(def_.get("hp", 1) * 0.35))   # (was 25%)
 		_logln("%s rises on its Phoenix Feather!" % _who(def_))
 		return
 	if _has(def_, "phoenix") and not def_.get("_phoenix_ab_used", false):
@@ -705,9 +720,10 @@ func _on_ko(att: Dictionary, def_: Dictionary, attacker_is_me: bool) -> void:
 		_float_on(att, "-%d" % boom, Color("ff5050"))
 		Sfx.play("crash")
 		await _ability_note(def_, "%s explodes for %d damage!" % [_who(def_), boom])
-	if _has(att, "moxie"):
+	if _has(att, "moxie"):   # (buffed: now also SPD +1)
 		_buff(att, "atk", 2)
-		await _ability_note(att, "%s's %s! ATK +2." % [_who(att), _abn("Moxie")])
+		_buff(att, "spd", 1)
+		await _ability_note(att, "%s's %s! ATK +2, SPD +1." % [_who(att), _abn("Moxie")])
 	elif _has(att, "soul_heart"):
 		_buff(att, "atk", 1)
 		_buff(att, "def", 1)
@@ -735,7 +751,7 @@ func _attack_or_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 func _use_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 	var key := SpiritsData.move_key(att)
 	var mv := SpiritsData.move_of(key)
-	var boost := 1.3 if _has(att, "overcharge") else 1.0
+	var boost := 1.6 if _has(att, "overcharge") else 1.0   # (was 1.3)
 	var power: float = float(mv.get("power", 1.0)) * boost
 	att["_moves_used"] = int(att.get("_moves_used", 0)) + 1
 	var c := _card_of(att)
@@ -743,6 +759,7 @@ func _use_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 		Sfx.play("crit", 0.8)
 		if c:
 			Juice.flash(c, Color(2.0, 1.8, 0.6), 0.35)
+		_flash_special(att, String(mv["name"]))
 	_logln("[color=#ffd24d]✦ %s uses %s![/color]" % [_who(att), mv["name"]])
 	await _beat(0.35)
 	var foes: Array = _foes_of(att).filter(_alive)
@@ -772,12 +789,13 @@ func _use_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 				Sfx.play("heal")
 			_logln("🌸 The whole team blooms back to health!")
 			await _beat(0.4)
-		"calm_mind":
-			_buff(att, "atk", 1)
+		"calm_mind":   # (buffed: was ATK/DEF +1 only — balance sim 32% win rate)
+			_buff(att, "atk", 2)
 			_buff(att, "def", 1)
 			att.erase("_status")
+			_heal_mon(att, int(att.get("hp", 1)) / 5)
 			_anim_ability(att)
-			_logln("%s centres itself — ATK/DEF +1." % _who(att))
+			_logln("%s centres itself — ATK +2, DEF +1, heals 20%%." % _who(att))
 			await _beat(0.4)
 		_:
 			if power > 0.0:

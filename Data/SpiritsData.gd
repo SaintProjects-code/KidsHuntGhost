@@ -45,75 +45,75 @@ const TYPE_COLORS := {
 
 # ─── Abilities (ported from the reference game) ───────────────────────────────
 const ABILITY_DATA := {
-	"intimidate":    {"name":"Intimidate",    "cat":"Match Start", "desc":"Match start: opponent team loses -1 ATK"},
+	"intimidate":    {"name":"Intimidate",    "cat":"Match Start", "desc":"Match start: the first two opponents lose -1 ATK"},
 	"drought":       {"name":"Drought",       "cat":"Round Start · Lead", "desc":"Round start: your whole team gains +1 ATK"},
 	"thunder_wave":  {"name":"Thunder Wave",  "cat":"Match Start", "desc":"Match start: Stun the opponent lead for 2 rounds"},
 	"veteran":       {"name":"Veteran",       "cat":"Match Start", "desc":"Match start: 1+ star: +2 ATK and immune to status"},
 	"screech":       {"name":"Screech",       "cat":"Match Start", "desc":"Match start: opponent lead loses -2 DEF"},
-	"spikes":        {"name":"Spikes",        "cat":"Match Start", "desc":"Match start: each opponent takes 30 dmg on first entry"},
+	"spikes":        {"name":"Spikes",        "cat":"Match Start", "desc":"Match start: each opponent takes 45 dmg on first entry"},
 	"confuse_ray":   {"name":"Confuse Ray",   "cat":"Match Start", "desc":"Match start: Confuse the opponent lead 2–3 rounds"},
-	"tailwind":      {"name":"Tailwind",      "cat":"Match Start", "desc":"Match start: your whole team gains +3 SPD"},
-	"speed_boost":   {"name":"Speed Boost",   "cat":"Match Start", "desc":"Match start: your team gains +1 SPD and +1 ATK"},
+	"tailwind":      {"name":"Tailwind",      "cat":"Match Start", "desc":"Match start: your whole team gains +2 SPD"},
+	"speed_boost":   {"name":"Speed Boost",   "cat":"Match Start", "desc":"Match start: your team gains +1 SPD; self +1 ATK"},
 	"taunt":         {"name":"Taunt",         "cat":"Match Start", "desc":"Match start: opponent cannot heal or inflict status"},
 	"sniper":        {"name":"Sniper",        "cat":"Match Start", "desc":"Match start: deal 25×(ATK/2) to a random opponent"},
-	"fire_bond":     {"name":"Fire Bond",     "cat":"Match Start", "desc":"Match start: +1 ATK per Fire ally; team +1 DEF"},
-	"water_bond":    {"name":"Water Bond",    "cat":"Match Start", "desc":"Match start: +1 ATK per Water ally; team +3 DEF"},
+	"fire_bond":     {"name":"Fire Bond",     "cat":"Match Start", "desc":"Match start: +1 ATK per Fire ally; self +1 DEF"},
+	"water_bond":    {"name":"Water Bond",    "cat":"Match Start", "desc":"Match start: +1 ATK per Water ally; team +1 DEF"},
 	"grass_bond":    {"name":"Grass Bond",    "cat":"Match Start", "desc":"Match start: +1 ATK per Grass ally; team +2 HP Tier"},
-	"electric_bond": {"name":"Electric Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Electric ally; team +3 SPD"},
-	"fighting_bond": {"name":"Fighting Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Fighting ally; team +1 DEF"},
+	"electric_bond": {"name":"Electric Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Electric ally; team +1 SPD"},
+	"fighting_bond": {"name":"Fighting Bond", "cat":"Match Start", "desc":"Match start: +1 ATK per Fighting ally; self +1 DEF"},
 	"psychic_bond":  {"name":"Psychic Bond",  "cat":"Match Start", "desc":"Match start: +1 ATK per Psychic ally; team immune to status"},
 	"dark_bond":     {"name":"Dark Bond",     "cat":"Match Start", "desc":"Match start: +1 ATK per Dark ally; opponent team -2 DEF"},
-	"u_turn":        {"name":"U-Turn",        "cat":"Match Start · Lead", "desc":"Match start: hit the lead, then switch out (ally +1 ATK)"},
-	"wish":          {"name":"Wish",          "cat":"Round Start", "desc":"Round start: heal all team spirits 20 HP"},
+	"u_turn":        {"name":"U-Turn",        "cat":"Match Start · Lead", "desc":"Match start: hit the lead hard, then switch out (ally +1 ATK)"},
+	"wish":          {"name":"Wish",          "cat":"Round Start", "desc":"Round start: heal all team spirits 15 HP"},
 	"regenerator":   {"name":"Regenerator",   "cat":"Round Start", "desc":"Round start: heal 30% max HP; if full, +1 ATK (max 3)"},
-	"medic":         {"name":"Medic",         "cat":"Round Start · Once", "desc":"Round start: 30% to revive a downed ally to 25% HP"},
+	"medic":         {"name":"Medic",         "cat":"Round Start · Once", "desc":"Round start: 50% to revive a downed ally to 35% HP"},
 	"leech_seed":    {"name":"Leech Seed",    "cat":"Round Start · Lead", "desc":"Round start: drain 10 HP from the lead (2× if statused)"},
 	"berserker":     {"name":"Berserker",     "cat":"Round Start · Lead", "desc":"Round start: +2 ATK, lose 20 HP"},
-	"drain_punch":   {"name":"Drain Punch",   "cat":"Round Start · Lead", "desc":"Round start: deal 25% ATK to the lead and heal that amount"},
-	"healer":        {"name":"Healer",        "cat":"Round Start", "desc":"Round start: heal the lead 40 HP (not while leading)"},
+	"drain_punch":   {"name":"Drain Punch",   "cat":"Round Start · Lead", "desc":"Round start: deal 15% ATK to the lead and heal that amount"},
+	"healer":        {"name":"Healer",        "cat":"Round Start", "desc":"Round start: heal the lead 30 HP (not while leading)"},
 	"dynasty":       {"name":"Dynasty",       "cat":"Round Start · Lead", "desc":"Round start: heal 20 HP while leading"},
-	"helping_hand":  {"name":"Helping Hand",  "cat":"Passive", "desc":"If lead drops below 45% HP, swap in and soak the hit"},
+	"helping_hand":  {"name":"Helping Hand",  "cat":"Passive", "desc":"If lead drops below 45% HP, swap in with +2 DEF and soak the hit"},
 	"vengeance":     {"name":"Vengeance",     "cat":"Passive", "desc":"When any ally faints, deal ATK to a lead"},
-	"encore":        {"name":"Encore",        "cat":"Passive", "desc":"Lead: opponent's ability suppressed for 3 rounds"},
-	"static":        {"name":"Static",        "cat":"Passive · Lead", "desc":"30% to Stun the attacker when hit"},
-	"poison_point":  {"name":"Poison Point",  "cat":"Passive · Lead", "desc":"Poison the attacker when hit"},
+	"encore":        {"name":"Encore",        "cat":"Passive", "desc":"Lead: opponent's ability suppressed for 5 rounds"},
+	"static":        {"name":"Static",        "cat":"Passive · Lead", "desc":"50% to Stun the attacker when hit"},
+	"poison_point":  {"name":"Poison Point",  "cat":"Passive · Lead", "desc":"Poison the attacker for 4 rounds when hit (first hit also -1 ATK)"},
 	"flame_body":    {"name":"Flame Body",    "cat":"Passive · Lead", "desc":"Burn the attacker when hit"},
 	"thick_fat":     {"name":"Thick Fat",     "cat":"Passive · Lead", "desc":"All incoming damage reduced by 20%"},
 	"thief":         {"name":"Thief",         "cat":"Passive · Lead", "desc":"On hit: steal +1 ATK (max 3×)"},
-	"moxie":         {"name":"Moxie",         "cat":"Passive · Lead", "desc":"On KO: gain +2 ATK"},
+	"moxie":         {"name":"Moxie",         "cat":"Passive · Lead", "desc":"On KO: gain +2 ATK and +1 SPD"},
 	"battle_armor":  {"name":"Battle Armor",  "cat":"Passive · Lead", "desc":"Lead: incoming damage halved for the first 2 rounds"},
 	"grit":          {"name":"Grit",          "cat":"Passive · Lead", "desc":"Below 30% HP: incoming damage reduced by 30%"},
-	"counter":       {"name":"Counter",       "cat":"Passive · Lead", "desc":"When hit for 50+: deal back 40% of that damage"},
+	"counter":       {"name":"Counter",       "cat":"Passive · Lead", "desc":"When hit for 30+: deal back 50% of that damage"},
 	"sturdy":        {"name":"Sturdy",        "cat":"Passive · Lead · Once", "desc":"Survive one KO per battle at 1 HP"},
 	"hypnosis":      {"name":"Hypnosis",      "cat":"Passive · Lead · Once", "desc":"Lead: opponent falls Asleep"},
 	"all_for_one":   {"name":"Underdog",      "cat":"Entry", "desc":"On entry: if the enemy has more spirits standing, +2 ATK and +2 SPD"},
-	"reflect":       {"name":"Reflect",       "cat":"Passive · Lead · Once", "desc":"Lead: your whole team gains +2 DEF"},
+	"reflect":       {"name":"Reflect",       "cat":"Passive · Lead · Once", "desc":"Lead: your whole team gains +1 DEF"},
 	"shell_smash":   {"name":"Shell Smash",   "cat":"Passive · Lead · Once", "desc":"Lead: DEF -3, ATK +3, SPD +1"},
 	"explosion":     {"name":"Explosion",     "cat":"Passive · Lead · Once", "desc":"On faint: deal 60% max HP as damage"},
 	"destiny_bond":  {"name":"Destiny Bond",  "cat":"Passive · Lead · Once", "desc":"On faint: the killer also faints"},
 	"anger_point":   {"name":"Anger Point",   "cat":"Passive · Lead · Once", "desc":"On a KO blow: survive at 1 HP and gain +3 ATK"},
 	"multiscale":    {"name":"Multiscale",    "cat":"Passive · Lead · Once", "desc":"Lead: if full HP, take 50% less from the first hit"},
-	"overgrow":      {"name":"Overgrow",      "cat":"Passive · Lead · Once", "desc":"Below 50% HP: +2 ATK and +1 DEF for the battle"},
-	"blaze":         {"name":"Blaze",         "cat":"Passive · Lead · Once", "desc":"Below 33% HP: permanently +4 ATK and +2 SPD"},
+	"overgrow":      {"name":"Overgrow",      "cat":"Passive · Lead · Once", "desc":"Below 50% HP: +3 ATK and +2 DEF for the battle"},
+	"blaze":         {"name":"Blaze",         "cat":"Passive · Lead · Once", "desc":"Below 33% HP: permanently +3 ATK and +1 SPD"},
 	"flash_fire":    {"name":"Flash Fire",    "cat":"Passive · Lead", "desc":"25% when hit: negate damage and gain +2 ATK"},
 	"volt_absorb":   {"name":"Volt Absorb",   "cat":"Passive · Lead", "desc":"35% when hit: absorb the damage as HP"},
 	"soul_heart":    {"name":"Soul Heart",    "cat":"Passive · Lead", "desc":"On KO: gain +1 ATK and +1 DEF (stacks)"},
-	"bulwark":       {"name":"Bulwark",       "cat":"Passive · Lead", "desc":"Lead: +2 DEF while above 50% HP"},
+	"bulwark":       {"name":"Bulwark",       "cat":"Passive · Lead", "desc":"Lead: takes 35% less damage while above 50% HP"},
 	"fortress":      {"name":"Fortress",      "cat":"Passive · Lead", "desc":"Lead: +1 DEF per round survived (max +3)"},
 	"iron_will":     {"name":"Iron Will",     "cat":"Round Start · Lead", "desc":"Round start: if full HP, gain +1 ATK"},
 	"monument":      {"name":"Last Stand",    "cat":"Entry · Once", "desc":"On entry as your last spirit standing: +2 ATK/DEF/SPD"},
 	"reckless":      {"name":"Reckless",      "cat":"Passive · Lead", "desc":"Deal +25% damage but take +15% damage"},
 	"spore":         {"name":"Spore",         "cat":"Passive · Lead", "desc":"When hit: inflict a random status on the attacker"},
 	# ── interactive set ──────────────────────────────────────────────────────
-	"mayhem":        {"name":"Mayhem",        "cat":"Match Start", "desc":"Match start: shuffle the opponent's whole team randomly"},
+	"mayhem":        {"name":"Mayhem",        "cat":"Match Start", "desc":"Match start: shuffle the opponent's team; they all lose -1 SPD"},
 	"fallen":        {"name":"Fallen",        "cat":"Passive", "desc":"+1 ATK and +1 DEF each time an ally faints"},
-	"electric_field":{"name":"Electric Field","cat":"Round Start · Lead", "desc":"Round start: deal 50% ATK to two random opponents (bench included)"},
+	"electric_field":{"name":"Electric Field","cat":"Round Start · Lead", "desc":"Round start: deal 30% ATK to two random opponents (bench included)"},
 	"mind_hold":     {"name":"Mind Hold",     "cat":"Match Start", "desc":"Match start: cancel two opponent spirits' abilities for the battle"},
 	"bodyguard":     {"name":"Bodyguard",     "cat":"Passive", "desc":"Redirect the first hit each round away from a hurt ally"},
 	"phoenix":       {"name":"Phoenix",       "cat":"Passive · Once", "desc":"On faint: revive once at 30% HP"},
 	# ── move set (work with signature moves) ─────────────────────────────────
-	"focus_energy":  {"name":"Focus Energy",  "cat":"Match Start", "desc":"Match start: its move starts one charge from ready"},
-	"overcharge":    {"name":"Overcharge",    "cat":"Passive", "desc":"Its move hits (and heals) 30% harder"},
+	"focus_energy":  {"name":"Focus Energy",  "cat":"Match Start", "desc":"Match start: its move starts one charge from ready; +1 ATK"},
+	"overcharge":    {"name":"Overcharge",    "cat":"Passive", "desc":"Its move hits (and heals) 60% harder"},
 	"rally_call":    {"name":"Rally Call",    "cat":"Passive", "desc":"Each time it uses its move, the team gains +1 ATK (max 2×)"},
 }
 
@@ -140,18 +140,18 @@ const MOVES := {
 	# Electric — speed and spread
 	"spark_rush":   {"name": "Spark Rush",   "type": "Electric", "charge": 1, "power": 1.2, "desc": "Quick hit ×1.2; self SPD +1"},
 	"chain_bolt":   {"name": "Chain Bolt",   "type": "Electric", "charge": 3, "power": 0.8, "desc": "Hit up to 3 enemies ×0.8"},
-	"thunderclap":  {"name": "Thunderclap",  "type": "Electric", "charge": 2, "power": 1.3, "desc": "Hit ×1.3; stun the target"},
+	"thunderclap":  {"name": "Thunderclap",  "type": "Electric", "charge": 2, "power": 1.1, "desc": "Hit ×1.1; stun the target"},
 	# Psychic — control
-	"mind_blast":   {"name": "Mind Blast",   "type": "Psychic", "charge": 2, "power": 1.4, "desc": "Hit ×1.4 that ignores DEF"},
+	"mind_blast":   {"name": "Mind Blast",   "type": "Psychic", "charge": 2, "power": 1.2, "desc": "Hit ×1.2 that ignores DEF"},
 	"hex_sleep":    {"name": "Hex Sleep",    "type": "Psychic", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; target sleeps 2 rounds"},
-	"calm_mind":    {"name": "Calm Mind",    "type": "Psychic", "charge": 2, "power": 0.0, "desc": "Self ATK +1, DEF +1, cure status"},
+	"calm_mind":    {"name": "Calm Mind",    "type": "Psychic", "charge": 2, "power": 0.0, "desc": "Self ATK +2, DEF +1, heal 20%, cure status"},
 	# Fighting — raw power and toughness
 	"haymaker":     {"name": "Haymaker",     "type": "Fighting", "charge": 4, "power": 2.6, "desc": "Hit ×2.6; self DEF −1"},
 	"iron_guard":   {"name": "Iron Guard",   "type": "Fighting", "charge": 2, "power": 0.9, "desc": "Hit ×0.9; self DEF +2"},
 	"combo_strike": {"name": "Combo Strike", "type": "Fighting", "charge": 2, "power": 0.8, "desc": "Hit twice ×0.8"},
 	# Dark — debuffs and finishing
 	"shadow_sneak": {"name": "Shadow Sneak", "type": "Dark", "charge": 2, "power": 1.3, "desc": "Hit ×1.3; ×2 if the target is below half HP"},
-	"curse":        {"name": "Curse",        "type": "Dark", "charge": 3, "power": 0.6, "desc": "Hit ×0.6; target is poisoned 4 rounds"},
+	"curse":        {"name": "Curse",        "type": "Dark", "charge": 2, "power": 0.8, "desc": "Hit ×0.8; target is poisoned 4 rounds"},
 	"dread":        {"name": "Dread",        "type": "Dark", "charge": 2, "power": 0.9, "desc": "Hit ×0.9; target ATK −2"},
 }
 
@@ -457,7 +457,16 @@ func get_spirit(spirit_name: String) -> Dictionary:
 	var base: Dictionary = SPIRITS[spirit_name]
 	var s: Dictionary = base.duplicate(true)
 	s["name"] = spirit_name
-	s["hp"] = 30 + int(base.get("hp_stat", 1)) * 30
+	for stat in STARTER_TWEAKS.get(spirit_name, {}):
+		s[stat] = clampi(int(s.get(stat, 1)) + int(STARTER_TWEAKS[spirit_name][stat]), 1, 6)
+	if NERF_BEST_STAT.has(spirit_name) or BUFF_WORST_STAT.has(spirit_name):
+		var stats := ["hp_stat", "atk", "def", "spd"]
+		stats.sort_custom(func(a, b): return int(s.get(a, 1)) > int(s.get(b, 1)))
+		if NERF_BEST_STAT.has(spirit_name):
+			s[stats[0]] = clampi(int(s[stats[0]]) - 1, 1, 6)
+		else:
+			s[stats[-1]] = clampi(int(s[stats[-1]]) + 1, 1, 6)
+	s["hp"] = 30 + int(s.get("hp_stat", 1)) * 30
 	s["current_hp"] = s["hp"]
 	s["stars"] = 0
 	s["ability"] = pick_ability_for_type(base["type"], base.get("type2", ""))
@@ -484,6 +493,21 @@ func move_key(s: Dictionary) -> String:
 # wild or in events, so only their trainer owns one. Legendaries are barred
 # from the wild too; they appear ONLY through the legendary event.
 const STARTER_NAMES := ["Cinderwisp", "Puddleboo", "Mossprig", "Zapkin", "Brawlboo", "Wispy", "Dreamwisp"]
+
+# Evens out the starters (balance sim: Zapkin won 66% of battles, Puddleboo,
+# Wispy and Dreamwisp 42–43%). Stat tiers, applied when the spirit is created;
+# their evolutions keep their own stats. hp_stat +1 = +30 HP.
+const STARTER_TWEAKS := {
+	"Zapkin":    {"spd": -1},
+	"Puddleboo": {"atk": 1},
+	"Wispy":     {"def": 1},
+	"Dreamwisp": {"hp_stat": 1},
+}
+
+# Balance sim outliers (3,000 random 3v3 battles). The strongest lose 1 tier
+# from their highest stat, the weakest gain 1 tier in their lowest.
+const NERF_BEST_STAT := ["Buzzghast", "Twinbeak", "Sparkbolt", "Crowcrypt", "Bullghast"]   # 61–68%
+const BUFF_WORST_STAT := ["Smogling", "Pincergeist", "Snoozelord", "Fuzzgeist", "Clamcrypt"]   # 36–40%
 const LEGENDARY_NAMES := ["Frostcrown", "Stormcrown", "Flamecrown", "Omenwraith", "Glimmer"]
 
 # A random wild spirit of the given stage — never a starter or a legendary.

@@ -65,6 +65,7 @@ func _ready() -> void:
 	if GameState.players.is_empty():
 		_make_dummies()
 	_spawn_tokens()
+	_setup_3d_view()
 	_spawn_hud()
 	choice_panel.move_to_front()   # popups above the HUD
 	event_panel.move_to_front()
@@ -129,6 +130,19 @@ func _load_map() -> Node2D:
 	remove_child(base)
 	base.queue_free()
 	return m
+
+# Boards flagged "view_3d" are shown in 3D. The 2D map and tokens stay in the
+# tree, hidden, because the game logic still reads and moves them.
+func _setup_3d_view() -> void:
+	var info: Dictionary = GameData.map_info(GameState.active_map)
+	if not info.get("view_3d", false):
+		return
+	map.hide()
+	var view: CanvasLayer = preload("res://Scenes/Board/View3D/Board3DView.gd").new()
+	view.name = "Board3DView"
+	add_child(view)
+	# Towns listed as "villages" keep their houses; any others are built as cities.
+	view.setup(map, camera, _tokens, info)
 
 func _deal_starting_cards() -> void:
 	# some boards start everyone with a few spirits (3v3 from turn one)
@@ -256,7 +270,7 @@ func _on_turn_started(idx: int) -> void:
 	info_label.text = "%s's turn — roll!" % p.player_name
 	roll_button.disabled = p.is_cpu
 	end_turn_button.disabled = true   # can't end a turn before moving
-	fly_button.visible = not p.is_cpu and p.progress.badge_count() >= Balance.FLY_BADGES
+	fly_button.visible = not p.is_cpu and p.progress.badge_count() >= GameState.trail_badges
 	if idx < _tokens.size():
 		_follow = _tokens[idx]
 	_reposition_tokens()
@@ -326,7 +340,12 @@ func _on_dice_rolled(total: int, faces: Array) -> void:
 	var bonus := total
 	for f in faces:
 		bonus -= int(f)
-	await hud.show_roll(faces, bonus, p.color)
+	# 3D boards throw real dice beside the player; 2D boards use the HUD tray.
+	var view := get_node_or_null("Board3DView")
+	if view != null:
+		await view.roll_dice(idx, faces, bonus)
+	else:
+		await hud.show_roll(faces, bonus, p.color)
 	info_label.text = "%s rolled %d" % [p.player_name, total]
 	await _move_player(idx, total)
 	if p.is_cpu:
@@ -399,7 +418,7 @@ func _cpu_pre_roll(idx: int) -> bool:
 		await get_tree().process_frame
 		while _jumping:
 			await get_tree().process_frame
-	elif p.progress.badge_count() >= Balance.FLY_BADGES and not _on_trail(idx):
+	elif p.progress.badge_count() >= GameState.trail_badges and not _on_trail(idx):
 		var fly_to := CpuBrain.wanted_town(p, graph.cities, _visited[idx], here, false)
 		if fly_to == "":
 			return false
@@ -722,10 +741,26 @@ func _apply_tile(i: int, type: StringName) -> void:
 	if map.GHOST_TILES.has(type):
 		await _start_encounter(i, type)
 	elif type == &"CLASH":
+		await _landing_show(i, type)
 		await _run_clash(i)
 	else:
+		if type == &"EVENT" or type == &"ITEM":
+			await _landing_show(i, type)
 		EventBus.tile_action.emit(i, type)
 		await EventBus.tile_resolved
+
+# 3D boards with "landing_shows": the bush beside the tile rustles and the
+# thing you landed on (spirit, gift, "?", rival) hops out before its window.
+func _landing_show(i: int, type: StringName, spirit: Dictionary = {}) -> void:
+	var view := get_node_or_null("Board3DView")
+	if view != null:
+		await view.play_landing(i, _space_index(i), type, spirit)
+
+# Index into map.spaces of the road tile player `i` stands on, or -1 at a node.
+func _space_index(i: int) -> int:
+	if _at_node(i):
+		return -1
+	return graph.route_space_start[_route_of[i]] + _index_of[i] - 1
 
 # Ghost tile: announce the spirit, then wait for the encounter flow.
 func _start_encounter(i: int, type: StringName) -> void:
@@ -739,6 +774,7 @@ func _start_encounter(i: int, type: StringName) -> void:
 	if p.lure:
 		p.lure = false
 		spirit["_lured"] = true
+	await _landing_show(i, type, spirit)
 	Sfx.play("boo", 1.3)
 	await _show_flash("%s — a wild %s appeared!" % [p.player_name, spirit.get("name", "?")], 1.0)
 	EventBus.wild_encounter_started.emit(i, spirit)

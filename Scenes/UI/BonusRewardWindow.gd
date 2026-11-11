@@ -11,18 +11,17 @@ signal chose_stat(stat: String)   # stat reward: player picked a stat
 
 const STAT_LABELS := {"hp": "HP", "atk": "ATK", "def": "DEF", "spd": "SPD"}
 
-# lvl 1 (replace) or lvl 3 (add): the player chooses from `options` (ability
-# keys), each shown with its description. `replaced` is the old key, or "".
+# lvl 1 and lvl 3: swap the spirit's one ability. The player chooses from
+# `options` (ability keys), each shown with its description, or keeps the
+# current one. `replaced` is the current key ("" if it somehow has none).
 func present_ability(spirit: Dictionary, lvl: int, options: Array, replaced: String) -> void:
 	var vb := _build(spirit, lvl)
-	# Replace (1st bonus) lets you opt out and keep your current ability; the
-	# add (3rd bonus) is purely additive — you always gain a new second ability.
 	var can_keep: bool = replaced != ""
 	if can_keep:
 		var old: Dictionary = SpiritsData.ability_of(replaced)
 		vb.add_child(_subtitle("Pick a new ability to replace %s" % old.get("name", replaced)))
 	else:
-		vb.add_child(_subtitle("Pick a new second ability for %s" % spirit.get("name", "?")))
+		vb.add_child(_subtitle("Pick an ability for %s" % spirit.get("name", "?")))
 	for key in options:
 		vb.add_child(_ability_option(String(key)))
 	if can_keep:

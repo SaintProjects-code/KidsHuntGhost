@@ -4,7 +4,8 @@ extends MenuWindow
 ##   dice to your 1 free die — then ROLL. Add the dice up; reach the target and
 ##   it's caught. Two tries: a miss raises the target, a second miss and it
 ##   flees. A Soul Lantern is a sure catch. Your chance is shown before you roll.
-## present(idx, spirit); emits done("caught" | "fled" | "left").
+##   Or fight it 1v1 with your lead first (once per ghost): see EncounterController.
+## present(idx, spirit, already_fought); emits done("caught" | "fled" | "left" | "fight").
 ## CPU catches play themselves in the same window.
 
 signal done(outcome: String)
@@ -23,10 +24,12 @@ var _info: Label
 var _target_lbl: Label
 var _cards_row: HBoxContainer
 var _odds: Label
+var _roll_row: HBoxContainer
 var _dice_row: HBoxContainer
 var _sum: Label
 var _result: Label
 var _roll_btn: Button
+var _fight_btn: Button
 var _leave_btn: Button
 
 func _ready() -> void:
@@ -54,15 +57,17 @@ func _ready() -> void:
 	col.add_child(_cards_row)
 	_odds = UIKit.wrap_label("", 16, 580)
 	col.add_child(_odds)
-	var roll_row := UIKit.hbox(16)
-	roll_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	roll_row.custom_minimum_size.y = 60
-	col.add_child(roll_row)
+	# the dice and the result line only take room once there's something to show
+	# (they used to leave a big empty gap above the buttons)
+	_roll_row = UIKit.hbox(16)
+	_roll_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_roll_row.custom_minimum_size.y = 60
+	col.add_child(_roll_row)
 	_dice_row = UIKit.hbox(10)
-	roll_row.add_child(_dice_row)
+	_roll_row.add_child(_dice_row)
 	_sum = UIKit.label("", 22)
 	_sum.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	roll_row.add_child(_sum)
+	_roll_row.add_child(_sum)
 	_result = UIKit.wrap_label("", 17, 580)
 	col.add_child(_result)
 	var actions := UIKit.hbox(10)
@@ -71,6 +76,8 @@ func _ready() -> void:
 	_roll_btn = _button("🎲 Roll!", _roll, 48, "gold")
 	_roll_btn.custom_minimum_size.x = 220
 	actions.add_child(_roll_btn)
+	_fight_btn = _button("⚔ Fight 1v1", _fight, 48, "primary")
+	actions.add_child(_fight_btn)
 	_leave_btn = _button("Leave", func(): _finish("left"), 48)
 	actions.add_child(_leave_btn)
 	EventBus.catch_succeeded.connect(_on_succeeded)
@@ -80,16 +87,19 @@ func _ready() -> void:
 func _player() -> PlayerData:
 	return GameState.players[_idx]
 
-func present(idx: int, spirit: Dictionary, _unused: bool = false) -> void:
+func present(idx: int, spirit: Dictionary, already_fought: bool = false) -> void:
 	_idx = idx
 	_spirit = spirit
 	_cpu = _player().is_cpu
+	_fight_btn.visible = not already_fought
 	_busy = false
 	_over = false
 	_picked = []
 	_result.text = ""
+	_result.hide()
 	_sum.text = ""
 	UIKit.clear(_dice_row)
+	_roll_row.hide()
 	_sprite.texture = SpiritsData.sprite_tex(spirit.get("name", ""), "front")
 	_sprite.modulate = Color.WHITE
 	_sprite.scale = Vector2.ONE
@@ -126,7 +136,12 @@ func _refresh() -> void:
 			CatchSystem.chance(_spirit, _picked)]
 	_roll_btn.text = ("✨ Catch!" if CatchSystem.is_sure(_picked) else "🎲 Roll %d!" % dice)
 	_roll_btn.disabled = _cpu or _busy or _over
+	_fight_btn.disabled = _cpu or _busy or _over or _player().living_team().is_empty()
 	_leave_btn.disabled = _cpu or _busy or _over
+
+func _fight() -> void:
+	if not (_busy or _over):
+		_finish("fight")
 
 func _toggle(key: String, cv: CardView) -> void:
 	if _busy or _over:
@@ -150,6 +165,7 @@ func _roll() -> void:
 	Sfx.play("whoosh")
 	var total := 0
 	UIKit.clear(_dice_row)
+	_roll_row.show()
 	if not CatchSystem.is_sure(used):
 		var dice: Array = []
 		var faces: Array = []
@@ -189,6 +205,7 @@ func _on_succeeded(idx: int, spirit: Dictionary) -> void:
 	tw.tween_property(_sprite, "modulate", Color(1.5, 1.5, 2.0, 0.0), 0.25)
 	var where := "sent to the Spirit Box (team full)" if _player().pc.has(spirit) else "caught"
 	_result.text = "Gotcha! %s was %s!" % [spirit.get("name", "?"), where]
+	_result.show()
 	_result.add_theme_color_override("font_color", UIKit.GOOD)
 	_refresh()
 	await get_tree().create_timer(1.3).timeout
@@ -201,6 +218,7 @@ func _on_failed(idx: int, s: Dictionary) -> void:
 	Juice.shake(_sprite, 10.0)
 	_busy = false
 	_result.add_theme_color_override("font_color", UIKit.BAD)
+	_result.show()
 	if int(s.get("catch_fails", 0)) >= Balance.CATCH_THROWS:
 		_over = true
 		_result.text = "Oh no! %s slipped away into the mist!" % _spirit.get("name", "?")
@@ -215,7 +233,7 @@ func _on_failed(idx: int, s: Dictionary) -> void:
 
 func _finish(outcome: String) -> void:
 	_over = true
-	if outcome != "caught":
+	if outcome == "fled" or outcome == "left":
 		EventBus.log_entry.emit(_idx, "The wild %s got away." % _spirit.get("name", "?") if outcome == "fled"
 			else "%s leaves the wild %s alone." % [_player().player_name, _spirit.get("name", "?")], "#aaaaaa")
 	done.emit(outcome)
