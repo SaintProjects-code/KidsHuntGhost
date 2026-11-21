@@ -40,9 +40,10 @@ func _hunt_it(idx: int, spirit: Dictionary, already_fought: bool) -> void:
 	if outcome == "fight" and await _fight_with_lead(idx, spirit):
 		await _hunt_it(idx, spirit, true)
 
-# Team + card select (humans) and a battle vs one event spirit. True on a win.
+# A battle vs one wild/event spirit: no team screen — your first spirits that
+# can fight go straight in (with your two best tactic cards). True on a win.
 func _fight(idx: int, spirit: Dictionary) -> bool:
-	var pick := await BattleSetup.pick_for(_select, idx, "vs %s" % spirit.get("name", "?"), [spirit])
+	var pick := await BattleSetup.pick_for(_select, idx, "vs %s" % spirit.get("name", "?"), [spirit], false)
 	if pick.is_empty():
 		return false
 	return await _battle_spirit(idx, pick["team"], pick["cards"], spirit, "%s attacks!" % spirit.get("name", "?"))

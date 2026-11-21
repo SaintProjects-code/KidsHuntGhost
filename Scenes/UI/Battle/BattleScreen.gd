@@ -62,6 +62,7 @@ func remote_owners() -> Array:
 func present(setup: Dictionary) -> void:
 	var team: Array = setup.get("team", [])
 	var color: Color = setup.get("color", Color.WHITE)
+	_set_mode()   # 3D maps → the arena; 2D maps → the card rows
 	_pvp_names = setup.get("pvp_names", [])
 	_team_disc.set_data(GameData.trainer_texture(setup.get("trainer", [])), color)
 	_opp_disc.set_data(GameData.trainer_texture(setup.get("foe_trainer", [])), ENEMY_RED)
@@ -115,6 +116,13 @@ func present(setup: Dictionary) -> void:
 		_logln("[color=#9f9]Blessed! ATK +%d this battle.[/color]" % atk_mod)
 	elif atk_mod < 0:
 		_logln("[color=#f99]Spooked! ATK %d this battle.[/color]" % atk_mod)
+	if _use_arena:
+		# trainers: yours in your colour; a rival's in theirs; NPC leaders in
+		# grey; a wild spirit has none
+		var opp_col = setup.get("opp_color", null)
+		if opp_col == null and not setup.get("foe_trainer", []).is_empty():
+			opp_col = ArenaScript.NPC_COLOR
+		_arena.begin([color, opp_col], [_team_name_lbl.text, _pvp_names[1] if _pvp_names.size() == 2 else ""])
 	_build_cards()
 	_refresh()
 	_refresh_hands()
@@ -269,6 +277,8 @@ func _play_tactic(key: String, is_me: bool) -> void:
 	if not _quiet():
 		Sfx.play("card")
 		Juice.pop(_card_of(me), 1.12)
+		if _use_arena:
+			_arena.ability(me)
 	_logln("[color=#7fe0d0]%s plays %s![/color]" % [
 		(_team_name_lbl.text if is_me else _opp_name_lbl.text), CardsData.card_name(key)])
 	var info := CardsData.card(key)
@@ -418,13 +428,16 @@ func autoplay() -> void:
 	_auto_gen += 1   # the CPU loop below drives this one
 	_auto_btn.hide()
 	_next_btn.disabled = true
-	_skip_btn.disabled = true
+	_skip_btn.disabled = false   # anyone watching can skip a CPU battle too
 	while not _over:
 		await get_tree().create_timer(0.5).timeout
+		if _skipping:
+			continue   # _on_skip is resolving the rounds
 		if not _busy and not _over:
 			await _round()
 	_continue_btn.hide()   # no button — the caller closes the window
-	await get_tree().create_timer(1.8).timeout
+	# (_on_skip disables the button, so a disabled one means it was skipped)
+	await get_tree().create_timer(0.4 if _skip_btn.disabled else 1.8).timeout
 
 # Resolve the whole battle instantly (no animations, no beats, no cards).
 func _on_skip() -> void:
@@ -693,13 +706,20 @@ func spectator_view(idx: int) -> Dictionary:
 		var got: String = _vote_paid.get(idx, "")
 		return {"title": "🗳 You picked %s" % names[_votes[idx]],
 			"lines": ["✅ Right! You get %s." % got if got != "" else "❌ Wrong guess this time."]}
+	var v: Dictionary
 	if _votes.has(idx):
-		return {"title": "🗳 You picked %s" % names[_votes[idx]], "lines": ["Right guess = +1 card (★ if your hand is full)."]}
-	if _round_num >= VOTE_ROUNDS:
-		return {"title": "🗳 Voting closed", "lines": ["%s vs %s" % names]}
-	return {"title": "🗳 Who wins this battle?", "lines": ["Votes close at round %d. Right guess = +1 card (★ if your hand is full)." % VOTE_ROUNDS],
-		"buttons": [{"label": "🟢 " + names[0], "gold": true, "desc": _voters_of(0)}, {"label": "🔴 " + names[1], "gold": true, "desc": _voters_of(1)}],
-		"_actions": [_vote.bind(idx, 0), _vote.bind(idx, 1)]}
+		v = {"title": "🗳 You picked %s" % names[_votes[idx]], "lines": ["Right guess = +1 card (★ if your hand is full)."]}
+	elif _round_num >= VOTE_ROUNDS:
+		v = {"title": "🗳 Voting closed", "lines": ["%s vs %s" % names]}
+	else:
+		v = {"title": "🗳 Who wins this battle?", "lines": ["Votes close at round %d. Right guess = +1 card (★ if your hand is full)." % VOTE_ROUNDS],
+			"buttons": [{"label": "🟢 " + names[0], "gold": true, "desc": _voters_of(0)}, {"label": "🔴 " + names[1], "gold": true, "desc": _voters_of(1)}],
+			"_actions": [_vote.bind(idx, 0), _vote.bind(idx, 1)]}
+	# anyone can skip any battle, watching or fighting
+	if _skip_btn.is_visible_in_tree() and not _skip_btn.disabled:
+		v["buttons"] = v.get("buttons", []) + [{"label": "⏩ Skip battle"}]
+		v["_actions"] = v.get("_actions", []) + [Remote.press_action(_skip_btn)]
+	return v
 
 func _voters_of(side: int) -> String:
 	var who: Array = _votes.keys().filter(func(i): return int(_votes[i]) == side and i < GameState.players.size()) \
@@ -716,7 +736,8 @@ func _vote(idx: int, side: int) -> void:
 
 # A small trainer portrait for every vote, under the side it backs.
 func _show_votes() -> void:
-	for box in [_team_voters, _opp_voters]:
+	var boxes := _voter_boxes()
+	for box in boxes:
 		UIKit.clear(box)
 	for idx in _votes:
 		if idx >= GameState.players.size():
@@ -725,7 +746,7 @@ func _show_votes() -> void:
 		var pic := UIKit.sprite(GameData.trainer_texture(GameData.player_trainer(p)), Vector2(24, 24))
 		pic.tooltip_text = "%s votes for this side" % p.player_name
 		pic.modulate = p.color.lightened(0.4)
-		(_team_voters if int(_votes[idx]) == 0 else _opp_voters).add_child(pic)
+		boxes[0 if int(_votes[idx]) == 0 else 1].add_child(pic)
 
 # Right guesses: a random card, or a star on a spirit when the hand is full.
 func _pay_votes(left_won: bool) -> void:

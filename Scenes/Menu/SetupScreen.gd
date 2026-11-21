@@ -1,5 +1,5 @@
 extends Control
-## Player setup: 2–4 player cards (name, trainer with its starter, human or
+## Player setup: 2–6 player cards (name, trainer with its starter, human or
 ## CPU), a Game card summing up the settings with a Settings window (map,
 ## battle size, points to win, sound), and 📱 Phones: host a room (see Remote);
 ## every phone that joins takes a human player card and can flip through
@@ -9,8 +9,10 @@ extends Control
 ## and both pop-ups are MenuWindows, so everything fits any screen size.
 
 const MIN_PLAYERS := 2
-const MAX_PLAYERS := 4
+const MAX_PLAYERS := 6
 const CARD_WIDTH := 184.0
+# 5–6 players: narrower cards (and Game card / Add slot) so the row still fits
+const CARD_WIDTH_BY_COUNT := {5: 140.0, 6: 132.0}
 const SIDE_BUTTON_WIDTH := 120.0   # Back, mirrored on the right so the title stays centred
 
 # Trainer (character) roster — each ties to a starter, a colour and a UNIQUE
@@ -28,6 +30,9 @@ const TRAINERS := [
 
 var player_cards: HBoxContainer   # only the player cards: child index = player number - 1
 var _add_slot: Button
+var _game_card: PanelContainer
+var _row: HBoxContainer
+var _row_holder: Control
 var _game_summary: Label
 var _phones_button: Button
 
@@ -89,13 +94,20 @@ func _build_layout() -> void:
 	var middle := CenterContainer.new()
 	middle.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	col.add_child(middle)
+	# the row sits in a plain holder (containers reset a child's scale), so it
+	# can be scaled down to fit when 5–6 player cards make it too wide
+	_row_holder = Control.new()
+	middle.add_child(_row_holder)
 	var row := UIKit.hbox(16)
-	middle.add_child(row)
+	_row = row
+	_row_holder.add_child(row)
+	resized.connect(_fit_row)
 	player_cards = UIKit.hbox(16)
 	row.add_child(player_cards)
 	_add_slot = _make_add_slot()
 	row.add_child(_add_slot)
-	row.add_child(_make_game_card())
+	_game_card = _make_game_card()
+	row.add_child(_game_card)
 
 	var bottom := UIKit.hbox(12)
 	col.add_child(bottom)
@@ -261,6 +273,32 @@ func _relabel() -> void:
 		remove.visible = i >= MIN_PLAYERS and not card.has_meta("remote_id")
 		_apply_trainer(card)
 	_add_slot.visible = player_cards.get_child_count() < MAX_PLAYERS
+	_fit_cards()
+
+# Narrower cards once there are 5 or 6 players, so the whole row stays on screen.
+func _fit_cards() -> void:
+	var n := player_cards.get_child_count()
+	var w: float = CARD_WIDTH_BY_COUNT.get(n, CARD_WIDTH)
+	for card in player_cards.get_children():
+		(card as Control).custom_minimum_size.x = w
+		var icon := card.find_child("PlayerIcon", true, false) as Control
+		if icon:
+			icon.custom_minimum_size.y = 120 if n <= 4 else 96
+	_add_slot.custom_minimum_size.x = 130 if n <= 4 else 90
+	if _game_card:
+		_game_card.custom_minimum_size.x = 190 if n <= 4 else 170
+	_fit_row.call_deferred()
+
+func _fit_row() -> void:
+	if _row == null:
+		return
+	var need := _row.get_combined_minimum_size()
+	var avail := size.x - 48.0
+	var k := minf(1.0, avail / maxf(1.0, need.x))
+	_row.size = need
+	_row.position = Vector2.ZERO
+	_row.scale = Vector2(k, k)
+	_row_holder.custom_minimum_size = need * k
 
 func _is_cpu(card: Node) -> bool:
 	return bool(card.get_meta("cpu", false))

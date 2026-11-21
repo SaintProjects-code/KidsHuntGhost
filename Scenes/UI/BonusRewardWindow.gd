@@ -11,6 +11,10 @@ signal chose_stat(stat: String)   # stat reward: player picked a stat
 
 const STAT_LABELS := {"hp": "HP", "atk": "ATK", "def": "DEF", "spd": "SPD"}
 
+# Whose spirit this is — Remote sends the window to that player's phone (not
+# whoever's turn it happens to be).
+var remote_owner := -1
+
 # lvl 1 and lvl 3: swap the spirit's one ability. The player chooses from
 # `options` (ability keys), each shown with its description, or keeps the
 # current one. `replaced` is the current key ("" if it somehow has none).
@@ -20,14 +24,19 @@ func present_ability(spirit: Dictionary, lvl: int, options: Array, replaced: Str
 	if can_keep:
 		var old: Dictionary = SpiritsData.ability_of(replaced)
 		vb.add_child(_subtitle("Pick a new ability to replace %s" % old.get("name", replaced)))
+		var now := _current_line("Now: %s — %s" % [old.get("name", replaced), old.get("desc", "")])
+		now.set_meta("phone_skip", true)   # on the phone, "Keep …" already says it
+		vb.add_child(now)
 	else:
 		vb.add_child(_subtitle("Pick an ability for %s" % spirit.get("name", "?")))
 	for key in options:
 		vb.add_child(_ability_option(String(key)))
 	if can_keep:
 		# "" = keep the current ability unchanged.
-		vb.add_child(_button("Keep %s" % SpiritsData.ability_of(replaced).get("name", replaced),
-			_pick_ability.bind(""), 34))
+		var keep := _button("Keep %s" % SpiritsData.ability_of(replaced).get("name", replaced),
+			_pick_ability.bind(""), 34)
+		keep.tooltip_text = String(SpiritsData.ability_of(replaced).get("desc", ""))   # shown under it on the phone
+		vb.add_child(keep)
 
 func present_stat(spirit: Dictionary, lvl: int) -> void:
 	var vb := _build(spirit, lvl)
@@ -64,6 +73,13 @@ func _build(spirit: Dictionary, lvl: int) -> VBoxContainer:
 	vb.add_child(spr)
 	return vb
 
+# The ability being replaced, with what it does, so the pick is a fair comparison.
+func _current_line(text: String) -> Label:
+	var l := _subtitle(text)
+	l.add_theme_font_size_override("font_size", 14)
+	l.add_theme_color_override("font_color", Color("9fdcff"))
+	return l
+
 func _subtitle(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
@@ -80,6 +96,7 @@ func _ability_option(key: String) -> Control:
 	box.add_theme_constant_override("separation", 2)
 	var b := _button(String(info.get("name", key)), _pick_ability.bind(key), 38)
 	b.add_theme_font_size_override("font_size", 18)
+	b.tooltip_text = String(info.get("desc", ""))   # the phone shows this under the button
 	box.add_child(b)
 	var d := Label.new()
 	d.text = String(info.get("desc", ""))
@@ -88,6 +105,7 @@ func _ability_option(key: String) -> Control:
 	d.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 	d.add_theme_font_size_override("font_size", 13)
 	d.custom_minimum_size = Vector2(360, 0)
+	d.set_meta("phone_skip", true)   # the phone shows it inside the button instead
 	box.add_child(d)
 	return box
 

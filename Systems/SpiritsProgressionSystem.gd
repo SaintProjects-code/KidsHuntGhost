@@ -47,9 +47,12 @@ func award_stars(player_idx: int, spirit: Dictionary, amount: float) -> void:
 			spirit.get("name", "?"), stat.to_upper()], "#d3a8ff")
 	EventBus.emit_signal("star_awarded", player_idx, spirit)
 	if new_val >= 3.0:
-		# Hitting 3 stars hands off to the bonus-reward flow (which grants the
-		# reward(s) and evolves the spirit if it has an evolution).
-		await BonusReward.run(player_idx, spirit)
+		# Hitting 3 stars hands off to the bonus-reward flow (rewards + evolution),
+		# but never mid-battle or on someone else's turn: the spirit is flagged
+		# and the board runs it on the owner's turn (BonusReward.run_pending).
+		spirit["_reward_pending"] = true
+		EventBus.log_entry.emit(player_idx, "%s is ready to grow — its reward comes on %s's turn." % [
+			spirit.get("name", "?"), GameState.players[player_idx].player_name], "#d3a8ff")
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

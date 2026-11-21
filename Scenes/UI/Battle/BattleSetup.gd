@@ -11,12 +11,18 @@ const BATTLE_CARDS := 2   # tactic cards each side brings into a battle
 # window; CPUs auto-pick (counter-picking against `opp_pool`, the other side's
 # FULL roster — nobody sees the 3 the other side actually brings).
 # Returns {team, cards}, or {} if a human backed out.
-static func pick_for(select: Control, idx: int, vs_text: String, opp_pool: Array) -> Dictionary:
+# `choose` = false skips the window for everyone: the first spirits on the team
+# that can still fight (as many as the battle size, 3 by default) and the two
+# best tactic cards go in. Only town Wardens, the Haunted Four / Spirit Lord and
+# PvP let you choose.
+static func pick_for(select: Control, idx: int, vs_text: String, opp_pool: Array, choose := true) -> Dictionary:
 	var p: PlayerData = GameState.players[idx]
-	if p.is_cpu:
-		return {"team": cpu_team(idx, opp_pool), "cards": cpu_cards(p)}
 	if p.living_team().is_empty():
 		return {}
+	if not choose:
+		return {"team": p.living_team().slice(0, Balance.BATTLE_PICK_MAX), "cards": cpu_cards(p)}
+	if p.is_cpu:
+		return {"team": cpu_team(idx, opp_pool), "cards": cpu_cards(p)}
 	select.present(p, vs_text, opp_pool)
 	UIManager.open(select)
 	return await select.chosen
@@ -47,7 +53,7 @@ static func pvp(a: int, b: int, pick_a: Dictionary, pick_b: Dictionary) -> Dicti
 	var pb: PlayerData = GameState.players[b]
 	return {
 		"team": pick_a["team"], "opp": pick_b["team"], "title": "%s vs %s" % [pa.player_name, pb.player_name],
-		"color": pa.color, "trainer": GameData.player_trainer(pa), "foe_trainer": GameData.player_trainer(pb),
+		"color": pa.color, "opp_color": pb.color, "trainer": GameData.player_trainer(pa), "foe_trainer": GameData.player_trainer(pb),
 		"pvp_names": [pa.player_name, pb.player_name],
 		"hand": pick_a["cards"].duplicate(), "hand_source": pa.inventory.hand, "hand_owner": a, "human": not pa.is_cpu,
 		"opp_hand": pick_b["cards"].duplicate(), "opp_source": pb.inventory.hand, "opp_owner": b, "opp_human": not pb.is_cpu,
@@ -58,6 +64,10 @@ static func pvp(a: int, b: int, pick_a: Dictionary, pick_b: Dictionary) -> Dicti
 # themselves), then hand the stars earned to the real spirits. Returns true if
 # the bottom side (the player) won.
 static func run(battle: Control, setup: Dictionary, idx: int) -> bool:
+	# 3D maps: the VS strip slams in over the dark board first
+	if bool(GameData.map_info(GameState.active_map).get("view_3d", false)):
+		preload("res://Scenes/UI/Battle/BattleArena.gd").board_ui_shown(battle.get_tree(), false)
+		await preload("res://Scenes/UI/Battle/VsBanner.gd").play(battle.get_tree(), setup)
 	battle.present(setup)
 	UIManager.open(battle)
 	var won: bool
@@ -66,6 +76,11 @@ static func run(battle: Control, setup: Dictionary, idx: int) -> bool:
 	else:
 		await battle.autoplay()
 		won = battle.won()
+	GameState.record_battle(idx, won)   # end-of-game stats
+	var foe: int = int(setup.get("opp_owner", -1))
+	if foe >= 0:
+		GameState.record_battle(foe, not won)
+		GameState._stat(idx if won else foe, "clash_wins")
 	await grant_stars(battle, idx, setup.get("team", []))
 	return won
 

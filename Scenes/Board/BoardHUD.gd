@@ -9,7 +9,7 @@ extends Control
 ## Menus opened here go through UIManager's overlay slot.
 
 const PLAYER_PANEL := preload("res://Scenes/Board/PlayerPanel.tscn")
-const CARD_SCALE := 0.9   # (was 0.72 — too small to read on a TV)
+const CARD_SCALE := 0.5   # (0.9 and 0.75 took too much of the screen)
 const HAND_CARD := Vector2(60, 82)   # 7 fit beside the action bar
 
 var board                        # the Board (set right after it adds us)

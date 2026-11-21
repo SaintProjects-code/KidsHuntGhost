@@ -68,6 +68,9 @@ func _ready() -> void:
 	var cancel := _button("Cancel", _cancel, 30)
 	cancel.add_theme_font_size_override("font_size", 13)
 	col.add_child(cancel)
+	visibility_changed.connect(func():
+		if _hides_board:
+			preload("res://Scenes/UI/Battle/BattleArena.gd").board_ui_shown(get_tree(), not visible))
 	hide()
 
 func _head(parent: Control, color: Color) -> Label:
@@ -77,7 +80,21 @@ func _head(parent: Control, color: Color) -> Label:
 	parent.add_child(l)
 	return l
 
+# 3D maps: the window floats over the dark board, a little see-through (only
+# the panel's own background fades — the text and buttons stay solid), and the
+# board's own UI hides while it's up.
+var _hides_board := false
+
+func _see_through() -> void:
+	var on := bool(GameData.map_info(GameState.active_map).get("view_3d", false))
+	if _dim:
+		_dim.color = Color(0, 0, 0, 0.75 if on else 0.55)   # the 3D map in the dark behind
+	if panel:
+		panel.self_modulate = Color(1, 1, 1, 0.8 if on else 1.0)
+	_hides_board = on
+
 func present(player: PlayerData, vs_label: String, opp_team: Array = []) -> void:
+	_see_through()
 	_pvp = false
 	_player = player
 	_opp_team = opp_team
@@ -90,6 +107,7 @@ func present(player: PlayerData, vs_label: String, opp_team: Array = []) -> void
 	_refresh()
 
 func present_pvp(a: PlayerData, b: PlayerData) -> void:
+	_see_through()
 	_pvp = true
 	_player = a
 	_player_b = b

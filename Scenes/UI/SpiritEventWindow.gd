@@ -8,6 +8,11 @@ extends MenuWindow
 ## can CHAIN into a follow-up page ("go deeper?"). Your lead always takes the
 ## challenge. Keys: 1–4 pick a choice, Space = Next / OK.
 ## present(player_index); emits closed(). CPU visits play themselves.
+##
+## 3D maps use a SCENE layout instead: the event's spirit (or trainer) on a
+## platform top-right, your player icon on a platform bottom-left,
+## and a dialogue box along the bottom holding the story, your lead's stats
+## (they still decide the contests) and the choices.
 
 signal closed()
 
@@ -32,10 +37,18 @@ var _ev_die: DiceView
 var _dice_text: Label
 var _result: Label
 var _ok: Button
+var _col: VBoxContainer
+var _classic: Array = []            # the card layout's rows (hidden in scene mode)
+var _scene_on := false
+var _stage: Control                 # scene mode: platforms + the two figures
+var _token: TextureRect             # scene mode: your player icon
+
+const STAGE_SIZE := Vector2(900, 330)
 
 func _ready() -> void:
 	var col := _init_window(780, 0)
 	col.add_theme_constant_override("separation", 10)
+	_col = col
 	var top := UIKit.hbox(12)
 	col.add_child(top)
 	var situation_card := UIKit.card_panel()
@@ -85,7 +98,122 @@ func _ready() -> void:
 	_ok = _button("OK", func(): closed.emit(), 40)
 	_ok.hide()
 	col.add_child(_ok)
+	_classic = [top, bottom]
 	hide()
+
+# ── 3D maps: the scene layout ─────────────────────────────────────────────────
+# Built once, from the same widgets (so the phone mirror and the event logic
+# don't change): the stage on top, the dialogue box below.
+func _to_scene_layout() -> void:
+	_scene_on = true
+	var col := _col
+	for row in _classic:
+		row.hide()
+	panel.custom_minimum_size.x = STAGE_SIZE.x + 32
+	_stage = Control.new()
+	_stage.custom_minimum_size = STAGE_SIZE
+	_stage.draw.connect(_draw_stage)
+	col.add_child(_stage)
+	col.move_child(_stage, 0)
+	# the event's spirit / trainer stands on the far platform
+	_portrait.reparent(_stage)
+	_portrait.custom_minimum_size = Vector2(170, 170)
+	_portrait.size = Vector2(170, 170)
+	_portrait.position = Vector2(STAGE_SIZE.x * 0.72 - 85, STAGE_SIZE.y * 0.48 - 160)
+	# your player icon on the near platform (its picture is set per event)
+	_token = TextureRect.new()
+	_token.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_token.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_token.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_token.size = Vector2(170, 210)
+	_token.position = Vector2(STAGE_SIZE.x * 0.24 - _token.size.x * 0.5, STAGE_SIZE.y - _token.size.y - 4)
+	_stage.add_child(_token)
+	# the contest dice sit between the two
+	_dice_row.reparent(_stage)
+	_dice_row.position = Vector2(STAGE_SIZE.x * 0.5 - 70, STAGE_SIZE.y * 0.55)
+	_dice_text.reparent(_stage)
+	_dice_text.position = Vector2(STAGE_SIZE.x * 0.5 - 200, STAGE_SIZE.y * 0.55 + 56)
+	_dice_text.custom_minimum_size.x = 400
+	# the dialogue box: story, whose stats count, the choices, the result, OK
+	var box := PanelContainer.new()
+	box.add_theme_stylebox_override("panel", UIKit.box(Color(0.06, 0.05, 0.12, 0.95), 14, 3, Color(0.92, 0.9, 1.0), Vector2(18, 12)))
+	col.add_child(box)
+	col.move_child(box, 1)
+	box.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed:
+			_finish_typing())
+	# the story on the left; the choices pop up on the right once it's read
+	var inner := UIKit.hbox(16)
+	box.add_child(inner)
+	var left := UIKit.vbox(8)
+	left.size_flags_horizontal = Control.SIZE_FILL   # fixed width: no re-wrap when the choices appear
+	inner.add_child(left)
+	_situation.reparent(left)
+	_situation.custom_minimum_size = Vector2(STAGE_SIZE.x - 440, 96)
+	_situation.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_situation.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_lead_stats.reparent(left)
+	_lead_stats.add_theme_color_override("font_color", Color("9fdcff"))
+	_lead_stats.add_theme_font_size_override("font_size", 13)
+	_result.reparent(left)
+	_result.custom_minimum_size.x = STAGE_SIZE.x - 440
+	_ok.reparent(left)
+	_choices_box.reparent(inner)
+	_choices_box.custom_minimum_size.x = 380
+	_choices_box.size_flags_horizontal = Control.SIZE_SHRINK_END
+
+# ── scene mode: the story types itself out, then the choices pop up ───────────
+const TYPE_SPEED := 40.0   # characters per second
+var _typing: Tween
+
+func _type_out() -> void:
+	if _typing and _typing.is_valid():
+		_typing.kill()
+	_choices_box.visible = false
+	_situation.visible_ratio = 0.0
+	var n := _situation.get_total_character_count()
+	_typing = create_tween()
+	_typing.tween_property(_situation, "visible_ratio", 1.0, maxf(0.3, n / TYPE_SPEED))
+	_typing.tween_callback(_reveal_choices)
+
+# A click (or Space) while it's still typing shows the rest at once.
+func _finish_typing() -> bool:
+	if not _scene_on or _typing == null or not _typing.is_valid() or not _typing.is_running():
+		return false
+	_typing.kill()
+	_situation.visible_ratio = 1.0
+	_reveal_choices()
+	return true
+
+func _reveal_choices() -> void:
+	_choices_box.visible = true
+	var i := 0
+	for b in _choices_box.get_children():
+		var c := b as Control
+		c.modulate.a = 0.0
+		var tw := c.create_tween()
+		tw.tween_interval(i * 0.09)
+		tw.tween_property(c, "modulate:a", 1.0, 0.18)
+		Juice.pop(c, 1.08, 0.2)
+		i += 1
+	Sfx.play("pop", 1.1)
+
+# Two oval platforms, like a battle stage: theirs far right, yours near left.
+func _draw_stage() -> void:
+	var w := STAGE_SIZE.x
+	var h := STAGE_SIZE.y
+	_stage.draw_rect(Rect2(Vector2.ZERO, STAGE_SIZE), Color(0.12, 0.1, 0.22, 0.55))
+	_ellipse(Vector2(w * 0.72, h * 0.48), Vector2(150, 36), Color(0.62, 0.6, 0.8), Color(0.4, 0.37, 0.58))
+	_ellipse(Vector2(w * 0.24, h - 8), Vector2(190, 44), Color(0.62, 0.6, 0.8), Color(0.4, 0.37, 0.58))
+
+func _ellipse(c: Vector2, r: Vector2, fill: Color, rim: Color) -> void:
+	for pass_i in 2:
+		var rr := r if pass_i == 0 else r * Vector2(0.88, 0.78)
+		var pts := PackedVector2Array()
+		for i in 48:
+			var a := i / 48.0 * TAU
+			pts.append(c + Vector2(cos(a) * rr.x, sin(a) * rr.y + (0.0 if pass_i == 0 else -3.0)))
+		_stage.draw_colored_polygon(pts, rim if pass_i == 0 else fill)
 
 # The board calls this after the window closes; non-empty = "fight this spirit".
 func take_pending_fight() -> Dictionary:
@@ -104,6 +232,10 @@ func _lead() -> Dictionary:
 func present(player_index: int) -> void:
 	_idx = player_index
 	_cpu = _player().is_cpu
+	if not _scene_on and bool(GameData.map_info(GameState.active_map).get("view_3d", false)):
+		_to_scene_layout()
+	if _token:
+		_token.texture = GameData.trainer_texture(GameData.player_trainer(_player()))
 	_pending_fight = {}
 	var badges: int = _player().progress.badge_count()
 	var pool: Array = EventsData.EVENTS.filter(func(e): return badges >= int(e.get("min_badges", 0)))
@@ -139,6 +271,12 @@ func _setup_cast() -> void:
 
 func _refresh_lead() -> void:
 	var lead := _lead()
+	if _scene_on:
+		# your trainer is on stage; the lead's stats still decide the contests
+		_lead_stats.text = "Using %s's stats  [%s]   HP %d/%d · ATK %d · DEF %d · SPD %d   🪙 %d" % [
+			lead.get("name", "?"), lead.get("type", ""), lead.get("current_hp", 0), lead.get("hp", 0),
+			lead.get("atk", 0), lead.get("def", 0), lead.get("spd", 0), _player().inventory.gold]
+		return
 	_lead_sprite.texture = SpiritsData.sprite_tex(lead.get("name", ""), "back")
 	_lead_stats.text = "%s  [%s]\nHP %d/%d\nATK %d   DEF %d\nSPD %d   🪙 %d" % [
 		lead.get("name", "?"), lead.get("type", ""), lead.get("current_hp", 0), lead.get("hp", 0),
@@ -163,6 +301,8 @@ func _show_page() -> void:
 		_choices_box.add_child(_button("Next ▶", _next_page, 44))
 	else:
 		_build_options()
+	if _scene_on:
+		_type_out()
 
 func _next_page() -> void:
 	_page += 1
@@ -246,7 +386,7 @@ func _on_option(opt: Dictionary) -> void:
 	Juice.pop(_result, 1.06)
 	Sfx.play("caught" if success else "lose")
 	if not success:
-		Juice.shake(_lead_sprite, 8.0)
+		Juice.shake(_token if _scene_on else _lead_sprite, 8.0)
 	_refresh_lead()
 	EventBus.log_entry.emit(_idx, "%s: %s" % [_event.get("title", "Event"), msg], "#9fff9f" if success else "#ff9f9f")
 	# the story may continue (push your luck!)
@@ -381,12 +521,16 @@ func _unhandled_key_input(ev: InputEvent) -> void:
 		return
 	if Controls.confirm_pressed(ev):
 		get_viewport().set_input_as_handled()
+		if _finish_typing():
+			return
 		if _ok.visible:
 			closed.emit()
 		elif _choices_box.get_child_count() == 1 and _page < _pages.size() - 1:
 			_next_page()
 		return
 	var n := Controls.number_pressed(ev)
+	if not _choices_box.visible:
+		return
 	var buttons: Array = _choices_box.get_children().filter(func(c): return c is Button)
 	if n >= 0 and n < buttons.size() and not buttons[n].disabled:
 		get_viewport().set_input_as_handled()

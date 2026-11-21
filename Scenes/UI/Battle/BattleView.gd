@@ -60,6 +60,11 @@ var _speed_btn: Button
 var _auto_btn: Button
 var _team_voters: HBoxContainer
 var _opp_voters: HBoxContainer
+var _cards_box: VBoxContainer         # the 2D card rows
+const ArenaScript := preload("res://Scenes/UI/Battle/BattleArena.gd")
+var _arena                            # the 3D stage (3D maps only) — a BattleArena
+var _arena_voters: Array = []         # [your side, their side] vote portraits in 3D mode
+var _use_arena := false
 var _auto := false                    # rounds play by themselves (never picks your cards)
 var _detached := false
 var _opening_pending := false
@@ -77,7 +82,10 @@ func _ready() -> void:
 	_opp_hand_box = UIKit.hbox(4)
 	head.add_child(_opp_hand_box)
 
-	var opp_side := _make_team_row(col, false)
+	# 2D maps: the spirit-card rows. 3D maps: the arena (see _set_mode).
+	_cards_box = UIKit.vbox(6)
+	col.add_child(_cards_box)
+	var opp_side := _make_team_row(_cards_box, false)
 	_opp_row = opp_side["cards"]
 	_opp_disc = opp_side["disc"]
 	_opp_name_lbl = opp_side["name"]
@@ -86,13 +94,23 @@ func _ready() -> void:
 	var vs := UIKit.label("VS", 20, UIKit.GOLD)
 	vs.custom_minimum_size = Vector2(TRAINER_W, 0)
 	vs.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(vs)
+	_cards_box.add_child(vs)
 
-	var team_side := _make_team_row(col, true)
+	var team_side := _make_team_row(_cards_box, true)
 	_team_row = team_side["cards"]
 	_team_disc = team_side["disc"]
 	_team_name_lbl = team_side["name"]
 	_team_voters = team_side["voters"]
+
+	_arena = ArenaScript.new()
+	_arena.view = self
+	_arena.hide()
+	col.add_child(_arena)
+	# the vote portraits sit in the arena's top corners in 3D mode
+	_arena_voters = [UIKit.hbox(2), UIKit.hbox(2)]
+	for k in 2:
+		_arena_voters[k].position = Vector2(12, 8) if k == 0 else Vector2(_arena.custom_minimum_size.x - 220, 8)
+		_arena.add_child(_arena_voters[k])
 
 	# bottom strip: log | your tactic cards | buttons
 	var bottom := UIKit.hbox(12)
@@ -139,6 +157,7 @@ func _ready() -> void:
 	# layout is only final once shown — refit every time the window opens,
 	# and start the intro once it can actually be seen
 	visibility_changed.connect(func():
+		_board_ui_shown(not (visible and _use_arena))
 		if visible:
 			_fit_to_screen()
 			if _opening_pending:
@@ -203,7 +222,33 @@ func _fit_to_screen() -> void:
 
 # ---------------- spirit cards ----------------
 
+# 3D maps fight in the arena, over the board and a little see-through; 2D maps
+# keep the card rows exactly as before.
+func _set_mode() -> void:
+	_use_arena = bool(GameData.map_info(GameState.active_map).get("view_3d", false))
+	_arena.visible = _use_arena
+	_cards_box.visible = not _use_arena
+	if _dim:
+		_dim.color = Color(0, 0, 0, 0.75 if _use_arena else 0.55)   # the 3D map stays visible, in the dark
+		# cover the whole screen whatever the window size (the root can be
+		# smaller than a stretched/resized game window)
+		_dim.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_dim.position = Vector2(-4000, -4000)
+		_dim.size = Vector2(12000, 12000)
+	panel.add_theme_stylebox_override("panel", UIKit.box(Color(UIKit.NIGHT, 0.72 if _use_arena else 1.0), 18, 3, Color(UIKit.PURPLE, 0.7)))
+
+# A 3D battle takes the whole screen: the board's own UI hides.
+func _board_ui_shown(on: bool) -> void:
+	ArenaScript.board_ui_shown(get_tree(), on)
+
+# The vote-portrait rows for [your side, their side] in the current mode.
+func _voter_boxes() -> Array:
+	return _arena_voters if _use_arena else [_team_voters, _opp_voters]
+
 func _build_cards() -> void:
+	if _use_arena:
+		_arena.rebuild()
+		return
 	UIKit.clear(_team_row)
 	UIKit.clear(_opp_row)
 	_team_cards = []
@@ -291,6 +336,8 @@ func _make_card(mon: Dictionary, is_player: bool) -> Dictionary:
 		"stats": stats, "status": status, "status_bg": status_bg}
 
 func _refresh() -> void:
+	if _use_arena:
+		return   # the arena reads the live state every frame
 	_refresh_side(_team, _team_cards, _active)
 	_refresh_side(_opp, _opp_cards, _opp_active)
 
@@ -354,6 +401,8 @@ func _quiet() -> bool:
 	return _skipping or not visible
 
 func _card_of(mon: Dictionary) -> Control:
+	if _use_arena:
+		return null
 	var i: int = _team.find(mon)
 	if i >= 0 and i < _team_cards.size():
 		return _team_cards[i]["card"]
@@ -375,6 +424,11 @@ func _fresh_tween(c: Control) -> Tween:
 
 # Attack: the card lunges toward the opposing row.
 func _anim_attack(mon: Dictionary) -> void:
+	if _use_arena:
+		if not _quiet():
+			_arena.attack(mon)
+			Sfx.play("whoosh", 1.4)
+		return
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
@@ -386,6 +440,11 @@ func _anim_attack(mon: Dictionary) -> void:
 
 # Ability: a smooth left-right sway.
 func _anim_ability(mon: Dictionary) -> void:
+	if _use_arena:
+		if not _quiet():
+			_arena.ability(mon)
+			Sfx.play("pop", 0.8)
+		return
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
@@ -396,6 +455,10 @@ func _anim_ability(mon: Dictionary) -> void:
 
 # Taking damage: a fast rattle and a white flash.
 func _anim_shake(mon: Dictionary) -> void:
+	if _use_arena:
+		if not _quiet():
+			_arena.hurt(mon)
+		return
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
@@ -412,6 +475,10 @@ const SPECIAL_YELLOW := Color("ffe94d")
 const SPECIAL_PULSES := 3
 
 func _flash_special(mon: Dictionary, move_name: String) -> void:
+	if _use_arena:
+		if not _quiet():
+			_arena.special(mon, move_name)
+		return
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
@@ -453,6 +520,10 @@ func _flash_special(mon: Dictionary, move_name: String) -> void:
 
 # A number that floats up off a spirit's card ("-34", "+20").
 func _float_on(mon: Dictionary, text: String, color: Color) -> void:
+	if _use_arena:
+		if not _quiet():
+			_arena.float_text(mon, text, color)
+		return
 	var c := _card_of(mon)
 	if _quiet() or c == null:
 		return
@@ -470,6 +541,12 @@ var _banner: Control
 # It holds for a moment, then leaves the way it came. `key` shows the card itself.
 func _tactic_banner(icon: String, headline: String, sub: String, color: Color, side := 0, key := "") -> void:
 	if _quiet():
+		return
+	if _use_arena:
+		# 3D: a small tag over the spirit of whoever played it
+		_arena.card_pop(0 if side > 0 else (1 if side < 0 else -1), icon,
+			headline + ("  —  " + sub if sub != "" else ""), color)
+		Sfx.play("card", 0.9)
 		return
 	if is_instance_valid(_banner):
 		_banner.queue_free()

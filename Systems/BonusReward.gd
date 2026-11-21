@@ -25,8 +25,30 @@ func _ready() -> void:
 	_win.hide()
 	layer.add_child(_win)
 
+var _running := false
+
+# Run every reward waiting on this player's spirits (flagged "_reward_pending"
+# when they hit 3 stars). The board calls this on the player's own turn, outside
+# battles, so evolutions never pop up mid-battle or on someone else's turn.
+func run_pending(player_idx: int) -> void:
+	if _running or player_idx < 0 or player_idx >= GameState.players.size():
+		return
+	_running = true
+	var p: PlayerData = GameState.players[player_idx]
+	var again := true
+	while again:
+		again = false
+		for m in p.team + p.pc:
+			if m.get("_reward_pending", false):
+				m.erase("_reward_pending")
+				await run(player_idx, m)
+				again = true   # the team array may have changed (evolution swaps the dict)
+				break
+	_running = false
+
 # Full flow for one spirit that just hit 3 stars. Awaits any human input.
 func run(player_idx: int, spirit: Dictionary) -> void:
+	_win.remote_owner = player_idx   # the reward card goes to this player's phone
 	var has_evo: bool = String(spirit.get("evolution", "")) != ""
 	var rewarded: bool = int(spirit.get("_bonus_lvl", 0)) > 0
 	var count: int = 2 if (not has_evo and not rewarded) else 1

@@ -72,7 +72,10 @@ func _name(idx: int) -> String:
 func _npc_battle(idx: int, roster: Array, title: String, portrait: Array, kind: String):
 	var foe_team := BattleSetup.counter_pick(roster, GameState.players[idx].living_team())
 	var vs := "vs %s!" % title + ("  (brings %d of these)" % Balance.BATTLE_PICK_MAX if roster.size() > Balance.BATTLE_PICK_MAX else "")
-	var pick: Dictionary = await BattleSetup.pick_for(_select, idx, vs, roster)
+	# you pick your team only for town Wardens and the Haunted Four / Spirit Lord;
+	# trainer fights take your first spirits straight in
+	var choose: bool = kind in ["gym", "warden", "champion"]
+	var pick: Dictionary = await BattleSetup.pick_for(_select, idx, vs, roster, choose)
 	if pick.is_empty():
 		return null
 	_last_team = pick["team"]

@@ -55,7 +55,7 @@ static var BATTLE_PICK_MAX := 3         # spirits per side in a battle: 3, 4 or 
 # their full strength. With fewer players everyone collects more badges before
 # reaching the trail, so small games get a bigger offset (weaker phantoms).
 # The offsets are written for the default requirement of 3 (see trail_tier).
-const TRAIL_BADGE_OFFSET := {1: 3, 2: 3, 3: 2, 4: 2}   # by player count
+const TRAIL_BADGE_OFFSET := {1: 3, 2: 3, 3: 2, 4: 2, 5: 2, 6: 2}   # by player count
 
 # ── Battles ───────────────────────────────────────────────────────────────────
 const MAX_KO_STARS := 2.0               # per spirit per battle

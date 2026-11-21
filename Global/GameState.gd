@@ -19,6 +19,37 @@ var trail_badges: int = Balance.FLY_BADGES:
 var winner_index: int = -1          # set once someone wins
 var dev_mode: bool = false          # only for games started from the menu's DEV button
 
+# ── end-of-game stats: counted from game events into each PlayerData.stats ────
+func _ready() -> void:
+	EventBus.turn_started.connect(func(i): _stat(i, "turns"))
+	EventBus.dice_rolled.connect(func(total, _f):
+		_stat(current_player_index, "rolls")
+		_stat(current_player_index, "dice_total", total))
+	EventBus.space_landed.connect(_on_landed)
+	EventBus.catch_succeeded.connect(func(i, _s): _stat(i, "catches"))
+	EventBus.catch_failed.connect(func(i, _s): _stat(i, "escapes"))
+	EventBus.card_played.connect(func(i, _k): _stat(i, "cards_played"))
+	EventBus.spirit_evolved.connect(func(i, _s): _stat(i, "evolutions"))
+	EventBus.trail_failed.connect(func(i): _stat(i, "trail_losses"))
+
+func _stat(i: int, key: String, amount: int = 1) -> void:
+	if i >= 0 and i < players.size():
+		players[i].add_stat(key, amount)
+
+func _on_landed(i: int, type: StringName) -> void:
+	match String(type):
+		"WISP", "GHOST", "PHANTOM": _stat(i, "ghost_tiles")
+		"EVENT": _stat(i, "events")
+		"ITEM": _stat(i, "item_tiles")
+		"COMPETITION": _stat(i, "comps")
+		"CLASH": _stat(i, "clash_tiles")
+		"CITY": _stat(i, "town_visits")
+
+# Every battle (wild, Warden, Haunted Four, Clash) reports here; see BattleSetup.
+func record_battle(i: int, won: bool) -> void:
+	_stat(i, "battles")
+	_stat(i, "wins" if won else "losses")
+
 func current_player() -> PlayerData:
 	return players[current_player_index]
 

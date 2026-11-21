@@ -1,10 +1,11 @@
 class_name Controls
-## Shared-keyboard layout: up to 4 players play the minigames on ONE keyboard,
+## Shared-keyboard layout: up to 6 players play the minigames on ONE keyboard,
 ## each with their own cluster. Every cluster has an ACTION key (jump / snap /
 ## scare / float) plus LEFT / MIDDLE / RIGHT for the maze's three paths.
 ##
 ##   P1  W  + A S D          P3  ↑        + ← ↓ →
 ##   P2  I  + J K L          P4  Num 8    + Num 4 5 6
+##   P5  T  + F G H          P6  Home     + Delete End PgDn
 ##
 ## Menus also take keys: 1–9 pick the matching button, Space/Enter confirms.
 
@@ -17,6 +18,10 @@ const LAYOUT := [
 		"names": ["↑", "←", "↓", "→"]},
 	{"action": KEY_KP_8, "left": KEY_KP_4, "middle": KEY_KP_5, "right": KEY_KP_6,
 		"names": ["Num8", "Num4", "Num5", "Num6"]},
+	{"action": KEY_T,    "left": KEY_F,    "middle": KEY_G,    "right": KEY_H,
+		"names": ["T", "F", "G", "H"]},
+	{"action": KEY_HOME, "left": KEY_DELETE, "middle": KEY_END, "right": KEY_PAGEDOWN,
+		"names": ["Home", "Del", "End", "PgDn"]},
 ]
 
 # The keyboard slot a player plays on: humans are numbered in seat order, so

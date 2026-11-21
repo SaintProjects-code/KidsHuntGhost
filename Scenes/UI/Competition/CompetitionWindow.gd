@@ -49,7 +49,7 @@ var _tip: Label      # which stats help
 var _body: VBoxContainer
 
 # Each keyboard player's keys: the ACTION key, then LEFT / MIDDLE / RIGHT.
-const SLOT_KEYS := ["W · A S D", "I · J K L", "↑ · ← ↓ →", "Num8 · 4 5 6"]
+const SLOT_KEYS := ["W · A S D", "I · J K L", "↑ · ← ↓ →", "Num8 · 4 5 6", "T · F G H", "Home · Del End PgDn"]
 
 # Split a game's hint into "what to do" and the stat tips (the sentences with
 # an "=" in them, like "SPD = lift").

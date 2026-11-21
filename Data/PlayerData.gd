@@ -53,6 +53,15 @@ var extra_die: bool = false     # Twin Dice
 var lure: bool = false          # Spooky Lure: next wild spirit is stronger + easier to catch
 var salt: bool = false          # Salt Circle: ignore the next wild spirit / event
 
+# Running totals for the end-of-game stats (GameState counts them).
+var stats: Dictionary = {}
+
+func add_stat(key: String, amount: int = 1) -> void:
+	stats[key] = int(stats.get(key, 0)) + amount
+
+func stat(key: String) -> int:
+	return int(stats.get(key, 0))
+
 func living_team() -> Array:
 	return team.filter(func(m): return int(m.get("current_hp", 0)) > 0)
 
@@ -69,7 +78,7 @@ func to_dict() -> Dictionary:
 		"champion": progress.champion_defeated, "points": progress.points,
 		"gold": inventory.gold, "hand": inventory.hand.duplicate(),
 		"battle_mod": next_battle_mod, "roll_bonus": roll_bonus, "extra_die": extra_die,
-		"lure": lure, "salt": salt, "remote_id": remote_id,
+		"lure": lure, "salt": salt, "remote_id": remote_id, "stats": stats.duplicate(),
 	}
 
 static func from_dict(d: Dictionary) -> PlayerData:
@@ -95,6 +104,7 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.extra_die = d.get("extra_die", false)
 	p.lure = d.get("lure", false)
 	p.salt = d.get("salt", false)
+	p.stats = d.get("stats", {})
 	# old saves: spirits could stack a 2nd ability; now each has one
 	for mon in p.team + p.pc:
 		mon.erase("ability2")

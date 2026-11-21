@@ -460,7 +460,9 @@ func _mirror(root: Node, _idx: int, with_text := true) -> Dictionary:
 			if not with_text or used.has(n):
 				continue
 			var s := String(n.text).strip_edges()
-			if s == "" or _inside_button(n):
+			# TV-only text (a window can mark labels whose words the phone
+			# already shows inside its buttons)
+			if s == "" or _inside_button(n) or n.has_meta("phone_skip"):
 				continue
 			if title == "":
 				title = s.left(300)

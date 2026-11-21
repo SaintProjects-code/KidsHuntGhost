@@ -13,7 +13,8 @@ const WALK_COLS := [1, 0, 1, 2]       # column 1 is the standing pose
 const WALK_FPS := 8.0
 const TOKEN_SCALE := 2.4
 # Corners for the players whose turn it ISN'T, so shared tiles fan out.
-const TOKEN_OFFSETS := [Vector2(-29, -8), Vector2(29, -8), Vector2(-29, 18), Vector2(29, 18)]
+const TOKEN_OFFSETS := [Vector2(-29, -8), Vector2(29, -8), Vector2(-29, 18), Vector2(29, 18),
+	Vector2(-58, 5), Vector2(58, 5)]   # players 5–6 stand a little further out
 const ACTIVE_TOKEN_DROP := Vector2(0, 10)
 const STEP_TIME := 0.28
 const CPU_END_TURN_DELAY := 0.7
@@ -35,6 +36,7 @@ const FOLLOW_LERP := 6.0
 @onready var event_ok: Button = $BoardUI/Root/EventPanel/VBox/OkButton
 
 signal _choice_selected(index: int)
+var _choice_count := 0   # buttons in the open choice (they may sit in a 2-column grid)
 
 var graph: BoardGraph
 var hud: Control
@@ -277,6 +279,8 @@ func _on_turn_started(idx: int) -> void:
 	_tick_traits(idx)
 	if _at_city(idx):
 		_heal_team_at_city(idx, _current_node(idx))
+	# rewards / evolutions earned off-turn (or in last turn's battles) happen now
+	BonusReward.run_pending(idx)
 
 func _tick_traits(i: int) -> void:
 	var p: PlayerData = GameState.players[i]
@@ -315,6 +319,7 @@ func _on_end_turn_pressed() -> void:
 		return
 	end_turn_button.disabled = true
 	Sfx.play("click")
+	await BonusReward.run_pending(GameState.current_player_index)   # e.g. a Star Candy played after moving
 	TurnSystem.advance_turn()
 
 func _unhandled_key_input(ev: InputEvent) -> void:
@@ -322,7 +327,7 @@ func _unhandled_key_input(ev: InputEvent) -> void:
 		return
 	if choice_panel.visible:
 		var n := Controls.number_pressed(ev)
-		if n >= 0 and n < choice_buttons.get_child_count():
+		if n >= 0 and n < _choice_count:
 			get_viewport().set_input_as_handled()
 			_choice_selected.emit(n)
 		return
@@ -348,6 +353,7 @@ func _on_dice_rolled(total: int, faces: Array) -> void:
 		await hud.show_roll(faces, bonus, p.color)
 	info_label.text = "%s rolled %d" % [p.player_name, total]
 	await _move_player(idx, total)
+	await BonusReward.run_pending(idx)   # evolutions from this move's battles/catches, after the battle closes
 	if p.is_cpu:
 		await get_tree().create_timer(CPU_END_TURN_DELAY).timeout
 		TurnSystem.advance_turn()
@@ -371,9 +377,28 @@ func _build_fly_button() -> void:
 func _on_fly_pressed() -> void:
 	if _moving:
 		return
-	var city := await pick_town("Fly where?", graph.cities)
-	if city != "":
-		await _jump_to_town(GameState.current_player_index, city, "flies")
+	var i := GameState.current_player_index
+	var labels: Array = graph.cities.map(func(c): return graph.label(c))
+	var has_trail: bool = graph.node_routes.has("VEnter") and not _on_trail(i)
+	if has_trail:
+		labels.append("🌫 Spectral Trail (Haunted Four)")
+	labels.append("✖ Cancel")
+	var pick: int = await _show_choice("Fly where?", labels)
+	if pick < graph.cities.size():
+		await _jump_to_town(i, graph.cities[pick], "flies")
+	elif has_trail and pick == graph.cities.size():
+		await _fly_to_trail(i)
+
+# ✈ straight to the Spectral Trail's first step (same as entering from a town).
+func _fly_to_trail(i: int) -> void:
+	fly_button.hide()
+	roll_button.disabled = true
+	Sfx.play("whoosh")
+	_teleport_trail(i)
+	EventBus.log_entry.emit(i, "%s flies to the Spectral Trail!" % GameState.players[i].player_name, "#ffd24d")
+	await BonusReward.run_pending(i)
+	if not GameState.players[i].is_cpu:
+		end_turn_button.disabled = false
 
 # Town picker shared by Fly and the Warp Door. Returns "" on cancel.
 func pick_town(title: String, towns: Array) -> String:
@@ -398,7 +423,8 @@ func _jump_to_town(i: int, city: String, verb: String) -> void:
 	Sfx.play("whoosh")
 	_teleport_to_city(i, city)
 	await _resolve_city(i, city)
-	await _check_whiteout(i)
+	await _check_all_whiteouts(i)
+	await BonusReward.run_pending(i)
 	_moving = false
 	_jumping = false
 	if not GameState.players[i].is_cpu:
@@ -459,7 +485,16 @@ func _teleport_to_city(i: int, city: String) -> void:
 	_reposition_tokens()
 	camera.position = _token_base[i]
 
-# All spirits fainted → rushed to Cobweb City (or home if never reached) and healed.
+# The mover first, then everyone else: a rival wiped out in a Clash on someone
+# else's turn is sent to Cobweb too, instead of standing there with no spirits.
+func _check_all_whiteouts(first: int) -> void:
+	await _check_whiteout(first)
+	for j in GameState.players.size():
+		if j != first:
+			await _check_whiteout(j)
+
+# All spirits fainted → rushed to Cobweb City once you've reached or passed it
+# (home before that) and healed.
 func _check_whiteout(i: int) -> void:
 	var p: PlayerData = GameState.players[i]
 	if p.team.is_empty() or not p.living_team().is_empty():
@@ -527,7 +562,7 @@ func _move_player(i: int, steps: int) -> void:
 	else:
 		await _resolve_space(i)
 	await _check_pvp_land(i)
-	await _check_whiteout(i)
+	await _check_all_whiteouts(i)
 	_moving = false
 
 # Reaching Cobweb City (C) awards the ⚔ PvP tag.
@@ -707,8 +742,7 @@ func _run_clash(i: int) -> void:
 		return
 	var j: int
 	if p.is_cpu:
-		rivals.sort_custom(func(a, b): return GameState.players[a].progress.points > GameState.players[b].progress.points)
-		j = rivals[0]
+		j = _cpu_clash_pick(rivals)
 	else:
 		_set_idle(i)
 		var labels: Array = rivals.map(func(k): return "⚔ %s  (%d pts)" % [GameState.players[k].player_name,
@@ -722,6 +756,20 @@ func _run_clash(i: int) -> void:
 	await _show_flash("%s challenges %s — PvP battle!" % [p.player_name, GameState.players[j].player_name], 1.2)
 	EventBus.pvp_started.emit(i, j, "battle")
 	await EventBus.pvp_finished
+
+# A CPU's rival on a Clash tile: a weighted random pick, not always the points
+# leader (that was nearly always the human). Leaders are a bit likelier.
+func _cpu_clash_pick(rivals: Array) -> int:
+	var weights: Array = rivals.map(func(k): return 3.0 + float(GameState.players[k].progress.points) * 0.25)
+	var total := 0.0
+	for w in weights:
+		total += w
+	var roll := randf() * total
+	for k in rivals.size():
+		roll -= weights[k]
+		if roll <= 0.0:
+			return rivals[k]
+	return rivals[rivals.size() - 1]
 
 # ---------------- tiles ----------------
 
@@ -829,12 +877,30 @@ func _fit_event_font() -> void:
 func _show_choice(title: String, labels: Array) -> int:
 	choice_title.text = title
 	UIKit.clear(choice_buttons)
+	_choice_count = labels.size()
+	# Up to 3 choices sit in one row; more (Fly's town list…) go in two columns
+	# and the panel grows to fit them instead of spilling off its edges.
+	var holder: Container = choice_buttons
+	var rows := 1
+	if labels.size() > 3:
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 12)
+		grid.add_theme_constant_override("v_separation", 10)
+		choice_buttons.add_child(grid)
+		holder = grid
+		rows = ceili(labels.size() / 2.0)
 	for i in labels.size():
 		var b := Button.new()
 		b.text = "%d · %s" % [i + 1, labels[i]] if labels.size() > 1 else String(labels[i])
 		UIKit.style_button(b, UIKit.kind_for(String(labels[i])), "m")
+		if rows > 1:
+			b.custom_minimum_size.x = 220
 		b.pressed.connect(func(): _choice_selected.emit(i))
-		choice_buttons.add_child(b)
+		holder.add_child(b)
+	var half_h := 90.0 if rows == 1 else 60.0 + rows * 28.0
+	choice_panel.offset_top = -half_h
+	choice_panel.offset_bottom = half_h
 	choice_panel.show()
 	Juice.pop(choice_panel, 1.04)
 	var idx: int = await _choice_selected

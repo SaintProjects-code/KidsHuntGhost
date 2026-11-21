@@ -734,15 +734,18 @@ func _on_ko(att: Dictionary, def_: Dictionary, attacker_is_me: bool) -> void:
 func _move_cost(m: Dictionary) -> int:
 	return int(SpiritsData.move_of(SpiritsData.move_key(m)).get("charge", 3))
 
-# The attacker's turn: a charge is gained; a full gauge fires the move instead
-# of the normal hit.
+# The attacker's turn: a charge is gained; a full gauge fires the move. A move
+# that hits replaces the normal hit; a move that doesn't (Calm Mind, Bloom) is
+# followed by the normal hit, so a spirit always attacks.
 func _attack_or_move(att: Dictionary, def_: Dictionary, is_me: bool) -> void:
 	att["_charge"] = int(att.get("_charge", 0)) + 1
 	var hp_before := int(def_.get("current_hp", 0))
+	var attacked := false
 	if int(att["_charge"]) >= _move_cost(att):
 		att["_charge"] = 0
+		attacked = float(SpiritsData.move_of(SpiritsData.move_key(att)).get("power", 1.0)) > 0.0
 		await _use_move(att, def_, is_me)
-	else:
+	if not attacked and _alive(att) and _alive(def_):
 		await _strike(att, def_, is_me)
 	# taking a hit builds the defender's gauge too (never past "ready")
 	if Balance.CHARGE_ON_HIT and _alive(def_) and int(def_.get("current_hp", 0)) < hp_before:
