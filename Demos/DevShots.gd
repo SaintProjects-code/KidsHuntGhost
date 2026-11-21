@@ -14,6 +14,12 @@ func _ready() -> void:
 	UIManager.open_overlay(dev)
 	await _wait(0.6)
 	_shot("1_dev_window")
+	if "map" in OS.get_cmdline_user_args():
+		dev._switch_map(3)
+		await _wait(2.0)
+		_shot("4_switched_to_3d_map")
+		get_tree().quit()
+		return
 	dev._add_player()
 	await _wait(1.2)
 	dev = _find(get_tree().root, "DevWindow.gd")

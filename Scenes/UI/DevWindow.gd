@@ -48,6 +48,18 @@ func _ready() -> void:
 		_button("＋ Add player", _add_player),
 		_button("📱 Connect phones", _connect_phones),
 	]))
+	# switch maps (3D maps marked) — the board restarts on the new map
+	var map_row := UIKit.hbox(8)
+	var map_pick := OptionButton.new()
+	map_pick.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var map_keys: Array = GameData.MAPS.keys()
+	for k in map_keys:
+		var info: Dictionary = GameData.MAPS[k]
+		map_pick.add_item("🗺 %s%s" % [info["name"], "  (3D)" if info.get("view_3d", false) else ""])
+	map_pick.select(maxi(0, map_keys.find(GameState.active_map)))
+	map_row.add_child(map_pick)
+	map_row.add_child(_button("Switch map", func(): _switch_map(map_keys[map_pick.selected])))
+	left.add_child(map_row)
 	_phone_info = UIKit.label("", 13, Color(1, 1, 1, 0.8))
 	_phone_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_phone_info.custom_minimum_size.x = 300
@@ -141,6 +153,14 @@ func _add_player() -> void:
 	p.inventory.gold = 100
 	p.inventory.hand = ["spirit_lantern", "spirit_lantern", "spirit_shield", "battle_cry"]
 	GameState.players.append(p)
+	closed.emit()
+	UIManager.reset_pause()
+	get_tree().reload_current_scene()
+
+# DEV: play the same players on another map (the board restarts there).
+func _switch_map(map: int) -> void:
+	GameState.active_map = map
+	GameState.gang_hideout = ""   # each map picks its own hideout town
 	closed.emit()
 	UIManager.reset_pause()
 	get_tree().reload_current_scene()
