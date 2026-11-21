@@ -94,7 +94,7 @@ class MazePanel:
 	func _init(l: Dictionary, owner_game) -> void:
 		lane = l
 		game = owner_game
-		custom_minimum_size = Vector2(320, 208)
+		custom_minimum_size = Vector2(220, 160)   # small enough for a 3 × 2 grid of six
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		# SPD 1 → ~2.3s per corridor, SPD 6 → ~0.8s
 		walk_time = clampf(2.6 - 0.3 * float(lane["spirit"].get("spd", 2)), 0.8, 2.6)
@@ -346,11 +346,13 @@ const MARK3 := {"path": Color("ffd24d"), "trap": Color("ff4040"), "dead": Color(
 
 func _build_3d(v) -> void:
 	v.sky(Color("020204"), 0.05, 0.1)
-	v.aim(Vector3(0, 25, 6), Vector3(0, 0, 0.3), 0.8)   # four panels: a wider view
+	var cols := 2 if lanes.size() <= 4 else 3
+	v.aim(Vector3(0, 25, 6), Vector3(0, 0, 0.3), 0.8 if cols == 2 else 1.08)   # the whole grid in view
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
 		lane["panel"].visible = false   # the 2D panel keeps running the logic, unseen
-		var o := Vector3((i % 2 - 0.5) * 10.4, 0, (i / 2 - 0.5) * 7.2)
+		var rows := ceili(lanes.size() / float(cols))
+		var o := Vector3((i % cols - (cols - 1) * 0.5) * 10.4, 0, (i / cols - (rows - 1) * 0.5) * 7.2)
 		lane["o3"] = o
 		v.box(Vector3(PANEL3.x, 0.1, PANEL3.y), Color("06060c"), o + Vector3(0, -0.06, 0))
 		for side in [[Vector3(PANEL3.x, 0.12, 0.12), Vector3(0, 0, -PANEL3.y / 2)], [Vector3(PANEL3.x, 0.12, 0.12), Vector3(0, 0, PANEL3.y / 2)],

@@ -58,6 +58,7 @@ func setup(entries: Array) -> void:
 	_init_game()
 	if has_method("_build_3d") and bool(GameData.map_info(GameState.active_map).get("view_3d", false)):
 		stage3d = preload("res://Scenes/UI/Competition/MiniStage3D.gd").new()
+		stage3d.lanes_n = lanes.size()   # cameras pull back to fit 5–6 players
 		add_child(stage3d)
 		move_child(stage3d, 0)   # under the banners and any child widgets (dice…)
 		call("_build_3d", stage3d)
@@ -182,7 +183,7 @@ func lane_rect(i: int) -> Rect2:
 			var h := (size.y - GAP * (n - 1)) / n
 			return Rect2(0, i * (h + GAP), size.x, h)
 		Layout.GRID:
-			var cols := 1 if n == 1 else 2
+			var cols := 1 if n == 1 else (2 if n <= 4 else 3)   # 5–6 players: 3 × 2
 			var rows := ceili(float(n) / cols)
 			var w := (size.x - GAP * (cols - 1)) / cols
 			var h := (size.y - GAP * (rows - 1)) / rows

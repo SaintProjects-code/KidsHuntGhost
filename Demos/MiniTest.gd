@@ -12,8 +12,13 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(OS.get_user_data_dir() + "/mgtest")
 	GameState.reset()
 	GameState.active_map = map
-	var picks := [["Ivy", "Mossprig", Color("5ad26a")], ["Brooke", "Puddleboo", Color("4aa3df")], ["Ember", "Cinderwisp", Color("ff7a3a")], ["Zap", "Zapkin", Color("ffd24d")]]
-	for t in picks:
+	var picks := [["Ivy", "Mossprig", Color("5ad26a")], ["Brooke", "Puddleboo", Color("4aa3df")], ["Ember", "Cinderwisp", Color("ff7a3a")], ["Zap", "Zapkin", Color("ffd24d")],
+		["Rex", "Brawlboo", Color("e0563a")], ["Shade", "Wispy", Color("8e6fd6")]]
+	var count := 4
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("players="):
+			count = int(a.substr(8))
+	for t in picks.slice(0, count):
 		var p := PlayerData.new()
 		p.player_name = t[0]
 		p.color = t[2]
@@ -32,5 +37,5 @@ func _ready() -> void:
 	EventBus.tile_action.emit(0, &"COMPETITION")
 	for s in [10.0, 15.0, 20.0]:
 		await get_tree().create_timer(s - (10.0 if s == 10.0 else s - 5.0) if s == 10.0 else 5.0).timeout
-		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_%d.png" % [ev, map, int(s)])
+		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_%d.png" % [ev, map, GameState.players.size(), int(s)])
 	get_tree().quit()

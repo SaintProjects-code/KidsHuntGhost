@@ -187,11 +187,12 @@ const ROOM3 := Vector2(5.2, 3.8)
 
 func _build_3d(v) -> void:
 	v.sky(Color("1c1830"), 0.55)
-	v.aim(Vector3(0, 5, 21), Vector3(0, 2.6, 0))
+	var cols := 2 if lanes.size() <= 4 else 3
+	v.aim(Vector3(0, 5, 21 if cols == 2 else 27), Vector3(0, 2.6, 0), 0.66)
 	var ghosts := ["Wispy", "Haunty", "Lullaboo", "Wispy"]
 	for i in lanes.size():
 		var lane: Dictionary = lanes[i]
-		var o := Vector3((i % 2 - 0.5) * 6.4, (1 - i / 2) * 4.8 - 1.2, -1.5)
+		var o := Vector3((i % cols - (cols - 1) * 0.5) * 6.4, (1 - i / cols) * 4.8 - 1.2, -1.5)
 		lane["o3"] = o
 		v.box(Vector3(ROOM3.x + 0.4, ROOM3.y + 0.4, 0.2), Color("2a2240"), o + Vector3(0, ROOM3.y / 2, -0.6))
 		v.box(Vector3(ROOM3.x + 0.4, 0.15, 1.4), Color("3a2e52"), o + Vector3(0, 0, 0))

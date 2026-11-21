@@ -178,7 +178,8 @@ func _build_3d(v) -> void:
 		lane["lans3"] = lans
 		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(cx, 0, 1.4), 0.028)
 		var l := lane
-		v.tag(lane["n3"], func(): return "%s %s  %s  best %d" % [l["name"], key_hint(l, "left").replace("]", "…]") if l["human"] else "(CPU)",
+		var short := lanes.size() > 4   # 5–6 players: keep the tags short so they don't overlap
+		v.tag(lane["n3"], func(): return ("%s %s" % [l["name"], "OUT" if l["out"] else "♥".repeat(maxi(0, l["lives"]))]) if short else 			"%s %s  %s  best %d" % [l["name"], key_hint(l, "left").replace("]", "…]") if l["human"] else "(CPU)",
 			"OUT" if l["out"] else "♥".repeat(maxi(0, l["lives"])), l["best"]], lane["color"].lightened(0.25), 2.0, 14)
 
 func _update_3d(v, delta: float) -> void:

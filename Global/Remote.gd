@@ -253,6 +253,7 @@ func _on_server(m: Dictionary) -> void:
 			var id := LocalServer.text(m.get("id"))
 			phones[id] = {"name": LocalServer.text(m.get("name"), "Player"), "online": true}
 			_sent.erase(id)
+			_dev_seat(id)
 			phones_changed.emit()
 		"leave":
 			var id := LocalServer.text(m.get("id"))
@@ -262,6 +263,20 @@ func _on_server(m: Dictionary) -> void:
 			phones_changed.emit()
 		"msg":
 			_on_phone(LocalServer.text(m.get("id")), m.get("data", {}))
+
+# DEV games: a phone that joins mid-game takes over the next CPU player (it
+# becomes a phone player: turns, cards, battles and minigames on the phone).
+func _dev_seat(id: String) -> void:
+	var scene := get_tree().current_scene
+	if not GameState.dev_mode or scene == null or scene.name != "Board" or player_of(id) >= 0:
+		return
+	for i in GameState.players.size():
+		var p: PlayerData = GameState.players[i]
+		if p.remote_id == "" and p.is_cpu:
+			p.remote_id = id
+			p.is_cpu = false
+			EventBus.log_entry.emit(i, "📱 %s's phone now plays %s." % [phones[id]["name"], p.player_name], "#9fdcff")
+			return
 
 # ─── phone input ──────────────────────────────────────────────────────────────
 

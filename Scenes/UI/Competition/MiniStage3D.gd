@@ -50,11 +50,18 @@ func _init() -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 
-# The game area is wide and short, so every camera moves in this much closer.
+# The game area is wide and short, so every camera moves in this much closer
+# (less so with 5–6 players, so everyone stays in view).
 const ZOOM := 0.66
+var lanes_n := 4
+
+func fit_zoom() -> float:
+	return ZOOM + maxf(0.0, lanes_n - 4) * 0.13
 
 # Camera placed with a transform (works before the stage is in the tree).
-func aim(from: Vector3, at: Vector3, zoom := ZOOM) -> void:
+func aim(from: Vector3, at: Vector3, zoom := -1.0) -> void:
+	if zoom < 0.0:
+		zoom = fit_zoom()
 	cam.transform = Transform3D(Basis(), at + (from - at) * zoom).looking_at(at, Vector3.UP)
 
 func sky(col: Color, ambient: float, sun_energy := 0.9) -> void:
