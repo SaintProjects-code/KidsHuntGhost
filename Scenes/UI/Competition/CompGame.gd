@@ -66,6 +66,17 @@ func setup(entries: Array) -> void:
 		_countdown = 0.0
 	if not use_intro or how_to == "":
 		_intro = 0.0
+	if _intro > 0.0:
+		move_child(_overlay, -1)   # the how-to card covers the game's own widgets (dice…)
+	if _intro > 0.0 and lanes.any(func(l): return l["human"]):
+		# people are playing: the how-to card waits for Start so they can read it
+		_start_btn = Button.new()
+		_start_btn.text = "▶  Start!"
+		UIKit.style_button(_start_btn, "primary", "l")
+		_start_btn.add_theme_font_size_override("font_size", 22)
+		_start_btn.custom_minimum_size = Vector2(220, 52)
+		_start_btn.pressed.connect(_press_start)
+		add_child(_start_btn)
 	if record_key != "":
 		record = float(_load_records().get(record_key, 0.0))
 
@@ -112,7 +123,14 @@ func _process(delta: float) -> void:
 			finished.emit(ranks())
 		return
 	if _intro > 0.0:
-		_intro -= delta
+		if _start_btn:   # hold the card up (fully shown) until Start
+			_intro = maxf(_intro - delta, INTRO_TIME - 0.31)
+			var r := _intro_rect()
+			_start_btn.size = _start_btn.custom_minimum_size
+			_start_btn.position = Vector2(r.get_center().x - _start_btn.size.x * 0.5, r.end.y - 66.0)
+			_start_btn.modulate.a = clampf((INTRO_TIME - _intro) / 0.3, 0.0, 1.0)
+		else:
+			_intro -= delta
 		_overlay.queue_redraw()
 		queue_redraw()
 		return
@@ -168,6 +186,13 @@ func _load_records() -> Dictionary:
 
 func _unhandled_key_input(ev: InputEvent) -> void:
 	var hit := Controls.lookup(ev)
+	if _start_btn and ev.is_pressed() and not ev.is_echo():
+		# Enter / Space, or any player's own key, also starts
+		var k := (ev as InputEventKey).keycode if ev is InputEventKey else 0
+		if k in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE] or (not hit.is_empty() and lanes.any(func(l): return l["human"] and l["slot"] == hit[0])):
+			get_viewport().set_input_as_handled()
+			_press_start()
+		return
 	if hit.is_empty() or not running:
 		return
 	for lane in lanes:
@@ -359,17 +384,38 @@ func _draw_overlay() -> void:
 		if beat_record():
 			banner(font, "🎉 NEW RECORD!  +%d pts" % Balance.RECORD_BONUS, 48.0, 24, appear)
 
-# The how-to-play card: the rule line plus every human's keys.
-func _draw_intro(font: Font) -> void:
-	var o := _overlay
-	var appear := clampf((INTRO_TIME - _intro) / 0.3, 0.0, 1.0)
-	var w := minf(size.x - 40.0, 640.0)
+var _start_btn: Button
+
+func _press_start() -> void:
+	if _start_btn == null:
+		return
+	Sfx.play("click")
+	_start_btn.queue_free()
+	_start_btn = null
+	_intro = 0.0   # on to the countdown
+	_overlay.queue_redraw()
+
+func _intro_lines() -> Array:
 	var lines: Array = []
 	for lane in lanes:
 		if lane["human"]:
 			lines.append("%s — %s" % [lane["name"], keys_text(lane)])
-	var h := 96.0 + lines.size() * 24.0
-	var r := Rect2((size.x - w) * 0.5, (size.y - h) * 0.5 + (1.0 - appear) * 20.0, w, h)
+	return lines
+
+func _intro_rect() -> Rect2:
+	var appear := clampf((INTRO_TIME - _intro) / 0.3, 0.0, 1.0)
+	var w := minf(size.x - 40.0, 920.0)   # wide enough for the longest rule line
+	var h := 96.0 + _intro_lines().size() * 24.0 + (80.0 if _start_btn else 0.0)
+	return Rect2((size.x - w) * 0.5, (size.y - h) * 0.5 + (1.0 - appear) * 20.0, w, h)
+
+# The how-to-play card: the rule line plus every human's keys (and, with
+# people playing, a Start button so they can read it first).
+func _draw_intro(font: Font) -> void:
+	var o := _overlay
+	var appear := clampf((INTRO_TIME - _intro) / 0.3, 0.0, 1.0)
+	var lines := _intro_lines()
+	var r := _intro_rect()
+	var w := r.size.x
 	o.draw_style_box(UIKit.box(Color(0.06, 0.04, 0.14, 0.92 * appear), 18, 2, Color(UIKit.GOLD, 0.8 * appear)), r)
 	o.draw_string(font, r.position + Vector2(0, 36), "HOW TO PLAY", HORIZONTAL_ALIGNMENT_CENTER, w, 22, Color(UIKit.GOLD, appear))
 	o.draw_string(font, r.position + Vector2(0, 66), how_to, HORIZONTAL_ALIGNMENT_CENTER, w, 16, Color(1, 1, 1, appear))

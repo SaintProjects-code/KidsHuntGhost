@@ -1,7 +1,7 @@
 extends Control
-## The "VS" strip that slams in over the dark board before a 3D battle: a torn
-## black strip, each side's trainer in a big circle with the spirits they're
-## bringing underneath, and a lightning-slash VS in the middle. (A wild spirit
+## The "VS" banner before a 3D battle: two coloured halves slam together on a
+## diagonal seam, each side's trainer in a big circle with the spirits they're
+## bringing underneath, and a VS bouncing onto the seam. (A wild spirit
 ## takes the circle itself.) await play(setup) — it removes itself when done.
 
 signal done
@@ -70,8 +70,8 @@ func _gui_input(ev: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	_t += delta
-	if not _flashed and _t >= IN_TIME + SIDES_TIME * 0.6:
-		_flashed = true
+	if not _flashed and _t >= IN_TIME:
+		_flashed = true   # the two halves slam together
 		Sfx.play("crit", 0.8)
 	if _t >= IN_TIME + SIDES_TIME + _hold + OUT_TIME:
 		set_process(false)
@@ -83,42 +83,86 @@ func _ease(x: float) -> float:
 	x = clampf(x, 0.0, 1.0)
 	return 1.0 - pow(1.0 - x, 3.0)
 
+# A slash that leans right: the seam runs from (+SLANT, top) to (-SLANT, bottom).
+const SLANT := 70.0
+const SHAKE_TIME := 0.32
+var _center_pt := Vector2.ZERO
+
 func _draw() -> void:
 	var vp := get_viewport_rect().size
-	var out_k := clampf((_t - (IN_TIME + SIDES_TIME + _hold)) / OUT_TIME, 0.0, 1.0)
+	var out_t := _t - (IN_TIME + SIDES_TIME + _hold)
+	var out_k := _ease(out_t / OUT_TIME) if out_t > 0.0 else 0.0
 	var a := 1.0 - out_k
-	# the board behind goes dark
-	draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.55 * a))
-	var cy := vp.y * 0.45
-	var slide := (1.0 - _ease(_t / IN_TIME)) * -vp.x
-	var tilt := -0.04
-	draw_set_transform(Vector2(vp.x * 0.5 + slide, cy), tilt, Vector2(1, 1.0 + out_k * 0.3))
-	# the torn paper strip (with a drop shadow)
-	var w := vp.x * 1.1
-	for pass_i in 2:
-		var off := Vector2(0, 6) if pass_i == 0 else Vector2.ZERO
-		# a black strip with a faint purple edge glow behind it
-		var col := Color(0.55, 0.45, 0.95, 0.35 * a) if pass_i == 0 else Color(0.04, 0.035, 0.07, a)
-		var pts := PackedVector2Array()
-		for i in _tear_top.size():
-			pts.append(off + Vector2(-w / 2 + w * i / 40.0, -STRIP_H / 2 + _tear_top[i]))
-		for i in range(_tear_bot.size() - 1, -1, -1):
-			pts.append(off + Vector2(-w / 2 + w * i / 40.0, STRIP_H / 2 + _tear_bot[i]))
-		draw_colored_polygon(pts, col)
-	# the two sides slide in from opposite ends
-	var sk := _ease((_t - IN_TIME) / SIDES_TIME)
-	var side_off := (1.0 - sk) * vp.x * 0.5
-	_draw_side(_left, Vector2(-vp.x * 0.3 - side_off, 0), a * sk)
-	_draw_side(_right, Vector2(vp.x * 0.3 + side_off, 0), a * sk)
-	# the lightning slash and VS
-	var vk := _ease((_t - IN_TIME - SIDES_TIME * 0.5) / (SIDES_TIME * 0.6))
-	if vk > 0.0:
-		_draw_vs(vk, a)
+	draw_rect(Rect2(Vector2.ZERO, vp), Color(0, 0, 0, 0.55 * a))   # the board behind goes dark
+	# the halves rush in from opposite sides, slam, then fly back out
+	var in_k := clampf(_t / IN_TIME, 0.0, 1.0)
+	var gap := (1.0 - in_k * in_k) * vp.x * 0.75 + out_k * vp.x * 0.75
+	var since := _t - IN_TIME
+	var shake := Vector2.ZERO
+	if since > 0.0 and since < SHAKE_TIME:
+		shake = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * 16.0 * (1.0 - since / SHAKE_TIME)
+	var c := Vector2(vp.x * 0.5, vp.y * 0.45) + shake
+	draw_set_transform(c, 0.0, Vector2.ONE)
+	_center_pt = c
+	var h := STRIP_H * 0.5
+	var far := vp.x
+	_draw_half(PackedVector2Array([Vector2(-far, -h), Vector2(SLANT, -h), Vector2(-SLANT, h), Vector2(-far, h)]),
+		Vector2(-gap, 0), _left["color"], a, -1.0)
+	_draw_half(PackedVector2Array([Vector2(SLANT, -h), Vector2(far, -h), Vector2(far, h), Vector2(-SLANT, h)]),
+		Vector2(gap, 0), _right["color"], a, 1.0)
+	# the bright seam where they meet
+	if since > 0.0:
+		var glow := clampf(1.0 - since / 0.6, 0.0, 1.0)
+		var top := Vector2(SLANT, -h - 30) * (1.0 + glow * 0.4)
+		var bot := Vector2(-SLANT, h + 30) * (1.0 + glow * 0.4)
+		draw_line(top, bot, Color(1, 0.95, 0.8, (0.25 + glow * 0.5) * a), 26.0 + glow * 30.0)
+		draw_line(top, bot, Color(1, 1, 1, a), 5.0 + glow * 4.0)
+	# each side rides in on its half
+	var sk := _ease(since / SIDES_TIME) if since > 0.0 else 0.0
+	_draw_side(_left, Vector2(-vp.x * 0.3 - gap - (1.0 - sk) * 60.0, 0), a * sk)
+	_draw_side(_right, Vector2(vp.x * 0.3 + gap + (1.0 - sk) * 60.0, 0), a * sk)
+	if since > 0.0:
+		_draw_vs(since, a)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	# a white flash as the VS lands
-	var fk := _t - (IN_TIME + SIDES_TIME * 0.6)
-	if fk > 0.0 and fk < 0.25:   # a quick flash as the VS lands
-		draw_rect(Rect2(Vector2.ZERO, vp), Color(1, 1, 1, 0.25 * (1.0 - fk / 0.25)))
+	if since > 0.0 and since < 0.2:   # a white flash as they hit
+		draw_rect(Rect2(Vector2.ZERO, vp), Color(1, 1, 1, 0.35 * (1.0 - since / 0.2)))
+
+# One half: black fading to the side's colour at the seam, a bright rim, and
+# speed streaks racing away from the hit. dir = -1 left half, +1 right half.
+func _draw_half(pts: PackedVector2Array, off: Vector2, col: Color, a: float, dir: float) -> void:
+	var dark := Color(0.04, 0.035, 0.07, a)
+	var lit := Color(col.darkened(0.25), a)
+	var shadow := PackedVector2Array()
+	var moved := PackedVector2Array()
+	var cols := PackedColorArray()
+	for p in pts:
+		moved.append(p + off)
+		shadow.append(p + off + Vector2(0, 8))
+		# the seam corners glow with the side's colour, the far ends stay black
+		cols.append(lit if absf(p.x) <= SLANT + 1.0 else dark)
+	draw_colored_polygon(shadow, Color(0.55, 0.45, 0.95, 0.3 * a))
+	draw_colored_polygon(moved, dark)
+	# a softer colour wash that only reaches part way out
+	var wash := PackedVector2Array()
+	var wash_c := PackedColorArray()
+	for p in pts:
+		var q := p
+		if absf(p.x) > SLANT + 1.0:
+			q.x = p.x / absf(p.x) * 520.0
+		wash.append(q + off)
+		wash_c.append(Color(col, 0.0) if absf(p.x) > SLANT + 1.0 else lit)
+	draw_polygon(wash, wash_c)
+	# rims along the top and bottom
+	draw_line(moved[0], moved[1], Color(col.lightened(0.3), a), 4.0)
+	draw_line(moved[2], moved[3], Color(col.lightened(0.3), a), 4.0)
+	# speed streaks
+	var h := STRIP_H * 0.5
+	for i in 7:
+		var y := -h + 24.0 + i * (STRIP_H - 48.0) / 6.0
+		var ph := fmod(_t * 1.6 + i * 0.37, 1.0)
+		var x0 := dir * (140.0 + ph * 700.0) + off.x
+		var ln := 60.0 + 80.0 * fmod(i * 0.61, 1.0)
+		draw_line(Vector2(x0, y), Vector2(x0 + dir * ln, y), Color(1, 1, 1, 0.18 * (1.0 - ph) * a), 3.0)
 
 func _draw_side(s: Dictionary, c: Vector2, a: float) -> void:
 	if a <= 0.0:
@@ -161,23 +205,19 @@ func _draw_side(s: Dictionary, c: Vector2, a: float) -> void:
 		draw_circle(p, 22, Color(0.16, 0.13, 0.26, a))
 		draw_texture_rect(it, Rect2(p - Vector2(24, 24), Vector2(48, 48)), false, Color(1, 1, 1, a))
 
-func _draw_vs(k: float, a: float) -> void:
-	# a jagged bolt slashing across the strip, then the letters on top
-	var s := 0.6 + k * 0.4
-	var bolt := PackedVector2Array([
-		Vector2(-30, -150), Vector2(40, -150), Vector2(10, -40), Vector2(55, -40),
-		Vector2(-35, 150), Vector2(-5, 20), Vector2(-50, 20)])
-	for i in bolt.size():
-		bolt[i] = bolt[i] * s
-	var outline := PackedVector2Array()
-	for p in bolt:
-		outline.append(p * 1.12)
-	draw_colored_polygon(outline, Color(0.1, 0.08, 0.16, a))
-	draw_colored_polygon(bolt, Color(1.0, 0.82, 0.2, a))
+func _draw_vs(since: float, a: float) -> void:
+	# VS drops onto the seam with a springy bounce, tilted along the slash
+	var s := 1.0 + 0.9 * exp(-since * 7.0) * cos(since * 22.0)
+	if since < 0.06:
+		s = 2.2 - since / 0.06 * 0.3
 	var font := ThemeDB.fallback_font
-	var size := int(84 * s)
+	var size := int(96 * s)
 	var vs := "VS"
 	var w := font.get_string_size(vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	var rot := -atan2(SLANT * 2.0, STRIP_H) * 0.5
+	draw_set_transform(_center_pt, rot, Vector2.ONE)
 	var pos := Vector2(-w / 2, size * 0.35)
-	draw_string_outline(font, pos, vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 14, Color(0.1, 0.08, 0.16, a))
+	draw_string_outline(font, pos + Vector2(6, 6), vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 16, Color(0, 0, 0, 0.6 * a))
+	draw_string_outline(font, pos, vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 16, Color(0.1, 0.08, 0.16, a))
+	draw_string_outline(font, pos, vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 6, Color(1, 1, 1, a))
 	draw_string(font, pos, vs, HORIZONTAL_ALIGNMENT_LEFT, -1, size, Color(1, 0.3, 0.25, a))

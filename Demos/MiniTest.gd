@@ -18,6 +18,10 @@ func _ready() -> void:
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("players="):
 			count = int(a.substr(8))
+	var humans := 0
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("humans="):
+			humans = int(a.substr(7))
 	for t in picks.slice(0, count):
 		var p := PlayerData.new()
 		p.player_name = t[0]
@@ -35,7 +39,33 @@ func _ready() -> void:
 	preload("res://Scenes/UI/Competition/CompetitionWindow.gd").dev_forced_event = ev
 	await get_tree().create_timer(0.8).timeout
 	EventBus.tile_action.emit(0, &"COMPETITION")
+	if humans > 0:   # picks done → these players become humans as the game starts
+		var comp: Node = null
+		while comp == null or comp._picks.size() < GameState.players.size():
+			await get_tree().process_frame
+			comp = _find(get_tree().root, "CompetitionWindow.gd")
+		for k in humans:
+			GameState.players[k].is_cpu = false
+	await get_tree().create_timer(2.5).timeout
+	get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_pick.png" % [ev, map, GameState.players.size()])
+	if humans > 0:   # the how-to card waits for Start: show it, then press it
+		var g: Node = null
+		while g == null or g.get("_start_btn") == null:
+			await get_tree().process_frame
+			g = _find(get_tree().root, "Game.gd")
+		await get_tree().create_timer(2.0).timeout
+		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_start.png" % [ev, map, GameState.players.size()])
+		g._press_start()
 	for s in [10.0, 15.0, 20.0]:
 		await get_tree().create_timer(s - (10.0 if s == 10.0 else s - 5.0) if s == 10.0 else 5.0).timeout
 		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_%d.png" % [ev, map, GameState.players.size(), int(s)])
 	get_tree().quit()
+
+func _find(n: Node, end: String) -> Node:
+	if n.get_script() and String(n.get_script().resource_path).ends_with(end):
+		return n
+	for c in n.get_children():
+		var f := _find(c, end)
+		if f:
+			return f
+	return null

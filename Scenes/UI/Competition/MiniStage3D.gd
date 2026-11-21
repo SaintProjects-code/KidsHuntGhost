@@ -165,6 +165,13 @@ func _pos(at) -> Vector3:
 		return (at as Node3D).global_position if is_instance_valid(at) and (at as Node3D).is_inside_tree() else Vector3(0, -999, 0)
 	return at
 
+# Where a 3D point lands on screen, in `ctrl`'s own coordinates (to pin 2D
+# widgets such as dice over a spirit).
+func screen_in(world: Vector3, ctrl: Control) -> Vector2:
+	var k := _overlay.size / Vector2(maxi(1, vp.size.x), maxi(1, vp.size.y))
+	var g := _overlay.get_global_transform() * (cam.unproject_position(world) * k)
+	return ctrl.get_global_transform().affine_inverse() * g
+
 func _draw_overlay() -> void:
 	var font := ThemeDB.fallback_font
 	var k := _overlay.size / Vector2(maxi(1, vp.size.x), maxi(1, vp.size.y))

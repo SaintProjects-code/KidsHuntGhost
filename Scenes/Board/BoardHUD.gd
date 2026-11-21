@@ -107,6 +107,12 @@ func _wire_buttons() -> void:
 	(util.get_node("LogButton") as Button).pressed.connect(func(): UIManager.open_overlay(_log_window))
 	var dev_btn: Button = util.get_node("DevButton")
 	dev_btn.visible = GameState.dev_mode   # only games started from the menu's DEV button
+	var dev_script := preload("res://Scenes/UI/DevWindow.gd")
+	if GameState.dev_mode and dev_script.reopen:   # back after Add player / Switch map
+		dev_script.reopen = false
+		(func():
+			_dev_window.present(GameState.current_player_index)
+			UIManager.open_overlay(_dev_window)).call_deferred()
 	dev_btn.pressed.connect(func():
 		_dev_window.present(GameState.current_player_index)
 		UIManager.open_overlay(_dev_window))

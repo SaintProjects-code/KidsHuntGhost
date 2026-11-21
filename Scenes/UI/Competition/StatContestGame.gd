@@ -80,7 +80,11 @@ func keys_text(lane: Dictionary) -> String:
 	return "press %s to roll your die (or click your column)" % Controls.key_name(lane["slot"], "action")
 
 func _process(delta: float) -> void:
-	for i in lanes.size():   # keep each die centred in its column
+	for i in lanes.size():   # keep each die centred in its column (3D: over its spirit)
+		var n3 = lanes[i].get("n3")
+		if stage3d and n3 is Node3D and (n3 as Node3D).is_inside_tree():
+			lanes[i]["die"].position = stage3d.screen_in((n3 as Node3D).global_position + Vector3(0, 4.2, 0), self) - Vector2(32, 32)
+			continue
 		var r := lane_rect(i)
 		lanes[i]["die"].position = Vector2(r.get_center().x - 32, r.position.y + r.size.y * 0.42)
 	super._process(delta)

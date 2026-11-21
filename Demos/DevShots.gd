@@ -25,12 +25,7 @@ func _ready() -> void:
 	dev = _find(get_tree().root, "DevWindow.gd")
 	dev._add_player()
 	await _wait(2.0)
-	_shot("2_board_after_adding_two")
-	dev = _find(get_tree().root, "DevWindow.gd")
-	dev.present(0)
-	UIManager.open_overlay(dev)
-	await _wait(0.6)
-	_shot("3_dev_window_5_players")
+	_shot("2_after_adding_two_window_still_open")
 	get_tree().quit()
 
 func _wait(t: float) -> void:

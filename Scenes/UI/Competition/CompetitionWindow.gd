@@ -312,6 +312,16 @@ func _set_fullscreen(on: bool) -> void:
 	var vp := get_viewport_rect().size
 	panel.custom_minimum_size = vp - Vector2(24, 24) if on else Vector2(700, 0)
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL if on else Control.SIZE_FILL
+	# a tall pick screen (6 players) may have shrunk / shifted the window to
+	# fit: undo that so the game sits dead centre at full size
+	if _center:
+		_center.scale = Vector2.ONE
+		_center.offset_left = 0
+		_center.offset_right = 0
+		_center.offset_top = 0
+		_center.offset_bottom = 0
+	panel.size = panel.get_combined_minimum_size()
+	_fit_panel.call_deferred()
 
 # ─── Step 3: podium (revealed 3rd → 2nd → 1st) ────────────────────────────────
 func _show_podium() -> void:
