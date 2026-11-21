@@ -102,7 +102,10 @@ func _tick(delta: float) -> void:
 			eliminated.append(lane["idx"])
 			Sfx.play("faint")
 	result_value = _best_height()
-	if t > TIME_LIMIT or lanes.all(func(l): return not l["alive"]):
+	# one climber left: it's over once they're the highest (no one else can catch up)
+	var alive := lanes.filter(func(l): return l["alive"])
+	var last_wins: bool = alive.size() == 1 and lanes.size() > 1 and alive[0]["best"] >= _best_height() * 10.0
+	if t > TIME_LIMIT or alive.is_empty() or last_wins:
 		finish()
 
 # A ghost platform fades in and out — you can only land while it's there.

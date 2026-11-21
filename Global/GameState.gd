@@ -97,6 +97,9 @@ func check_win(player_index: int) -> void:
 		winner_index = player_index
 		EventBus.game_won.emit(player_index)
 
+# Minigames turned off in Game Settings (keys from CompetitionWindow).
+var minigames_off: Array = []
+
 func reset() -> void:
 	players.clear()
 	current_player_index = 0
@@ -118,6 +121,7 @@ func to_dict() -> Dictionary:
 		"win_threshold": win_threshold, "infinite": infinite_points,
 		"map": active_map, "dev": dev_mode, "battle_size": battle_size, "trail_badges": trail_badges,
 		"weather": weather, "weather_until": weather_until, "hideout": gang_hideout,
+		"minigames_off": minigames_off,
 	}
 
 func from_dict(d: Dictionary) -> void:
@@ -135,3 +139,4 @@ func from_dict(d: Dictionary) -> void:
 	weather = String(d.get("weather", ""))
 	weather_until = int(d.get("weather_until", 0))
 	gang_hideout = String(d.get("hideout", ""))
+	minigames_off = Array(d.get("minigames_off", []))

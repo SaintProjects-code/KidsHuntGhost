@@ -153,6 +153,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	_overlay.queue_redraw()
 
+# True once only one player is still going (none in a solo game): the rest
+# are out or already finished, so the last place is settled.
+func one_left(still_going: int) -> bool:
+	return still_going <= (0 if lanes.size() == 1 else 1)
+
 func finish() -> void:
 	if ended:
 		return

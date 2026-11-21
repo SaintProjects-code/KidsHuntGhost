@@ -173,6 +173,10 @@ func _refresh_game_card() -> void:
 	var goal := "No points: beat the Haunted Four" if GameState.infinite_points else "First to %d points" % GameState.win_threshold
 	_game_summary.text = "🗺 %s\n\n⚔ %dv%d battles\n\n🏆 %s\n\n👻 Haunted Four at %d badge%s" % [info["name"],
 		GameState.battle_size, GameState.battle_size, goal, GameState.trail_badges, "" if GameState.trail_badges == 1 else "s"]
+	if not GameState.minigames_off.is_empty():
+		_game_summary.text += "
+
+🎮 %d / %d minigames" % [CompWin.all_events().size() - GameState.minigames_off.size(), CompWin.all_events().size()]
 
 # ---------------- Player cards ----------------
 
@@ -386,6 +390,62 @@ func _done_button(win: Control) -> Button:
 		win.hide())
 	return done
 
+# ---------------- Minigames on / off ----------------
+
+const CompWin := preload("res://Scenes/UI/Competition/CompetitionWindow.gd")
+var _games_btn: Button
+var _games_win: MenuWindow
+
+func _games_label() -> String:
+	var all := CompWin.all_events()
+	var on := all.filter(func(k): return not GameState.minigames_off.has(k)).size()
+	return "🎮 %d / %d on — choose…" % [on, all.size()]
+
+# A window with a checkbox per minigame (2 columns); at least one stays on.
+func _build_games_window() -> void:
+	if _games_win:
+		_games_win.queue_free()
+	var made := _make_window(620, "Minigames")
+	_games_win = made[0]
+	var col: VBoxContainer = made[1]
+	var hint := UIKit.label("Untick the ones you don't want to play. At least one stays on.", 14, Color(1, 1, 1, 0.7))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(hint)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 6)
+	col.add_child(grid)
+	var boxes: Array = []
+	for k in CompWin.all_events():
+		var cb := CheckBox.new()
+		cb.text = CompWin.event_name(k)
+		cb.focus_mode = Control.FOCUS_NONE
+		cb.add_theme_font_size_override("font_size", 17)
+		cb.custom_minimum_size.x = 270
+		cb.button_pressed = not GameState.minigames_off.has(k)
+		var key: String = k
+		cb.toggled.connect(func(on: bool):
+			if on:
+				GameState.minigames_off.erase(key)
+			elif CompWin.all_events().size() - GameState.minigames_off.size() > 1:
+				GameState.minigames_off.append(key)
+			else:
+				cb.set_pressed_no_signal(true)   # keep the last one on
+				Sfx.play("error")
+			_games_btn.text = _games_label())
+		grid.add_child(cb)
+		boxes.append(cb)
+	var row := UIKit.hbox(10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_child(UIKit.small_button("All on", func():
+		GameState.minigames_off.clear()
+		for b in boxes:
+			b.set_pressed_no_signal(true)
+		_games_btn.text = _games_label()))
+	row.add_child(_done_button(_games_win))
+	col.add_child(row)
+
 # ---------------- Game settings ----------------
 
 func _build_settings_window() -> void:
@@ -492,6 +552,17 @@ func _build_settings_window() -> void:
 	vol_row.add_child(volume_slider)
 	vol_row.add_child(volume_value)
 	_settings_row(grid, "Sound", [vol_row])
+
+	# Minigames: a button that opens a checklist of every minigame
+	_games_btn = Button.new()
+	_games_btn.focus_mode = Control.FOCUS_NONE
+	_games_btn.text = _games_label()
+	UIKit.style_button(_games_btn, "secondary", "m")
+	_games_btn.pressed.connect(func():
+		Sfx.play("click")
+		_build_games_window()
+		_games_win.show())
+	_settings_row(grid, "Minigames", [_games_btn])
 
 	col.add_child(_done_button(_settings_win))
 	_settings_win.visibility_changed.connect(_refresh_game_card)

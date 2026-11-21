@@ -61,7 +61,7 @@ func _tick(delta: float) -> void:
 					if not lane["done"]:
 						_miss(lane)
 				var alive := lanes.filter(func(l): return not l["out"])
-				if alive.size() <= (0 if lanes.size() == 1 else 1) or _seq.size() >= MAX_ROUNDS + 2:
+				if one_left(alive.size()) or _seq.size() >= MAX_ROUNDS + 2:
 					result_value = float(_lane_by_idx(ranks()[0])["best"])
 					finish()
 				else:

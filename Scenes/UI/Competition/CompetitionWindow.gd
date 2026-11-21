@@ -97,8 +97,14 @@ func present(_player_index: int) -> void:
 	_phase = 1
 	_picks.clear()
 	_ranks.clear()
-	_event = dev_forced_event if all_events().has(dev_forced_event) else \
-		(CONTESTS.keys().pick_random() if randf() < CONTEST_CHANCE else GAMES.keys().pick_random())
+	# only the minigames left on in Game Settings (all of them if none are)
+	var games: Array = GAMES.keys().filter(func(k): return not GameState.minigames_off.has(k))
+	var contests: Array = CONTESTS.keys().filter(func(k): return not GameState.minigames_off.has(k))
+	if games.is_empty() and contests.is_empty():
+		games = GAMES.keys()
+		contests = CONTESTS.keys()
+	var pool: Array = contests if (games.is_empty() or (randf() < CONTEST_CHANCE and not contests.is_empty())) else games
+	_event = dev_forced_event if all_events().has(dev_forced_event) else String(pool.pick_random())
 	_build_selection()
 
 func _is_game() -> bool:

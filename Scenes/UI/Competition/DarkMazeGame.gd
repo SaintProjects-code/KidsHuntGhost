@@ -11,7 +11,7 @@ var order: Array = []   # player indices in escape order
 
 func _init_game() -> void:
 	layout = Layout.GRID
-	how_to = "At each crossroad pick LEFT / MIDDLE / RIGHT. Read the hints in the lantern light!"
+	how_to = "Each room has 3 doors — pick LEFT / MIDDLE / RIGHT. Every room gives a different clue: marks, a sign, candles, a quick peek or a glow. Pick fast for a speed boost!"
 	custom_minimum_size = Vector2(650, 440)
 	for lane in lanes:
 		var panel := MazePanel.new(lane, self)
@@ -36,7 +36,7 @@ func _on_escaped(idx: int) -> void:
 	order.append(idx)
 	_lane_by_idx(idx)["panel"].place = order.size()
 	result_value = t
-	if order.size() >= lanes.size():
+	if one_left(lanes.size() - order.size()):   # the last one in the maze comes last anyway
 		finish()
 
 func _on_action(lane: Dictionary, action: String) -> void:
@@ -74,7 +74,15 @@ class MazePanel:
 	var lane: Dictionary
 	var game
 	var place := 0
-	var phase := "walk"        # walk / fork / back / out
+	var phase := "walk"        # walk / fork / enter / back / out
+	const ENTER_TIME := 0.9    # walking through the chosen door
+	const QUICK := 1.6         # pick the right door this fast → a speed boost
+	const HINTS := ["marks", "peek", "sign", "candles", "glow"]
+	var hint := "marks"        # this room's kind of clue
+	var clue := ""             # what the room says (shown while choosing)
+	var candles := {}          # dir -> 1..3 (the "candles" clue)
+	var pending := ""          # the door being walked through
+	var quick := false
 	var t := 0.0
 	var walk_time := 1.6
 	var back_time := BACK_TIME
@@ -135,6 +143,12 @@ class MazePanel:
 			s["life"] -= delta
 		_sparkles = _sparkles.filter(func(s): return s["life"] > 0.0)
 		match phase:
+			"enter":
+				t += delta
+				if t >= ENTER_TIME:
+					_resolve(pending)
+			"fork":
+				t += delta
 			"walk", "back":
 				t += delta
 				_step_t += delta
@@ -157,9 +171,28 @@ class MazePanel:
 		hazards.shuffle()
 		arms = {dirs[0]: "path", dirs[1]: hazards[0], dirs[2]: hazards[1]}
 		treasure = dirs[0] if randf() < 0.3 else ""
+		hint = HINTS.pick_random() if forks_passed > 0 else "marks"
+
 		for d in DIRS:
-			revealed[d] = randf() < (HINT_PATH if arms[d] == "path" else HINT_HAZARD)
-		msg = "Which way?"
+			revealed[d] = hint == "marks" and randf() < (HINT_PATH if arms[d] == "path" else HINT_HAZARD)
+		match hint:
+			"marks":
+				clue = "Look for marks in the light"
+			"peek":
+				clue = "👀 Quick — watch the doors!"
+			"sign":
+				clue = "🪧 Not %s, not %s" % [dirs[1].to_upper(), dirs[2].to_upper()]
+			"candles":
+				var most := randf() < 0.5
+				var n := [3, 2, 1] if most else [1, 2, 3]
+				candles = {dirs[0]: n[0], dirs[1]: n[1], dirs[2]: n[2]}
+				if randf() < 0.5:
+					candles[dirs[1]] = n[2]
+					candles[dirs[2]] = n[1]
+				clue = "🕯 Go %s candles" % ("MOST" if most else "FEWEST")
+			"glow":
+				clue = "✨ Watch for the glow"
+		msg = clue
 		if lane["human"]:
 			_set_buttons(true)
 		else:
@@ -171,6 +204,15 @@ class MazePanel:
 		if phase != "fork":
 			return
 		var pick := ""
+		var path_d := ""
+		for d in DIRS:
+			if arms[d] == "path":
+				path_d = d
+		if hint != "marks":
+			# reading / remembering / spotting the clue — usually right
+			var odds := {"peek": 0.85, "sign": 1.0, "candles": 0.95, "glow": 0.8}
+			choose(path_d if randf() < smart * float(odds.get(hint, 1.0)) else DIRS.pick_random())
+			return
 		if randf() < smart:
 			for d in DIRS:
 				if revealed[d] and arms[d] == "path":
@@ -185,8 +227,30 @@ class MazePanel:
 		if phase != "fork":
 			return
 		_set_buttons(false)
+		quick = t <= QUICK
 		t = 0.0
 		last_pick = dir
+		pending = dir
+		phase = "enter"   # walk up to the door and through it first
+		msg = "…"
+
+	# What's behind the door, once the spirit is through it.
+	func shows(d: String) -> bool:
+		if phase == "enter":
+			return d == pending
+		if phase != "fork":
+			return false
+		match hint:
+			"marks":
+				return revealed.get(d, false)
+			"peek":
+				return t < 0.8
+			"glow":
+				return arms.get(d, "") == "path" and fmod(t, 1.4) > 1.1
+		return false
+
+	func _resolve(dir: String) -> void:
+		t = 0.0
 		back_time = BACK_TIME
 		match arms.get(dir, "dead"):
 			"path":
@@ -196,6 +260,9 @@ class MazePanel:
 					msg = "💰 Treasure room!"
 					t = walk_time * 0.4   # a head start into the next corridor
 					Sfx.play("coin")
+				elif quick:
+					msg = "⚡ Quick! Speed boost"
+					t = walk_time * 0.35
 				else:
 					msg = "✓ Right way!"
 				Sfx.play("collect", 0.8)
@@ -256,9 +323,13 @@ class MazePanel:
 				_wall(Rect2(xl - 8, y, 8, 22))
 				_wall(Rect2(xr, y, 8, 22))
 				y += 30.0
-		elif phase == "fork":
+		elif phase == "fork" or phase == "enter":
 			_draw_fork(font, c, rx, ry, xl, xr)
-		var bob := sin(game.t * 8.0) * 2.0 if phase == "walk" else 0.0
+		var bob := sin(game.t * 8.0) * 2.0 if phase == "walk" or phase == "enter" else 0.0
+		if phase == "enter":   # up to the chosen door and in
+			var k := minf(1.0, t / (ENTER_TIME * 0.8))
+			var door := {"left": Vector2(-80, -7), "middle": Vector2(0, -48), "right": Vector2(80, -7)}
+			c += (door.get(pending, Vector2.ZERO) as Vector2) * k
 		_oval(c + Vector2(0, 34), 22, 6, Color(0, 0, 0, 0.35))
 		draw_circle(c + Vector2(0, 8 + bob), 33.0, Color(lane["color"], 0.25))
 		if lane["tex"]:
@@ -313,8 +384,14 @@ class MazePanel:
 		var mid_y := (y_top + y_near) * 0.5 + 3.0
 		var spots := {"middle": Vector2(c.x, y_top - 12.0), "left": Vector2(c.x - 80.0, mid_y), "right": Vector2(c.x + 80.0, mid_y)}
 		for d in DIRS:
-			if revealed.get(d, false):
+			if shows(d):
 				_draw_hint(font, d, String(arms[d]), spots[d], y_top, y_near, xl, xr, c)
+			if hint == "candles" and phase == "fork":
+				var n: int = candles.get(d, 1)
+				for i in n:
+					var cp: Vector2 = spots[d] + Vector2((i - (n - 1) * 0.5) * 9.0, -16.0)
+					draw_rect(Rect2(cp.x - 2, cp.y, 4, 8), Color(0.95, 0.92, 0.8))
+					draw_circle(cp + Vector2(0, -2), 2.6 + sin(game.t * 14.0 + i) * 0.5, Color(1, 0.7, 0.25))
 
 	func _draw_hint(font: Font, dir: String, kind: String, p: Vector2, y_top: float, y_near: float, xl: float, xr: float, c: Vector2) -> void:
 		match kind:
@@ -377,6 +454,13 @@ func _build_3d(v) -> void:
 			doors[d] = {"gap": gap, "mark": mark}
 		dw.visible = false
 		lane["dw3"] = dw
+		var pl = lane["panel"]
+		# the room's clue along the bottom of the panel (clear of the name tag)
+		v.tag(o + Vector3(0, 0, PANEL3.y / 2 - 0.55), func(): return pl.clue if pl.phase == "fork" and pl.hint != "marks" else "", Color("ffe9a8"), 0.0, 13 if lanes.size() > 4 else 15)
+		for a2 in 3:
+			var d2: String = DIRS3[a2]
+			v.tag(doors[d2]["gap"], func(): return "🕯".repeat(int(pl.candles.get(d2, 1))) if pl.phase == "fork" and pl.hint == "candles" else "",
+				Color("ffcf70"), 1.1, 15)
 		lane["doors3"] = doors
 		lane["n3"] = v.spirit(lane["tex"], lane["color"], o + Vector3(0, 0, 1.6), 0.034, true)
 		lane["lamp3"] = v.lamp(Color("ffc870"), o + Vector3(0, 2.2, 1.6), 2.6, 5.0)
@@ -410,27 +494,29 @@ func _update_3d(v, delta: float) -> void:
 				lane["doors3"][d]["gap"].material_override = v.mat(Color("0a0a10"), true)
 				lane["doors3"][d]["mark"].material_override = v.mat(MARK3[kind], true)
 				lane["doors3"][d]["mark"].visible = p.revealed.get(d, false)
-		elif p.phase != "fork" and lane["ph3"] == "doors":
+		elif p.phase == "enter" and lane["ph3"] == "doors":
 			lane["ph3"] = "through"   # a door was picked: walk to it and through
 			lane["pt3"] = 0.0
 			var kind2: String = p.arms.get(p.last_pick, "dead")
 			lane["doors3"][p.last_pick]["gap"].material_override = v.mat(MARK3[kind2], true)
 		match lane["ph3"]:
 			"doors":
+				for d in DIRS3:   # this room's clue: marks, a peek, a glow…
+					lane["doors3"][d]["mark"].visible = p.shows(d)
 				dw.position.z = lerpf(o.z - 2.6, o.z - 1.4, minf(1.0, lane["pt3"] / 0.6))
 				scroll = 2.2 * (1.0 - minf(1.0, lane["pt3"] / 0.6))
 			"through":
 				var door_x: float = o.x + (DIRS3.find(p.last_pick) - 1) * 2.4
-				if lane["pt3"] < 0.45:
+				if p.t < p.ENTER_TIME * 0.5:
 					n.position.x = lerpf(n.position.x, door_x, minf(1.0, delta * 6.0))
 					n.position.z = lerpf(n.position.z, dw.position.z + 0.4, minf(1.0, delta * 6.0))
 				else:
 					n.position.z -= delta * 2.0
-					n.scale = Vector3.ONE * maxf(0.05, 1.0 - (lane["pt3"] - 0.45) * 2.0)
+					n.scale = Vector3.ONE * maxf(0.05, 1.0 - (p.t - p.ENTER_TIME * 0.5) * 2.2)
 					if p.msg.begins_with("🕳"):
 						n.position.y -= delta * 3.0
-				if lane["pt3"] > 0.95:
-					v.pop(dw.position + Vector3(door_x - o.x, 0, -0.4), p.msg, Color("ffd24d") if p.phase == "walk" else Color("ff9a9a"), 1.8, 1.1, 17)
+				if p.phase != "enter":   # through: show what was behind the door
+					v.pop(o + Vector3(0, 0, PANEL3.y / 2 - 0.9), p.msg, Color("ffd24d") if p.phase == "walk" else Color("ff9a9a"), 1.8, 1.1, 13 if lanes.size() > 4 else 16)
 					if p.msg.begins_with("💥"):
 						lane["lamp3"].light_color = Color("ff5050")
 					elif p.msg.begins_with("💰"):

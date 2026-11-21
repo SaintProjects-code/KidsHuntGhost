@@ -48,7 +48,7 @@ func _tick(delta: float) -> void:
 			elif bat["y"] >= 1.1:
 				lane["bats"].erase(bat)
 	var alive := lanes.filter(func(l): return l["out_t"] < 0.0)
-	if alive.size() <= (0 if lanes.size() == 1 else 1) or t >= TIME_LIMIT:
+	if one_left(alive.size()) or t >= TIME_LIMIT:
 		result_value = t
 		finish()
 

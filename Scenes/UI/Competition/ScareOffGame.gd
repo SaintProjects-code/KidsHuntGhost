@@ -39,7 +39,7 @@ func _tick(delta: float) -> void:
 			if lane["next"] <= 0.0:
 				lane["next"] = 1.0 / (lane["rate"] * randf_range(0.8, 1.2))
 				_press(lane)
-	var all_done := lanes.all(func(l): return l["done_t"] >= 0.0)
+	var all_done := one_left(lanes.filter(func(l): return l["done_t"] < 0.0).size())
 	if all_done or t > TIME_LIMIT:
 		var winner := _lane_by_idx(ranks()[0])
 		result_value = float(winner["done_t"]) if winner["done_t"] >= 0.0 else 0.0

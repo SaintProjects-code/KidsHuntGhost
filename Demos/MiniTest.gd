@@ -56,6 +56,12 @@ func _ready() -> void:
 		await get_tree().create_timer(2.0).timeout
 		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_start.png" % [ev, map, GameState.players.size()])
 		g._press_start()
+	if "burst" in OS.get_cmdline_user_args():   # a frame every 0.4s for 12s
+		for k in 30:
+			await get_tree().create_timer(0.4).timeout
+			get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/burst_%s_m%d_%02d.png" % [ev, map, k])
+		get_tree().quit()
+		return
 	for s in [10.0, 15.0, 20.0]:
 		await get_tree().create_timer(s - (10.0 if s == 10.0 else s - 5.0) if s == 10.0 else 5.0).timeout
 		get_viewport().get_texture().get_image().save_png(OS.get_user_data_dir() + "/mgtest/%s_m%d_p%d_%d.png" % [ev, map, GameState.players.size(), int(s)])
