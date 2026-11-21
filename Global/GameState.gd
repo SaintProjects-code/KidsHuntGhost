@@ -17,6 +17,12 @@ var trail_badges: int = Balance.FLY_BADGES:
 	set(v):
 		trail_badges = clampi(v, 1, 8)
 var winner_index: int = -1          # set once someone wins
+# Weather (see Data/WeatherData.gd): "" = clear. Lasts until turn_count
+# reaches weather_until (2 full rounds from when it started).
+var weather := ""
+var weather_until := 0
+# The Grim Gang's hideout town (a node key), picked when the board loads.
+var gang_hideout := ""
 var dev_mode: bool = false          # only for games started from the menu's DEV button
 
 # ── end-of-game stats: counted from game events into each PlayerData.stats ────
@@ -50,6 +56,23 @@ func record_battle(i: int, won: bool) -> void:
 	_stat(i, "battles")
 	_stat(i, "wins" if won else "losses")
 
+func set_weather(kind: String, rounds: int = 2) -> void:
+	weather = kind
+	weather_until = turn_count + rounds * maxi(1, players.size())
+	EventBus.weather_changed.emit(kind)
+
+func weather_rounds_left() -> int:
+	if weather == "":
+		return 0
+	return maxi(1, ceili(float(weather_until - turn_count) / maxi(1, players.size())))
+
+# Called as each turn ends: clear skies once the 2 rounds are up.
+func tick_weather() -> void:
+	if weather != "" and turn_count >= weather_until:
+		weather = ""
+		EventBus.weather_changed.emit("")
+		EventBus.log_entry.emit(current_player_index, "The weather clears.", "#9fdcff")
+
 func current_player() -> PlayerData:
 	return players[current_player_index]
 
@@ -80,6 +103,9 @@ func reset() -> void:
 	turn_count = 0
 	winner_index = -1
 	dev_mode = false
+	weather = ""
+	weather_until = 0
+	gang_hideout = ""
 
 # ── save / load ───────────────────────────────────────────────────────────────
 
@@ -91,6 +117,7 @@ func to_dict() -> Dictionary:
 		"players": ps, "current": current_player_index, "turn": turn_count,
 		"win_threshold": win_threshold, "infinite": infinite_points,
 		"map": active_map, "dev": dev_mode, "battle_size": battle_size, "trail_badges": trail_badges,
+		"weather": weather, "weather_until": weather_until, "hideout": gang_hideout,
 	}
 
 func from_dict(d: Dictionary) -> void:
@@ -105,3 +132,6 @@ func from_dict(d: Dictionary) -> void:
 	battle_size = int(d.get("battle_size", 3))
 	trail_badges = int(d.get("trail_badges", Balance.FLY_BADGES))   # older saves: the old fixed 3
 	dev_mode = d.get("dev", false)
+	weather = String(d.get("weather", ""))
+	weather_until = int(d.get("weather_until", 0))
+	gang_hideout = String(d.get("hideout", ""))

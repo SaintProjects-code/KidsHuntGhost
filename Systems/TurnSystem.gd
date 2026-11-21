@@ -34,6 +34,15 @@ func _begin_turn() -> void:
 	var idx := GameState.current_player_index
 	var gen := _generation
 	EventBus.turn_started.emit(idx)
+	# stuck (Quicksand, a Hex…): sit this turn out
+	var p := GameState.current_player()
+	if p.skip_turns > 0:
+		p.skip_turns -= 1
+		EventBus.log_entry.emit(idx, "%s is stuck and skips this turn!" % p.player_name, "#ff9f9f")
+		await get_tree().create_timer(1.2).timeout
+		if gen == _generation and idx == GameState.current_player_index and GameState.winner_index == -1:
+			advance_turn()
+		return
 	if GameState.current_player().is_cpu:
 		await get_tree().create_timer(CPU_ROLL_DELAY).timeout
 		if gen != _generation or GameState.winner_index != -1 or idx != GameState.current_player_index:
@@ -65,4 +74,5 @@ func advance_turn() -> void:
 	EventBus.turn_ended.emit(idx)
 	GameState.current_player_index = (idx + 1) % GameState.players.size()
 	GameState.turn_count += 1
+	GameState.tick_weather()
 	_begin_turn()

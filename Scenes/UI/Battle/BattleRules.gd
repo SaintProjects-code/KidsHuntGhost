@@ -530,9 +530,17 @@ func _helping_hand(side: Array, active: int) -> void:
 # ---------------- the hit ----------------
 
 # One hit. `mult` scales it (moves); `ignore_def` skips the defender's DEF.
+const WeatherData := preload("res://Data/WeatherData.gd")
+
 func _strike(att: Dictionary, def_: Dictionary, attacker_is_me: bool, mult: float = 1.0, ignore_def := false) -> void:
 	_anim_attack(att)
 	await _beat(0.3)
+	# 🌫 Ghost Mist: attacks can miss (Psychic / Dark see through it)
+	if WeatherData.is_on("mist") and not WeatherData.immune(att) and randf() < WeatherData.MIST_MISS:
+		_logln("[color=#c8c8e0]🌫 %s's attack misses in the mist![/color]" % _who(att))
+		_float_on(def_, "MISS", Color("d0d0e8"))
+		await _beat(0.3)
+		return
 	# Bodyguard: a bench ally throws itself in front of a HURT lead, once per round
 	if float(def_.get("current_hp", 0)) / float(maxi(1, def_.get("hp", 1))) < 0.5:
 		for b in _side_of(def_):
@@ -542,6 +550,7 @@ func _strike(att: Dictionary, def_: Dictionary, attacker_is_me: bool, mult: floa
 				def_ = b
 				break
 	var item_mult := 1.25 if _charm(att) == "power_band" else 1.0   # (was 1.2)
+	item_mult *= WeatherData.damage_mult(att)   # weather: boosted types +25%, weakened −25%
 	if _has(att, "reckless"):
 		item_mult *= 1.25
 	var target_stats: Dictionary = {"type": def_.get("type", ""), "def": 0} if ignore_def else def_

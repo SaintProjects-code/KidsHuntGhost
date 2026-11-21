@@ -55,6 +55,8 @@ func _on_tile_action(idx: int, kind: StringName) -> void:
 		"BATTLE": await _run_battle_tile(idx)
 		var k:
 			if GameData.GYMS.has(k):
+				if k == GameState.gang_hideout:
+					await _run_hideout(idx)
 				await _run_city(idx, k)
 	UIManager.close()
 	UIManager.release_pause()
@@ -74,7 +76,7 @@ func _npc_battle(idx: int, roster: Array, title: String, portrait: Array, kind: 
 	var vs := "vs %s!" % title + ("  (brings %d of these)" % Balance.BATTLE_PICK_MAX if roster.size() > Balance.BATTLE_PICK_MAX else "")
 	# you pick your team only for town Wardens and the Haunted Four / Spirit Lord;
 	# trainer fights take your first spirits straight in
-	var choose: bool = kind in ["gym", "warden", "champion"]
+	var choose: bool = kind in ["gym", "warden", "champion", "gang_boss"]
 	var pick: Dictionary = await BattleSetup.pick_for(_select, idx, vs, roster, choose)
 	if pick.is_empty():
 		return null
@@ -96,18 +98,121 @@ func _run_event(idx: int) -> void:
 	_event.present(idx)
 	UIManager.open(_event)
 	await _event.closed
+	await _after_event(idx)
+
+# What an event left to do once its window closes: a wild fight, a trainer
+# battle (full strength for your badges), a Grim Gang fight, or a challenge.
+func _after_event(idx: int) -> void:
 	var foe: Dictionary = _event.take_pending_fight()
+	var gang: bool = _event.take_pending_gang()
+	var rival: int = _event.take_pending_challenge()
 	if not foe.is_empty():
 		UIManager.close()
-		EventBus.wild_encounter_started.emit(idx, foe)
-		await EventBus.encounter_finished
+		if foe.get("_no_catch", false):
+			await _event_trainer_battle(idx, foe)
+		else:
+			EventBus.wild_encounter_started.emit(idx, foe)
+			await EventBus.encounter_finished
+	if gang:
+		UIManager.close()
+		await _gang_battle(idx, "Grim Gang Grunt")
+	if rival >= 0 and rival < GameState.players.size():
+		UIManager.close()
+		await _pvp_battle(idx, rival, true)
+
+# A trainer from an event: a full team, as strong as your badges say.
+func _event_trainer_battle(idx: int, foe: Dictionary) -> void:
+	var team := strong_team(idx, 3, 1)
+	await _npc_battle(idx, team, String(foe.get("_trainer_name", "Trainer")), foe.get("_portrait", ["acetrainer"]), "trainer")
+
+# ─── the Grim Gang ────────────────────────────────────────────────────────────
+# Ghost bandits. Lose a fight to them and they take your LEAD to their hideout
+# (one town, marked ☠). Stopping there starts a gang event — or, if they have
+# one of your spirits, a fight with their boss to win it back.
+const GANG_PORTRAIT := ["rocketgrunt", "rocketgruntf", "aetherfoundation"]
+const BOSS_PORTRAIT := ["giovanni", "rocketboss", "aetherfoundation2"]
+
+# A team scaled to the player's badges, `bonus` tiers tougher (max tier 3).
+static func strong_team(idx: int, size: int, bonus: int) -> Array:
+	var tier: int = clampi(GameData.challenge_tier(GameState.players[idx].progress.badge_count()) + bonus, 1, 3)
+	var team: Array = []
+	for k in size:
+		var s: Dictionary = SpiritsData.random_spirit(mini(3, tier))
+		if s.is_empty():
+			continue
+		s["stars"] = clampi(tier - 1 + bonus, 0, 3)
+		team.append(s)
+	return team
+
+func _gang_battle(idx: int, title: String) -> void:
+	var p: PlayerData = GameState.players[idx]
+	if p.living_team().is_empty():
+		return
+	var won = await _npc_battle(idx, strong_team(idx, 3, 1), title, GANG_PORTRAIT, "gang")
+	if won == true:
+		p.inventory.gold += 20
+		GameState.award_points(idx, 1)
+		EventBus.log_entry.emit(idx, "%s beat the Grim Gang! +1 pt, +20 gold." % p.player_name, "#ffd24d")
+	elif won == false:
+		await _steal_lead(idx)
+
+func _steal_lead(idx: int) -> void:
+	var p: PlayerData = GameState.players[idx]
+	if p.team.size() <= 1:
+		EventBus.log_entry.emit(idx, "The Grim Gang laughs — %s has nothing worth taking." % p.player_name, "#ff9f9f")
+		return
+	var lead: Dictionary = p.team.pop_front()
+	p.stolen.append(lead)
+	Sfx.play("lose")
+	var town: String = get_tree().current_scene.graph.label(GameState.gang_hideout) if get_tree().current_scene.get("graph") else "their hideout"
+	EventBus.log_entry.emit(idx, "☠ The Grim Gang snatched %s's %s! Win it back at %s." % [p.player_name, lead.get("name", "?"), town], "#ff6a6a")
+	var board := get_tree().current_scene
+	if board and board.has_method("_show_flash"):
+		await board._show_flash("☠ The Grim Gang took %s! Get it back at %s" % [lead.get("name", "?"), town], 2.0)
+
+func _run_hideout(idx: int) -> void:
+	var p: PlayerData = GameState.players[idx]
+	if not p.stolen.is_empty():
+		var board := get_tree().current_scene
+		if board and board.has_method("_show_flash"):
+			await board._show_flash("☠ The Grim Boss is waiting in the hideout…", 1.4)
+		var boss := strong_team(idx, 4, 2)
+		for m in boss:   # the boss's spirits are the real deal
+			m["stars"] = 3
+			m["atk"] = mini(6, int(m.get("atk", 1)) + 1)
+			m["hp"] = int(m.get("hp", 90)) + 30
+			m["current_hp"] = m["hp"]
+		var won = await _npc_battle(idx, boss, "Grim Boss Vex", BOSS_PORTRAIT, "gang_boss")
+		if won == true:
+			var names: Array = []
+			for m in p.stolen:
+				m["current_hp"] = m.get("hp", 1)
+				names.append(m.get("name", "?"))
+				if p.team.size() < Balance.TEAM_MAX:
+					p.team.append(m)
+				else:
+					p.pc.append(m)
+			p.stolen.clear()
+			p.inventory.gold += 40
+			GameState.award_points(idx, 3)
+			Sfx.play("win")
+			EventBus.log_entry.emit(idx, "%s beat Grim Boss Vex and rescued %s! +3 pts, +40 gold." % [p.player_name, ", ".join(names)], "#ffd24d")
+		elif won == false:
+			EventBus.log_entry.emit(idx, "Grim Boss Vex throws %s out of the hideout!" % p.player_name, "#ff9f9f")
+		return
+	# nothing to rescue: the gang has something else in mind
+	_event.present(idx, "gang_hideout")
+	UIManager.open(_event)
+	await _event.closed
+	await _after_event(idx)
 
 func _run_trainer_battle(idx: int) -> void:
 	var p: PlayerData = GameState.players[idx]
 	var t: Dictionary = GameData.TRAINER_BATTLES.pick_random()
-	var tier: int = GameData.challenge_tier(p.progress.badge_count())
+	# trainers bring a full team, a tier above your badges (they're strong!)
+	var tier: int = clampi(GameData.challenge_tier(p.progress.badge_count()) + 1, 1, 3)
 	var entries: Array = t.get("team", [])
-	var size: int = GameData.trainer_team_size(p.pvp_tag, entries.size())
+	var size: int = mini(entries.size(), maxi(3, Balance.BATTLE_PICK_MAX))
 	var foe_team: Array = GameData.build_team(entries.slice(0, size), tier)
 	var won = await _npc_battle(idx, foe_team, String(t["name"]), t.get("portrait", ["acetrainer"]), "trainer")
 	if won == true:

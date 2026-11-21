@@ -359,3 +359,96 @@ func _draw_pageant() -> void:
 		if lane["place"] > 0:
 			text(Vector2(home.x - 50, home.y - 26), "%s %d" % [_medal(lane["place"]), _score(lane)], 16,
 				UIKit.GOLD if lane["place"] == 1 else Color.WHITE, 100, 4)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# The same three steps (roll → perform → results), staged in 3D:
+#   race (SPD / HP): lanes down a track · lift (ATK): a barbell, one rep per
+#   point · climb (DEF): up a glowing pillar · pageant: a stage, three judges.
+func _build_3d(v) -> void:
+	var n := lanes.size()
+	var gap := 3.4
+	v.sky(Color("2a2452"), 0.75)
+	match _kind3():
+		"race":
+			v.aim(Vector3(0, 12, 19), Vector3(0, 0, -9))
+			for i in n:
+				v.box(Vector3(3.2, 0.1, 40), Color("3a3266") if i % 2 else Color("443a74"), Vector3(v.lane_x(i, n, gap), -0.05, -16))
+			v.box(Vector3(n * gap, 0.12, 0.5), Color.WHITE, Vector3(0, 0, -32), true)
+		"lift":
+			gap = 4.4
+			v.aim(Vector3(0, 5, 12 + n * 2.0), Vector3(0, 2, 0))
+			v.box(Vector3(n * gap + 2, 0.3, 5), Color("3a3266"), Vector3(0, -0.15, 0))
+		"climb":
+			gap = 4.0
+			v.aim(Vector3(0, 6, 14 + n * 2.0), Vector3(0, 4, 0))
+			for i in n:
+				v.box(Vector3(0.6, 10, 0.6), Color("4a3a9a"), Vector3(v.lane_x(i, n, gap), 5, -0.8), true)
+		"pageant":
+			gap = 3.6
+			v.aim(Vector3(0, 5, 13 + n * 1.5), Vector3(0, 1.8, 0))
+			v.box(Vector3(n * gap + 4, 0.4, 6), Color("5a2a5a"), Vector3(0, -0.2, 0))
+			for k in _judges.size():
+				var jn: Node3D = v.spirit(_judges[k]["tex"], Color(0, 0, 0, 0), Vector3((k - 1) * 3.0, 0, -3.6), 0.03)
+				v.tag(jn, "%s (loves %s)" % [_judges[k]["name"], JUDGE_STATS[_judges[k]["likes"]]], Color("e8d0ff"), 2.6, 12)
+			_spot3 = v.lamp(Color("fff0c0"), Vector3(0, 5, 2.5), 0.0, 8)
+	for i in n:
+		var lane: Dictionary = lanes[i]
+		var x: float = v.lane_x(i, n, gap)
+		lane["x3"] = x
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(x, 0, 1.2), 0.03)
+		if _kind3() == "lift":
+			var bar := Node3D.new()
+			v.world.add_child(bar)
+			v.box(Vector3(2.2, 0.1, 0.1), Color("c8c8d0"), Vector3.ZERO, false, bar)
+			for sx in [-1.0, 1.0]:
+				v.ball(0.35, Color("33333a"), Vector3(sx * 1.1, 0, 0), false, bar)
+			lane["bar3"] = bar
+		lane["placed3"] = false
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s  %s" % [l["name"], ("🎲 %d" % l["roll"]) if l["rolled"] and _phase == "roll" else str(int(l["show"])) if _phase != "roll" else key_hint(l)],
+			lane["color"].lightened(0.25), 2.3, 14)
+
+var _spot3: OmniLight3D
+var _votes_seen3 := Vector2i(-1, 0)
+
+func _kind3() -> String:
+	if stat == "beauty":
+		return "pageant"
+	if _is_race():
+		return "race"
+	return "lift" if stat == "atk" else "climb"
+
+func _update_3d(v, _delta: float) -> void:
+	var kind := _kind3()
+	for lane in lanes:
+		var n: Node3D = lane["n3"]
+		var x: float = lane["x3"]
+		var k: float = lane["show"] / float(maxi(1, _max_score))
+		match kind:
+			"race":
+				n.position = Vector3(x, absf(sin(t * 12.0 + lane["idx"])) * 0.3 if _phase == "perform" else 0.0, 1.2 - k * 33.0)
+			"lift":
+				var lift: float = absf(sin(lane["show"] * PI)) if _phase == "perform" else 0.0
+				lane["bar3"].position = Vector3(x, 1.7 + lift * 1.4, 1.2)
+				n.scale = Vector3(1.0 + (1.0 - lift) * 0.1, 1.0 - (1.0 - lift) * 0.1, 1.0)
+			"climb":
+				n.position = Vector3(x, k * 8.5, 1.2 - 1.6)
+			"pageant":
+				pass
+		if lane["place"] > 0 and not lane["placed3"]:
+			lane["placed3"] = true
+			var medal: String = ["🥇 1st", "🥈 2nd", "🥉 3rd"][lane["place"] - 1] if lane["place"] <= 3 else ORDINAL[lane["place"] - 1]
+			v.pop(n, medal, Color("ffd24d") if lane["place"] == 1 else Color.WHITE, 3.2, 3.0, 22)
+	if kind == "pageant":
+		var at := _pageant_at(_phase_t) if _phase == "perform" else Vector2i(-1, 0)
+		for i in lanes.size():
+			var star: bool = at.x == i
+			var n2: Node3D = lanes[i]["n3"]
+			n2.position = n2.position.lerp(Vector3(0, 0, 2.2) if star else Vector3(lanes[i]["x3"], 0, 0.6 if at.x >= 0 else 1.2), 0.12)
+		_spot3.light_energy = 3.0 if at.x >= 0 else 0.0
+		if at.x >= 0:
+			_spot3.position = lanes[at.x]["n3"].position + Vector3(0, 4, 1)
+			if at != _votes_seen3 and at.y > 0:
+				_votes_seen3 = at
+				var vote: int = lanes[at.x]["votes"][at.y - 1]
+				v.pop(Vector3((at.y - 2) * 3.0, 0, -3.6), "%d" % vote, Color("ffd24d"), 3.2, 1.2, 28)

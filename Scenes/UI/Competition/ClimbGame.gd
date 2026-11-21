@@ -13,6 +13,8 @@ const SPRING_V := 1050.0
 const GRAVITY := 1200.0
 const PLAT_W := 0.22          # platform width, as a fraction of the column
 const TIME_LIMIT := 35.0
+const PLAT_COLORS := {"normal": Color("4be0a8"), "move": Color("a978ff"), "crumble": Color("8a8aa0"),
+	"spring": Color("ffd24d"), "cloud": Color("eef4ff"), "ghost": Color("b8a8ff"), "rocket": Color("ff6a3a")}
 
 var eliminated: Array = []
 
@@ -44,14 +46,23 @@ func _spawn_plats(lane: Dictionary, top: float) -> void:
 		var difficulty := clampf(y / 4000.0, 0.0, 1.0)
 		var roll := randf()
 		var kind := "normal"
-		if roll < 0.06 + difficulty * 0.04:
+		# special tiles get more common (and new ones appear) the higher you go:
+		#   spring (gold), cloud (soft, slow bounce, from 80m), ghost (only
+		#   solid while visible, from 150m), rocket (a huge launch, from 220m)
+		if y > 2200 and roll < 0.05 + difficulty * 0.03:
+			kind = "rocket"
+		elif roll < 0.10 + difficulty * 0.08:
 			kind = "spring"
-		elif roll < 0.22 + difficulty * 0.18:
+		elif y > 800 and roll < 0.20 + difficulty * 0.1:
+			kind = "cloud"
+		elif y > 1500 and roll < 0.30 + difficulty * 0.12:
+			kind = "ghost"
+		elif roll < 0.42 + difficulty * 0.14:
 			kind = "move"
-		elif roll < 0.32 + difficulty * 0.2 and y > 300:
+		elif roll < 0.52 + difficulty * 0.16 and y > 300:
 			kind = "crumble"
 		lane["plats"].append({"x": randf_range(0.12, 0.88), "y": y, "kind": kind,
-			"dx": randf_range(0.15, 0.3) * [-1.0, 1.0].pick_random(), "gone": false})
+			"dx": randf_range(0.15, 0.3) * [-1.0, 1.0].pick_random(), "gone": false, "phase": randf() * TAU})
 		lane["next_y"] = y + randf_range(70.0, 95.0) + difficulty * 55.0
 
 func _tick(delta: float) -> void:
@@ -76,7 +87,7 @@ func _tick(delta: float) -> void:
 		# landing: only while falling, crossing a platform's top
 		if lane["vy"] < 0.0:
 			for p in lane["plats"]:
-				if p["gone"] or prev_y < p["y"] or lane["y"] > p["y"]:
+				if p["gone"] or prev_y < p["y"] or lane["y"] > p["y"] or not _solid(p):
 					continue
 				if absf(_wrap_dx(lane["x"], p["x"])) < PLAT_W * 0.5 + R / maxf(1.0, r.size.x):
 					_bounce(lane, p)
@@ -94,9 +105,19 @@ func _tick(delta: float) -> void:
 	if t > TIME_LIMIT or lanes.all(func(l): return not l["alive"]):
 		finish()
 
+# A ghost platform fades in and out — you can only land while it's there.
+func _solid(p: Dictionary) -> bool:
+	return p["kind"] != "ghost" or sin(t * 2.2 + p["phase"]) > -0.2
+
+const ROCKET_V := 1500.0
+
 func _bounce(lane: Dictionary, p: Dictionary) -> void:
-	var spring: bool = p["kind"] == "spring"
-	lane["vy"] = SPRING_V if spring else lane["jump"]
+	var spring: bool = p["kind"] == "spring" or p["kind"] == "rocket"
+	match p["kind"]:
+		"rocket": lane["vy"] = ROCKET_V
+		"spring": lane["vy"] = SPRING_V
+		"cloud": lane["vy"] = lane["jump"] * 0.8
+		_: lane["vy"] = lane["jump"]
 	lane["squash"] = Vector2(1.35, 0.7)
 	for k in 6:
 		lane["fx"].append({"p": Vector2(lane["x"], p["y"]), "v": Vector2(randf_range(-0.25, 0.25), randf_range(20, 80)),
@@ -178,8 +199,9 @@ func _draw_game() -> void:
 			if c.y < r.position.y - 10 or c.y > r.end.y + 10:
 				continue
 			var w := PLAT_W * (r.size.x - 12)
-			var col: Color = {"normal": Color("4be0a8"), "move": Color("a978ff"), "crumble": Color("8a8aa0"),
-				"spring": UIKit.GOLD}[p["kind"]]
+			var col: Color = PLAT_COLORS.get(p["kind"], Color("4be0a8"))
+			if p["kind"] == "ghost":
+				col.a = 0.25 if not _solid(p) else 0.85
 			glow(c, w * 0.35, Color(col, 0.6), 4)
 			rrect(Rect2(c - Vector2(w * 0.5, 5), Vector2(w, 10)), col, 5)
 			draw_rect(Rect2(c - Vector2(w * 0.5 - 4, 4), Vector2(w - 8, 2)), Color(1, 1, 1, 0.35))
@@ -217,3 +239,56 @@ func _column_plate(lane: Dictionary, r: Rect2) -> void:
 	var pr := Rect2(r.get_center().x - w * 0.5, r.position.y + 30, w, 22)
 	rrect(pr, Color(0.05, 0.04, 0.12, 0.75), 11, 1, Color(lane["color"], 0.6))
 	text(Vector2(pr.position.x, pr.position.y + 16), label, 13, lane["color"].lightened(0.3), pr.size.x, 0)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Columns side by side; platforms are glowing slabs (y: 60 px = 1 unit).
+# The camera follows whoever is highest.
+const U := 60.0
+const COL_W := 3.4
+
+func _build_3d(v) -> void:
+	v.sky(Color("1c1844"), 0.75)
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var cx: float = v.lane_x(i, lanes.size(), COL_W + 2.0)
+		lane["cx3"] = cx
+		for sx in [-1.0, 1.0]:
+			v.box(Vector3(0.06, 600, 0.06), Color("3a3478"), Vector3(cx + sx * (COL_W * 0.5 + 0.4), 280, -0.8), true)
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(cx, 0, 0), 0.028)
+		lane["p3"] = []   # [platform, node] pairs
+		var l := lane
+		v.tag(Vector3(cx, 0, 0), func(): return "", Color.WHITE)
+		v.tag(lane["n3"], func(): return "%s  %dm" % [l["name"], int(l["best"] / 10.0)] if l["alive"] else "✗ %dm" % int(l["best"] / 10.0),
+			lane["color"].lightened(0.25), 1.8, 14)
+	_cam_y3 = 2.0
+
+var _cam_y3 := 2.0
+
+func _update_3d(v, delta: float) -> void:
+	var top := 0.0
+	for lane in lanes:
+		var pairs: Array = lane["p3"]
+		for p in lane["plats"]:
+			p["_seen3"] = Engine.get_process_frames()
+			if not p.has("_n3"):
+				p["_n3"] = v.box(Vector3(COL_W * PLAT_W * 1.6, 0.22, 1.2), PLAT_COLORS.get(p["kind"], Color.WHITE), Vector3.ZERO, true)
+				pairs.append([p, p["_n3"]])
+			var m: MeshInstance3D = p["_n3"]
+			m.visible = not p["gone"]
+			m.position = Vector3(lane["cx3"] + (p["x"] - 0.5) * COL_W, p["y"] / U, 0)
+			if p["kind"] == "ghost":
+				m.material_override.albedo_color = Color(PLAT_COLORS["ghost"], 0.85 if _solid(p) else 0.2)
+		for pr in pairs.duplicate():
+			if pr[0].get("_seen3", -1) != Engine.get_process_frames():
+				pr[1].queue_free()
+				pairs.erase(pr)
+		var n: Node3D = lane["n3"]
+		n.position = Vector3(lane["cx3"] + (lane["x"] - 0.5) * COL_W, lane["y"] / U, 0)
+		var sq: Vector2 = lane["squash"]
+		n.scale = Vector3(sq.x, sq.y, 1.0)
+		n.visible = lane["alive"]
+		if lane["alive"]:
+			top = maxf(top, lane["y"] / U)   # follow the leader
+	_cam_y3 = lerpf(_cam_y3, top, minf(1.0, delta * 2.0))
+	var dist := 14.0 + lanes.size() * 3.0
+	v.aim(Vector3(0, _cam_y3 + 2.0, dist), Vector3(0, _cam_y3 + 2.0, 0))

@@ -65,6 +65,8 @@ const ArenaScript := preload("res://Scenes/UI/Battle/BattleArena.gd")
 var _arena                            # the 3D stage (3D maps only) — a BattleArena
 var _arena_voters: Array = []         # [your side, their side] vote portraits in 3D mode
 var _use_arena := false
+var _weather_fx: Control
+var _weather_tag: Label
 var _auto := false                    # rounds play by themselves (never picks your cards)
 var _detached := false
 var _opening_pending := false
@@ -156,6 +158,14 @@ func _ready() -> void:
 
 	# layout is only final once shown — refit every time the window opens,
 	# and start the intro once it can actually be seen
+	# the weather rages over the battle too (a softer tint so text stays readable)
+	_weather_fx = preload("res://Scenes/Board/WeatherFX.gd").new()
+	_weather_fx.strength = 0.6
+	add_child(_weather_fx)
+	_weather_tag = UIKit.label("", 15, Color.WHITE)
+	_weather_tag.add_theme_stylebox_override("normal", UIKit.box(Color(UIKit.NIGHT, 0.85), 8, 2, Color("9fdcff"), Vector2(10, 4)))
+	_weather_tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_weather_tag)
 	visibility_changed.connect(func():
 		_board_ui_shown(not (visible and _use_arena))
 		if visible:
@@ -164,6 +174,19 @@ func _ready() -> void:
 				_opening_pending = false
 				_opening())
 	hide()
+
+func _process(_delta: float) -> void:
+	if not visible or _weather_tag == null:
+		return
+	_weather_fx.move_to_front()
+	_weather_tag.move_to_front()
+	var w: Dictionary = preload("res://Data/WeatherData.gd").info(GameState.weather)
+	_weather_tag.visible = not w.is_empty()
+	if not w.is_empty():
+		_weather_tag.text = "%s %s" % [w["icon"], w["name"]]
+		_weather_tag.tooltip_text = String(w["desc"])
+		var pr := Rect2(panel.position, panel.size * panel.scale)
+		_weather_tag.position = pr.position + Vector2(18, 14)
 
 func _small(text: String, w: float, cb: Callable) -> Button:
 	var b := _button(text, cb, 36)

@@ -52,6 +52,8 @@ var roll_bonus: int = 0         # Loaded Die
 var extra_die: bool = false     # Twin Dice
 var lure: bool = false          # Spooky Lure: next wild spirit is stronger + easier to catch
 var salt: bool = false          # Salt Circle: ignore the next wild spirit / event
+var skip_turns: int = 0         # turns to sit out (Quicksand, a Hex…)
+var stolen: Array = []          # spirits the Grim Gang snatched — win them back at the hideout
 
 # Running totals for the end-of-game stats (GameState counts them).
 var stats: Dictionary = {}
@@ -79,6 +81,7 @@ func to_dict() -> Dictionary:
 		"gold": inventory.gold, "hand": inventory.hand.duplicate(),
 		"battle_mod": next_battle_mod, "roll_bonus": roll_bonus, "extra_die": extra_die,
 		"lure": lure, "salt": salt, "remote_id": remote_id, "stats": stats.duplicate(),
+		"skip_turns": skip_turns, "stolen": stolen.duplicate(true),
 	}
 
 static func from_dict(d: Dictionary) -> PlayerData:
@@ -105,6 +108,8 @@ static func from_dict(d: Dictionary) -> PlayerData:
 	p.lure = d.get("lure", false)
 	p.salt = d.get("salt", false)
 	p.stats = d.get("stats", {})
+	p.skip_turns = int(d.get("skip_turns", 0))
+	p.stolen = d.get("stolen", [])
 	# old saves: spirits could stack a 2nd ability; now each has one
 	for mon in p.team + p.pc:
 		mon.erase("ability2")

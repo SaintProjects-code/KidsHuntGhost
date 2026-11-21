@@ -39,6 +39,7 @@ signal trail_failed(player_index: int)     # lost to a warden → back to Cobweb
 signal badge_earned(player_index: int, gym_name: String)
 signal points_awarded(player_index: int, amount: int)
 signal game_won(player_index: int)
+signal weather_changed(kind: String)   # "" = clear skies
 
 # Free-form entry for the game log (LOG button). color is a hex string.
 signal log_entry(player_index: int, text: String, color: String)

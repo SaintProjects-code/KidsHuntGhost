@@ -25,6 +25,8 @@ var _pages: Array = []
 var _page := 0
 var _options: Array = []
 var _pending_fight: Dictionary = {}
+var _pending_gang := false        # a Grim Gang fight once the window closes
+var _pending_challenge := -1      # a PvP challenge against this player index
 var _cpu := false
 var _situation: Label
 var _portrait: TextureRect
@@ -42,6 +44,7 @@ var _classic: Array = []            # the card layout's rows (hidden in scene mo
 var _scene_on := false
 var _stage: Control                 # scene mode: platforms + the two figures
 var _token: TextureRect             # scene mode: your player icon
+var _dice3d: SubViewportContainer   # scene mode: the 3D dice
 
 const STAGE_SIZE := Vector2(900, 330)
 
@@ -80,10 +83,10 @@ func _ready() -> void:
 	_dice_row = UIKit.hbox(10)
 	_dice_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	left.add_child(_dice_row)
-	_my_die = DiceView.new(48, 6, Color("cfe8ff"))
+	_my_die = DiceView.new(48, 6, Color.WHITE)
 	_dice_row.add_child(_my_die)
 	_dice_row.add_child(UIKit.label("vs", 16))
-	_ev_die = DiceView.new(48, 6, Color("ffd0d0"))
+	_ev_die = DiceView.new(48, 6, Color.WHITE)
 	_dice_row.add_child(_ev_die)
 	_dice_text = UIKit.label("", 15, UIKit.GOLD)
 	_dice_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -131,8 +134,12 @@ func _to_scene_layout() -> void:
 	# the contest dice sit between the two
 	_dice_row.reparent(_stage)
 	_dice_row.position = Vector2(STAGE_SIZE.x * 0.5 - 70, STAGE_SIZE.y * 0.55)
+	_dice3d = preload("res://Scenes/UI/Common/Dice3D.gd").new(Vector2(340, 170))
+	_dice3d.position = Vector2(STAGE_SIZE.x * 0.5 - 170, STAGE_SIZE.y * 0.5 - 85)
+	_dice3d.visible = false
+	_stage.add_child(_dice3d)
 	_dice_text.reparent(_stage)
-	_dice_text.position = Vector2(STAGE_SIZE.x * 0.5 - 200, STAGE_SIZE.y * 0.55 + 56)
+	_dice_text.position = Vector2(STAGE_SIZE.x * 0.5 - 200, STAGE_SIZE.y * 0.55 + 74)
 	_dice_text.custom_minimum_size.x = 400
 	# the dialogue box: story, whose stats count, the choices, the result, OK
 	var box := PanelContainer.new()
@@ -221,6 +228,18 @@ func take_pending_fight() -> Dictionary:
 	_pending_fight = {}
 	return f
 
+func take_pending_gang() -> bool:
+	var g := _pending_gang
+	_pending_gang = false
+	return g
+
+func take_pending_challenge() -> int:
+	var c := _pending_challenge
+	_pending_challenge = -1
+	return c
+
+const GANG_PORTRAIT := ["rocketgrunt", "rocketgruntf", "aetherfoundation"]
+
 func _player() -> PlayerData:
 	return GameState.players[_idx]
 
@@ -229,7 +248,7 @@ func _lead() -> Dictionary:
 
 # ── setup ─────────────────────────────────────────────────────────────────────
 
-func present(player_index: int) -> void:
+func present(player_index: int, pool_kind := "", only_title := "") -> void:
 	_idx = player_index
 	_cpu = _player().is_cpu
 	if not _scene_on and bool(GameData.map_info(GameState.active_map).get("view_3d", false)):
@@ -237,13 +256,21 @@ func present(player_index: int) -> void:
 	if _token:
 		_token.texture = GameData.trainer_texture(GameData.player_trainer(_player()))
 	_pending_fight = {}
+	_pending_gang = false
+	_pending_challenge = -1
 	var badges: int = _player().progress.badge_count()
-	var pool: Array = EventsData.EVENTS.filter(func(e): return badges >= int(e.get("min_badges", 0)))
+	var pool: Array = EventsData.EVENTS.filter(func(e): return badges >= int(e.get("min_badges", 0)) \
+		and (String(e.get("kind", "")) == "gang_hideout") == (pool_kind == "gang_hideout") \
+		and (GameState.players.size() > 1 or not e.get("needs_rival", false)))
+	if only_title != "":   # (dev / tests: a specific event)
+		pool = EventsData.EVENTS.filter(func(e): return e.get("title", "") == only_title)
 	_event = pool.pick_random()
 	_setup_cast()
 	_result.text = ""
 	_dice_text.text = ""
-	_dice_row.modulate.a = 0.35
+	_dice_row.visible = false   # the dice only appear once a choice is rolled
+	if _dice3d:
+		_dice3d.visible = false
 	_ok.hide()
 	_refresh_lead()
 	var desc = _event.get("desc", "")
@@ -255,7 +282,10 @@ func present(player_index: int) -> void:
 func _setup_cast() -> void:
 	var tier: int = GameData.challenge_tier(_player().progress.badge_count())
 	var portrait = _event.get("portrait", "")
-	if String(_event.get("kind", "spirit")) == "trainer":
+	if String(_event.get("kind", "")) in ["gang", "gang_hideout"]:
+		_spirit = SpiritsData.random_spirit(1 if tier == 1 else 2)
+		_portrait.texture = GameData.trainer_texture(GANG_PORTRAIT + ["acetrainer"])
+	elif String(_event.get("kind", "spirit")) == "trainer":
 		_spirit = SpiritsData.random_spirit(1 if tier == 1 else 2)
 		var cands: Array = portrait if portrait is Array else [String(portrait)]
 		_portrait.texture = GameData.trainer_texture(cands + ["acetrainer", "acetrainer-gen1"])
@@ -288,6 +318,10 @@ func _fmt(text: String) -> String:
 # ── pages & choices ───────────────────────────────────────────────────────────
 
 func _show_story(pages: Array, options: Array) -> void:
+	_dice_row.visible = false   # a new page: no dice until the next roll
+	if _dice3d:
+		_dice3d.visible = false
+	_dice_text.text = ""
 	_pages = pages
 	_options = options
 	_page = 0
@@ -324,8 +358,8 @@ func _build_options() -> void:
 			label += "   (uses %s — sure thing!)" % CardsData.card_name(o["need_card"])
 		elif stat != "":
 			var bonus := _type_bonus(o)
-			label += "   (%s %d%s → %d%%)" % [STAT_LABELS.get(stat, stat), _stat_of(stat),
-				(" +%d type" % bonus) if bonus > 0 else "", int(round(win_chance(o) * 100))]
+			label += "   (%s %d%s)" % [STAT_LABELS.get(stat, stat), _stat_of(stat),
+				(" +%d type" % bonus) if bonus > 0 else ""]
 		var b := _button(label, _on_option.bind(o), 44)
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var cost := int(o.get("cost", 0))
@@ -372,10 +406,15 @@ func _on_option(opt: Dictionary) -> void:
 		var my_roll := randi_range(1, 6)
 		var ev_roll := randi_range(1, 6)
 		success = mine + my_roll >= power + ev_roll
-		_dice_row.modulate.a = 1.0
 		_dice_text.text = "rolling…"
-		_ev_die.roll(ev_roll, 0.7)
-		await _my_die.roll(my_roll, 0.7)
+		if _scene_on:
+			_dice3d.visible = true
+			await _dice3d.roll([my_roll, ev_roll])   # yours on the left, theirs on the right
+		else:
+			_dice_row.visible = true
+			Juice.pop(_dice_row, 1.15)
+			_ev_die.roll(ev_roll, 0.7)
+			await _my_die.roll(my_roll, 0.7)
 		_dice_text.text = "You %d+🎲%d = %d   vs   %d+🎲%d = %d" % [mine, my_roll, mine + my_roll, power, ev_roll, power + ev_roll]
 		Juice.pop(_dice_text, 1.25)
 		await get_tree().create_timer(0.3).timeout
@@ -457,6 +496,10 @@ func _apply_outcome(out: Dictionary) -> String:
 		_pending_fight["_event_fight"] = true   # a real battle, not a hunt
 		if String(_event.get("kind", "spirit")) == "trainer":
 			_pending_fight["_no_catch"] = true   # a trainer's spirit: no catching
+			var por = _event.get("portrait", [])
+			_pending_fight["_portrait"] = (por if por is Array else [String(por)]) + ["acetrainer"]
+			_pending_fight["_trainer_name"] = String(_event.get("title", "Trainer"))
+	parts.append_array(_board_outcome(out))
 	var msg := " ".join(parts)
 	# cards and stars may pop their own windows (hand full / bonus reward)
 	for n in maxi(0, int(out.get("lanterns", 0))):
@@ -471,6 +514,122 @@ func _apply_outcome(out: Dictionary) -> String:
 	if out.get("star", false):
 		await SpiritsProgressionSystem.award_star(_idx, lead)
 	return msg
+
+# ── outcomes that change the board and the other players ─────────────────────
+
+func _board() -> Node:
+	var b := get_tree().current_scene
+	return b if b and b.has_method("shift_player") else null
+
+# Another player: "leader" (most points, not you), "last" (fewest), "random".
+func _other(which: String) -> int:
+	var others: Array = []
+	for j in GameState.players.size():
+		if j != _idx:
+			others.append(j)
+	if others.is_empty():
+		return -1
+	match which:
+		"leader":
+			others.sort_custom(func(a, b): return GameState.players[a].progress.points > GameState.players[b].progress.points)
+		"last":
+			others.sort_custom(func(a, b): return GameState.players[a].progress.points < GameState.players[b].progress.points)
+		_:
+			others.shuffle()
+	return others[0]
+
+func _board_outcome(out: Dictionary) -> Array:
+	var parts: Array = []
+	var p := _player()
+	var board := _board()
+	if out.has("move") and board:
+		var n := int(out["move"])
+		board.shift_player(_idx, n)
+		parts.append("%s %s %d space%s." % [p.player_name, "moves ahead" if n > 0 else "is pushed back", absi(n), "" if absi(n) == 1 else "s"])
+	if out.has("others_move") and board:
+		var n2 := int(out["others_move"])
+		for j in GameState.players.size():
+			if j != _idx:
+				board.shift_player(j, n2)
+		parts.append("Everyone else %s %d!" % ["moves ahead" if n2 > 0 else "is pushed back", absi(n2)])
+	if out.has("warp") and board:
+		var towns: Array = board.town_cities()
+		var city := ""
+		match String(out["warp"]):
+			"hideout":
+				city = GameState.gang_hideout
+			"home":
+				city = towns[0] if not towns.is_empty() else ""
+			_:
+				city = towns.pick_random() if not towns.is_empty() else ""
+		if city != "":
+			board.warp_player(_idx, city)
+			parts.append("%s is whisked away to %s!" % [p.player_name, board.graph.label(city)])
+	if out.has("swap") and board:
+		var j := _other(String(out["swap"]))
+		if j >= 0:
+			board.swap_players(_idx, j)
+			parts.append("%s swaps places with %s!" % [p.player_name, GameState.players[j].player_name])
+	if out.get("skip", false):
+		p.skip_turns += 1
+		parts.append("%s will miss a turn!" % p.player_name)
+	if out.has("weather"):
+		var kind := String(out["weather"])
+		if kind == "@spirit":
+			kind = WeatherData.for_type(String(_spirit.get("type", "")))
+		elif kind == "random":
+			kind = WeatherData.KINDS.keys().pick_random()
+		GameState.set_weather(kind)
+		var w := WeatherData.info(kind)
+		parts.append("%s %s rolls in for 2 rounds!" % [w["icon"], w["name"]])
+	if out.has("points"):
+		GameState.award_points(_idx, int(out["points"]))
+		parts.append("+%d pt!" % int(out["points"]))
+	if out.has("gold_from_all"):
+		var got := 0
+		for j in GameState.players.size():
+			if j != _idx:
+				var g := mini(int(out["gold_from_all"]), GameState.players[j].inventory.gold)
+				GameState.players[j].inventory.gold -= g
+				got += g
+		p.inventory.gold += got
+		parts.append("Every player pays you — +%d gold!" % got)
+	if out.get("leader_pays_all", 0) != 0:
+		var lead_j := -1
+		for j in GameState.players.size():
+			if lead_j < 0 or GameState.players[j].progress.points > GameState.players[lead_j].progress.points:
+				lead_j = j
+		var each := int(out["leader_pays_all"])
+		var payer: PlayerData = GameState.players[lead_j]
+		for j in GameState.players.size():
+			if j != lead_j:
+				var g2 := mini(each, payer.inventory.gold)
+				payer.inventory.gold -= g2
+				GameState.players[j].inventory.gold += g2
+		parts.append("%s (the leader) pays everyone %d gold!" % [payer.player_name, each])
+	if out.get("all_lantern", false):
+		for j in GameState.players.size():
+			if not GameState.players[j].inventory.hand_full():
+				GameState.players[j].inventory.hand.append("spirit_lantern")
+				EventBus.hand_changed.emit(j)
+		parts.append("Every player gets a Spirit Lantern!")
+	if out.has("all_trait"):
+		for q in GameState.players:
+			if not q.team.is_empty():
+				EventsData.grant_trait(q.lead(), String(out["all_trait"]))
+		parts.append("It spreads to EVERY player's lead!")
+	if out.get("hex", false):
+		parts.append(CardSystem.hex_leader(_idx))
+	if out.get("gang_fight", false):
+		_pending_gang = true
+		parts.append("☠ The Grim Gang attacks!")
+	if out.has("challenge"):
+		_pending_challenge = _other(String(out["challenge"]))
+		if _pending_challenge >= 0:
+			parts.append("⚔ %s is challenged to a battle!" % GameState.players[_pending_challenge].player_name)
+	return parts
+
+const WeatherData := preload("res://Data/WeatherData.gd")
 
 func _join_spirit(p: PlayerData) -> String:
 	var joiner: Dictionary = _spirit.duplicate(true)

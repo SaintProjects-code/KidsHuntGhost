@@ -156,7 +156,7 @@ static func board_ui_shown(tree: SceneTree, on: bool) -> void:
 	var board := tree.current_scene
 	if board == null:
 		return
-	for path in ["BoardUI", "TopUI"]:
+	for path in ["BoardUI", "TopUI", "WeatherOverlay"]:   # (battles draw their own weather)
 		var layer := board.get_node_or_null(path) as CanvasLayer
 		if layer:
 			layer.visible = on

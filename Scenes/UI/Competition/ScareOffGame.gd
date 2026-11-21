@@ -134,3 +134,42 @@ func _draw_game() -> void:
 	if running:
 		rrect(Rect2(size.x * 0.5 - 46, 4, 92, 22), Color(0.05, 0.04, 0.12, 0.75), 11)
 		text(Vector2(size.x * 0.5 - 46, 20), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+func _build_3d(v) -> void:
+	var gap := 5.8
+	v.sky(Color("e0884a"), 0.85)
+	v.aim(Vector3(0, 8, 12 + lanes.size() * 2.8), Vector3(0, 1.2, -1))
+	v.box(Vector3(lanes.size() * gap + 4, 0.2, 12), Color("8a6a3a"), Vector3(0, -0.1, -1))
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var x: float = v.lane_x(i, lanes.size(), gap)
+		lane["x3"] = x
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(x, 0, 2.6), 0.036)
+		var sc := Node3D.new()
+		sc.position = Vector3(x, 0, -2.5)
+		v.world.add_child(sc)
+		v.box(Vector3(0.16, 2.6, 0.16), Color("6a4a2a"), Vector3(0, 1.3, 0), false, sc)
+		v.box(Vector3(2.0, 0.14, 0.14), Color("6a4a2a"), Vector3(0, 1.9, 0), false, sc)
+		v.ball(0.55, Color("ff8a20"), Vector3(0, 2.8, 0), false, sc)
+		lane["sc3"] = sc
+		v.box(Vector3(0.35, 2.4, 0.08), Color("222222"), Vector3(x + 1.8, 1.4, 2.6), true)
+		lane["m3"] = v.box(Vector3(0.28, 1, 0.1), Color("ff5a5a"), Vector3(x + 1.8, 0.2, 2.65), true)
+		lane["boo3"] = false
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s %s" % [l["name"], key_hint(l)], lane["color"].lightened(0.25), 2.8, 14)
+
+func _update_3d(v, _delta: float) -> void:
+	for lane in lanes:
+		var f: float = lane["meter"] / GOAL
+		lane["m3"].scale.y = maxf(0.01, f * 2.4)
+		lane["m3"].position.y = 0.2 + f * 1.2
+		var n: Node3D = lane["n3"]
+		n.scale = Vector3.ONE * (1.0 + lane["pulse"] * 0.22 + f * 0.35)
+		var sc: Node3D = lane["sc3"]
+		if lane["done_t"] >= 0.0:
+			sc.position = Vector3(lane["x3"], absf(sin(t * 14.0)) * 0.4, -2.5 - lane["run_x"] / 80.0)
+			sc.rotation.y = lane["boo_t"] * 7.0
+			if not lane["boo3"]:
+				lane["boo3"] = true
+				v.pop(n, "BOO!", Color("ffd24d"), 3.8, 1.2, 36)

@@ -115,3 +115,51 @@ func _draw_game() -> void:
 			rrect(Rect2(bar.position.x + 2, bar.end.y - 2 - h, bar.size.x - 4, h), Color("4dd0ff").lerp(Color("ffd24d"), lane["power"]), 6)
 		var status := "%d/%d  %.1fm" % [lane["throws"].size(), THROWS, _total(lane)]
 		nameplate(lane, r.position + Vector2(8, 30), status)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Lanes run down a long field (1 m = 0.5 units). A power meter stands by each
+# spirit; the pumpkin arcs out, and a flag in the player's colour marks every
+# landing (they stay).
+const M3 := 0.5
+
+func _build_3d(v) -> void:
+	var gap := 4.2
+	v.sky(Color("6a9ad8"), 0.85)
+	v.aim(Vector3(0, 13 + lanes.size(), 20 + lanes.size() * 1.5), Vector3(0, 0, -12))
+	v.box(Vector3(lanes.size() * gap + 4, 0.2, 80), Color("5a9a4a"), Vector3(0, -0.1, -30))
+	for z in range(-5, -70, -5):
+		v.box(Vector3(lanes.size() * gap + 4, 0.03, 0.14), Color.WHITE, Vector3(0, 0.01, z), true)
+		v.tag(Vector3(-(lanes.size() * gap + 4) / 2 - 0.4, 0, z), "%dm" % int(-z / M3), Color(1, 1, 1, 0.8), 0.2, 12)
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var x: float = v.lane_x(i, lanes.size(), gap)
+		lane["x3"] = x
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(x, 0, 2), 0.03)
+		v.box(Vector3(0.4, 3, 0.08), Color("222222"), Vector3(x + 1.2, 1.5, 1.9), true)
+		lane["bar3"] = v.box(Vector3(0.3, 1, 0.1), Color("ffd24d"), Vector3(x + 1.2, 0, 1.95), true)
+		lane["pk3"] = v.ball(0.42, Color("ff8a20"), Vector3(x, 1.2, 1.6))
+		lane["flags3"] = 0
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s %s  %dm" % [l["name"], key_hint(l), int(_total(l))], lane["color"].lightened(0.25), 2.2, 14)
+
+func _update_3d(v, _delta: float) -> void:
+	for lane in lanes:
+		var x: float = lane["x3"]
+		lane["bar3"].scale.y = maxf(0.01, lane["power"] * 3.0)
+		lane["bar3"].position.y = lane["power"] * 1.5
+		var pk: MeshInstance3D = lane["pk3"]
+		if lane["fly_t"] >= 0.0:
+			var u: float = lane["fly_t"] / FLIGHT
+			pk.position = Vector3(x, 1.2 + sin(u * PI) * (2.0 + lane["fly_d"] * 0.12), 1.6 - lane["fly_d"] * M3 * u)
+			pk.rotation.x += 0.3
+		else:
+			pk.position = Vector3(x, 1.2, 1.6)
+		# a landed throw leaves its flag (it stays)
+		var landed: int = lane["throws"].size() - (1 if lane["fly_t"] >= 0.0 else 0)
+		while lane["flags3"] < landed:
+			var d: float = lane["throws"][lane["flags3"]]
+			var at := Vector3(x, 0.7, 1.6 - d * M3)
+			v.box(Vector3(0.08, 1.4, 0.08), lane["color"], at, true)
+			v.box(Vector3(0.5, 0.3, 0.04), lane["color"], at + Vector3(0.25, 0.55, 0), true)
+			v.pop(at, "%dm" % int(d), Color("ffd24d"), 1.4)
+			lane["flags3"] += 1

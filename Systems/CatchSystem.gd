@@ -20,7 +20,10 @@ static func min_dice(spirit: Dictionary) -> int:
 	return maxi(1, ceili(float(target_for(spirit) - bonus_for(spirit)) / 6.0))
 
 static func bonus_for(spirit: Dictionary) -> int:
-	return Balance.CATCH_LURE_BONUS if spirit.get("_lured", false) else 0
+	var b := Balance.CATCH_LURE_BONUS if spirit.get("_lured", false) else 0
+	if GameState.weather == "sun":   # ☀ Blazing Sun: catching is easier
+		b += 1
+	return b
 
 # Dice rolled for a set of Lantern cards (the free die included).
 static func dice_for(lanterns: Array) -> int:

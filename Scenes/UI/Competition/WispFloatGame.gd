@@ -155,3 +155,44 @@ func _draw_game() -> void:
 	if running:
 		rrect(Rect2(size.x - 104, 8, 92, 22), Color(0.05, 0.04, 0.12, 0.7), 11)
 		text(Vector2(size.x - 104, 24), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Four stacked tunnels (side view). Wisps and bats come in from the right;
+# the spirit floats up while held (lane y 0 = top … 1 = bottom).
+const BAND3 := 3.6
+const SPAN3 := 22.0
+
+func _build_3d(v) -> void:
+	v.sky(Color("101830"), 0.7)
+	v.aim(Vector3(0, (lanes.size() - 1) * BAND3 * 0.5 + 1.4, 8 + lanes.size() * 3.4), Vector3(0, (lanes.size() - 1) * BAND3 * 0.5 + 1.4, 0), 0.95)
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var y0 := (lanes.size() - 1 - i) * BAND3   # P1 on top
+		lane["y03"] = y0
+		v.box(Vector3(SPAN3 + 2, 0.1, 1.6), Color("22304a"), Vector3(0, y0 - 0.05, 0))
+		v.box(Vector3(SPAN3 + 2, 0.1, 1.6), Color("22304a"), Vector3(0, y0 + 3.0, 0))
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(-SPAN3 / 2 + 2.5, y0 + 1, 0), 0.02)
+		lane["it3"] = []   # [item, node] pairs
+		var l := lane
+		v.tag(Vector3(-SPAN3 / 2 - 0.2, y0 + 2.6, 0), func(): return "%s %s  ✦ %d" % [l["name"], key_hint(l), l["score"]], lane["color"].lightened(0.25), 0.0, 14)
+
+func _update_3d(v, _delta: float) -> void:
+	for lane in lanes:
+		var y0: float = lane["y03"]
+		var n: Node3D = lane["n3"]
+		n.position.y = y0 + 0.15 + (1.0 - lane["y"]) * 2.1
+		n.rotation.z = sin(t * 30.0) * 0.4 if lane["stun"] > 0.0 else 0.0
+		var pairs: Array = lane["it3"]
+		for it in lane["items"]:
+			it["_seen3"] = Engine.get_process_frames()
+			if not it.has("_n3"):
+				it["_n3"] = v.box(Vector3(0.7, 0.25, 0.4), Color("3a2050"), Vector3.ZERO) if it["bat"] else v.ball(0.25, Color("9fe8ff"), Vector3.ZERO, true)
+				pairs.append([it, it["_n3"]])
+			var m: MeshInstance3D = it["_n3"]
+			m.position = Vector3(n.position.x + (it["x"] - X) * SPAN3 / maxf(1.0, size.x), y0 + 0.4 + (1.0 - it["y"]) * 2.1, 0)
+		for pr in pairs.duplicate():
+			if pr[0].get("_seen3", -1) != Engine.get_process_frames():
+				if pr[0].get("hit", false):
+					v.pop(n, "−1" if pr[0]["bat"] else "+1", Color("ff6a6a") if pr[0]["bat"] else Color("9fe8ff"), 1.4, 0.8, 18)
+				pr[1].queue_free()
+				pairs.erase(pr)

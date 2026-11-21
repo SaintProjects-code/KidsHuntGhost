@@ -38,6 +38,9 @@ var _last_beep := 4
 var _end_t := 0.0
 var _emitted := false
 var _overlay: Control           # banners draw above any child panels
+# 3D maps: games that have _build_3d(stage) / _update_3d(stage, delta) draw
+# into a MiniStage3D instead of their 2D playfield (same rules, new look).
+var stage3d: Control = null
 
 func setup(entries: Array) -> void:
 	for e in entries:
@@ -53,6 +56,11 @@ func setup(entries: Array) -> void:
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	_init_game()
+	if has_method("_build_3d") and bool(GameData.map_info(GameState.active_map).get("view_3d", false)):
+		stage3d = preload("res://Scenes/UI/Competition/MiniStage3D.gd").new()
+		add_child(stage3d)
+		move_child(stage3d, 0)   # under the banners and any child widgets (dice…)
+		call("_build_3d", stage3d)
 	if not use_countdown:
 		_countdown = 0.0
 	if not use_intro or how_to == "":
@@ -89,6 +97,8 @@ func result_text() -> String:
 # ── shared flow ───────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
+	if stage3d and not _emitted:
+		call("_update_3d", stage3d, delta)
 	if _emitted:
 		return
 	if ended:
@@ -235,6 +245,10 @@ func _lane_by_idx(idx: int) -> Dictionary:
 const INK := Color(0.04, 0.03, 0.09)
 
 func _draw() -> void:
+	if stage3d:
+		if has_method("_draw_3d_hud"):
+			call("_draw_3d_hud")   # a 3D game's flat extras (a timer, meters…)
+		return
 	_draw_game()
 
 # Vertical gradient (top → bottom).

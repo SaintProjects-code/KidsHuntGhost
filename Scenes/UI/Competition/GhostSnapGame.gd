@@ -179,3 +179,48 @@ func _draw_game() -> void:
 			text(Vector2(r.position.x, fr.position.y - 10 - (1.0 - a) * 18), lane["pop"], 22,
 				Color(UIKit.GOLD if lane["pop"] == "PERFECT!" else Color.WHITE, a), r.size.x, 5)
 		nameplate(lane, r.position + Vector2(10, 6), "📷 %d pts · %d/%d" % [_score(lane), lane["shots"].size(), SHOTS])
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# A haunted room per player (2×2); the ghost (g: 0..1 across the panel) flits
+# about, your camera frame sits in the middle, and a flash fires on a snap.
+const ROOM3 := Vector2(5.2, 3.8)
+
+func _build_3d(v) -> void:
+	v.sky(Color("1c1830"), 0.55)
+	v.aim(Vector3(0, 5, 21), Vector3(0, 2.6, 0))
+	var ghosts := ["Wispy", "Haunty", "Lullaboo", "Wispy"]
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var o := Vector3((i % 2 - 0.5) * 6.4, (1 - i / 2) * 4.8 - 1.2, -1.5)
+		lane["o3"] = o
+		v.box(Vector3(ROOM3.x + 0.4, ROOM3.y + 0.4, 0.2), Color("2a2240"), o + Vector3(0, ROOM3.y / 2, -0.6))
+		v.box(Vector3(ROOM3.x + 0.4, 0.15, 1.4), Color("3a2e52"), o + Vector3(0, 0, 0))
+		for sx in [-1.0, 1.0]:
+			v.box(Vector3(0.15, ROOM3.y + 0.4, 1.4), lane["color"].darkened(0.3), o + Vector3(sx * (ROOM3.x / 2 + 0.2), ROOM3.y / 2, 0))
+		lane["gh3"] = v.spirit(SpiritsData.sprite_tex(ghosts[i % 4], "front"), Color(0, 0, 0, 0), o, 0.032, true)
+		# the camera frame (white) and its PERFECT spot (gold), from thin bars
+		var f: float = lane["frame"]
+		var fw := f * 2.0 * ROOM3.x
+		var fh := f * 2.0 * ROOM3.y
+		var c := o + Vector3(0, (1.0 - 0.52) * ROOM3.y, 0.3)
+		for bar in [[Vector3(fw, 0.06, 0.02), Vector3(0, fh / 2, 0)], [Vector3(fw, 0.06, 0.02), Vector3(0, -fh / 2, 0)],
+				[Vector3(0.06, fh, 0.02), Vector3(fw / 2, 0, 0)], [Vector3(0.06, fh, 0.02), Vector3(-fw / 2, 0, 0)]]:
+			v.box(bar[0], Color.WHITE, c + bar[1], true)
+		v.box(Vector3(fw * 0.3, fh * 0.3, 0.01), Color(1, 0.85, 0.3, 0.25), c, true)
+		lane["fl3"] = v.lamp(Color.WHITE, o + Vector3(0, 2, 2.5), 0.0, 8)
+		lane["popped3"] = 0
+		var me: Node3D = v.spirit(lane["tex"], lane["color"], o + Vector3(-ROOM3.x / 2 + 0.6, 0.1, 0.6), 0.022)
+		var l := lane
+		v.tag(o + Vector3(0, ROOM3.y + 0.3, 0), func(): return "%s %s  📸 %d/%d  ★ %d" % [l["name"], key_hint(l), l["shots"].size(), SHOTS, _score(l)],
+			lane["color"].lightened(0.25), 0.0, 14)
+
+func _update_3d(v, _delta: float) -> void:
+	for lane in lanes:
+		var o: Vector3 = lane["o3"]
+		var g: Vector2 = lane["g"]
+		lane["gh3"].position = o + Vector3((g.x - 0.5) * ROOM3.x, (1.0 - g.y) * ROOM3.y - 0.5, 0.1)
+		lane["fl3"].light_energy = lane["flash"] * 5.0
+		if lane["shots"].size() > lane["popped3"]:
+			lane["popped3"] = lane["shots"].size()
+			var pts: int = lane["shots"][-1]
+			v.pop(lane["gh3"], ["MISS", "BLURRY +1", "NICE +2", "PERFECT +3"][pts], [Color("ff6a6a"), Color("c8c8e0"), Color("7be0a0"), Color("ffd24d")][pts], 1.6)

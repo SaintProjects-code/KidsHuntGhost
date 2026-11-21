@@ -44,6 +44,10 @@ const CARDS := {
 		"desc": "Steal a random card from another player"},
 	"lucky_coin":    {"name": "Lucky Coin",     "kind": "field", "icon": "🪙", "cost": 0,  "weight": 5, "value": 3, "target": "",
 		"desc": "Cash it in for 25 gold"},
+	"weather_charm": {"name": "Weather Charm",  "kind": "field", "icon": "🌦", "cost": 20, "weight": 4, "value": 4, "target": "",
+		"desc": "Set the weather for 2 rounds: Storm, Sun, Mist or Sandstorm"},
+	"hex":           {"name": "Grim Hex",       "kind": "field", "icon": "☠", "cost": 25, "weight": 3, "value": 4, "target": "",
+		"desc": "A Grim Gang curse on the points leader: they lose 15 gold to you, get pushed back 3, or skip a turn"},
 	# ── tactic ───────────────────────────────────────────────────────────────
 	"spirit_shield": {"name": "Spirit Shield",  "kind": "tactic", "icon": "🛡", "cost": 20, "weight": 6, "value": 4,
 		"desc": "Your lead takes only 40% damage this round"},

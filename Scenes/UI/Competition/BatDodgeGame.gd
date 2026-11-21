@@ -109,3 +109,59 @@ func _draw_game() -> void:
 	if running:
 		rrect(Rect2(size.x * 0.5 - 46, 4, 92, 22), Color(0.05, 0.04, 0.12, 0.75), 11)
 		text(Vector2(size.x * 0.5 - 46, 20), "⏱ %.1f" % maxf(0.0, TIME_LIMIT - t), 13, Color.WHITE, 92, 0)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Each player's lane is a long track with three sub-lanes; bats fly in from
+# the far end (their `y` 0 → 1 is far → the spirit) and the spirit hops.
+const SUB := 1.4
+const FAR := -24.0
+const NEAR := 4.0
+
+func _build_3d(v) -> void:
+	var gap := 5.6
+	v.sky(Color("1a1538"), 0.6)
+	v.aim(Vector3(0, 9 + lanes.size() * 1.0, 15 + lanes.size() * 2.6), Vector3(0, 0, -5))
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var cx: float = v.lane_x(i, lanes.size(), gap)
+		v.box(Vector3(4.2, 0.2, 30), Color("2a2450"), Vector3(cx, -0.1, -9))
+		for lx in [-0.7, 0.7]:
+			v.box(Vector3(0.05, 0.03, 30), Color("6a62b0"), Vector3(cx + lx, 0.01, -9), true)
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(cx, 0, NEAR), 0.032)
+		lane["cx3"] = cx
+		lane["bat3"] = []   # [bat dict, node] pairs (a bat's fields change, so not a dict key)
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s %s  %s" % [l["name"], key_hint(l), "OUT" if l["out_t"] >= 0.0 else "♥".repeat(maxi(0, l["hearts"]))],
+			lane["color"].lightened(0.2), 2.4, 15)
+
+func _bat_node(v) -> Node3D:
+	var b := Node3D.new()
+	v.world.add_child(b)
+	v.ball(0.3, Color("2a1a3a"), Vector3.ZERO, false, b)
+	for side in [-1, 1]:
+		v.box(Vector3(0.8, 0.06, 0.4), Color("4a2a66"), Vector3(side * 0.5, 0, 0), false, b)
+	return b
+
+func _update_3d(v, delta: float) -> void:
+	for lane in lanes:
+		var pairs: Array = lane["bat3"]
+		for bat in lane["bats"]:
+			bat["_seen3"] = Engine.get_process_frames()
+			if not bat.has("_n3"):
+				bat["_n3"] = _bat_node(v)
+				pairs.append([bat, bat["_n3"]])
+			var b: Node3D = bat["_n3"]
+			b.position = Vector3(lane["cx3"] + (bat["col"] - 1) * SUB, 1.0, FAR + bat["y"] / 0.92 * (NEAR - FAR))
+			b.get_child(1).rotation.z = sin(t * 22.0) * 0.6
+			b.get_child(2).rotation.z = -sin(t * 22.0) * 0.6
+		for pr in pairs.duplicate():
+			if pr[0].get("_seen3", -1) != Engine.get_process_frames():
+				pr[1].queue_free()
+				pairs.erase(pr)
+		var n: Node3D = lane["n3"]
+		n.position.x = lerpf(n.position.x, lane["cx3"] + (lane["pos"] - 1) * SUB, minf(1.0, delta * 14.0))
+		n.position.y = absf(sin(t * 8.0 + lane["idx"])) * 0.25 + lane["hurt"] * 0.6
+		var spr: Sprite3D = v.sprite_of(n)
+		spr.modulate = Color(0.4, 0.4, 0.45, 0.6) if lane["out_t"] >= 0.0 else (Color(1.6, 0.6, 0.6) if lane["hurt"] > 0.5 else Color.WHITE)
+		if lane["hurt"] > 0.95:
+			v.pop(n, "−1 ♥", Color("ff6a6a"))

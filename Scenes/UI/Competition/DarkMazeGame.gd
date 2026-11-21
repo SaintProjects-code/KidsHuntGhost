@@ -3,7 +3,7 @@ extends CompGame
 ## only by a flickering lantern. Spirits walk automatically (SPD = walking
 ## speed); at each 3-way crossroad pick LEFT / MIDDLE / RIGHT (your keys, or
 ## the buttons). One arm is the way on; the others are a trap (−30 HP), a dead
-## end, or a wrong turn (back one fork). A high HP tier shakes off traps
+## end, or a wrong turn (back one room). A high HP tier shakes off traps
 ## faster. Hints show in the light: cap wall,
 ## red spikes, grey arrow, gold star. First one out wins.
 
@@ -78,8 +78,10 @@ class MazePanel:
 	var t := 0.0
 	var walk_time := 1.6
 	var back_time := BACK_TIME
-	var forks_passed := 0
+	var forks_passed := 0      # rooms cleared
 	var arms := {}             # dir -> "path" | "trap" | "dead" | "back"
+	var treasure := ""         # a "path" door can be a treasure room (a quicker next walk)
+	var last_pick := ""        # the door just chosen (the 3D view walks through it)
 	var revealed := {}
 	var msg := ""
 	var smart := 0.8
@@ -154,6 +156,7 @@ class MazePanel:
 		var hazards := ["trap", "dead", "back"]
 		hazards.shuffle()
 		arms = {dirs[0]: "path", dirs[1]: hazards[0], dirs[2]: hazards[1]}
+		treasure = dirs[0] if randf() < 0.3 else ""
 		for d in DIRS:
 			revealed[d] = randf() < (HINT_PATH if arms[d] == "path" else HINT_HAZARD)
 		msg = "Which way?"
@@ -183,18 +186,24 @@ class MazePanel:
 			return
 		_set_buttons(false)
 		t = 0.0
+		last_pick = dir
 		back_time = BACK_TIME
 		match arms.get(dir, "dead"):
 			"path":
 				forks_passed += 1
 				phase = "walk"
-				msg = ""
+				if dir == treasure:
+					msg = "💰 Treasure room!"
+					t = walk_time * 0.4   # a head start into the next corridor
+					Sfx.play("coin")
+				else:
+					msg = "✓ Right way!"
 				Sfx.play("collect", 0.8)
 			"trap":
 				var s: Dictionary = lane["spirit"]
 				s["current_hp"] = maxi(1, int(s.get("current_hp", s.get("hp", 60))) - 30)
 				phase = "back"
-				msg = "💥 A trap! −30 HP"
+				msg = "💥 Spikes! −30 HP"
 				# HP 1 → 1.6s stuck … HP 6 → 0.8s
 				back_time = 1.76 - int(s.get("hp_stat", 2)) * 0.16
 				_flash = 1.0
@@ -202,12 +211,12 @@ class MazePanel:
 				Sfx.play("crash")
 			"dead":
 				phase = "back"
-				msg = "🧱 Dead end!"
+				msg = "🕳 Trap door!"
 				Sfx.play("error")
 			"back":
 				forks_passed = maxi(0, forks_passed - 1)
 				phase = "back"
-				msg = "↩ Wrong turn — back one fork!"
+				msg = "↩ Wrong way — back a room!"
 				Sfx.play("whoosh")
 
 	func _escape() -> void:
@@ -260,7 +269,7 @@ class MazePanel:
 		# header pill + message pill
 		var keys := "" if not lane["human"] else "  %s / %s / %s" % [Controls.key_name(lane["slot"], "left"),
 			Controls.key_name(lane["slot"], "middle"), Controls.key_name(lane["slot"], "right")]
-		var head := "%s%s   fork %d/%d   ♥%d" % [lane["name"], keys, mini(forks_passed + 1, FORKS), FORKS,
+		var head := "%s%s   room %d/%d   ♥%d" % [lane["name"], keys, mini(forks_passed + 1, FORKS), FORKS,
 			int(lane["spirit"].get("current_hp", 0))]
 		draw_style_box(UIKit.box(Color(0.05, 0.04, 0.12, 0.8), 10, 1, Color(1, 1, 1, 0.1)),
 			Rect2(6, 6, font.get_string_size(head, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 18, 22))
@@ -326,3 +335,126 @@ class MazePanel:
 				for k in range(4, 0, -1):
 					draw_circle(p, 5.0 + k * 3.0 * twinkle, Color(1, 0.8, 0.2, 0.08))
 				draw_string(font, Vector2(p.x - 8, p.y + 6), "★", HORIZONTAL_ALIGNMENT_LEFT, -1, int(16 * twinkle + 4), Color(1.0, 0.85, 0.3))
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Four dark panels (2×2). The spirit walks a stone path lit by its lantern;
+# at a room a wall with three doors slides in (hint markers over some), it
+# walks THROUGH the chosen door and what's behind it shows: right way,
+# treasure room, trap door, spikes or wrong way.
+const PANEL3 := Vector2(9.0, 6.0)
+const MARK3 := {"path": Color("ffd24d"), "trap": Color("ff4040"), "dead": Color("8a5ad0"), "back": Color("9a9aa8")}
+
+func _build_3d(v) -> void:
+	v.sky(Color("020204"), 0.05, 0.1)
+	v.aim(Vector3(0, 25, 6), Vector3(0, 0, 0.3), 0.8)   # four panels: a wider view
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		lane["panel"].visible = false   # the 2D panel keeps running the logic, unseen
+		var o := Vector3((i % 2 - 0.5) * 10.4, 0, (i / 2 - 0.5) * 7.2)
+		lane["o3"] = o
+		v.box(Vector3(PANEL3.x, 0.1, PANEL3.y), Color("06060c"), o + Vector3(0, -0.06, 0))
+		for side in [[Vector3(PANEL3.x, 0.12, 0.12), Vector3(0, 0, -PANEL3.y / 2)], [Vector3(PANEL3.x, 0.12, 0.12), Vector3(0, 0, PANEL3.y / 2)],
+				[Vector3(0.12, 0.12, PANEL3.y), Vector3(-PANEL3.x / 2, 0, 0)], [Vector3(0.12, 0.12, PANEL3.y), Vector3(PANEL3.x / 2, 0, 0)]]:
+			v.box(side[0], lane["color"], o + side[1], true)
+		v.box(Vector3(2.0, 0.05, PANEL3.y - 0.4), Color("3a3646"), o)
+		var walls: Array = []
+		for w in 7:
+			for sx in [-1.0, 1.0]:
+				walls.append(v.box(Vector3(0.45, 1.1, 0.75), Color("2c2a3a"), o + Vector3(sx * 1.25, 0.55, -2.7 + w * 0.9)))
+		lane["walls3"] = walls
+		var dw := Node3D.new()
+		v.world.add_child(dw)
+		v.box(Vector3(7.6, 1.6, 0.4), Color("2c2a3a"), Vector3(0, 0.8, 0), false, dw)
+		var doors := {}
+		for a in 3:
+			var d: String = DIRS3[a]
+			var fx := (a - 1) * 2.4
+			v.box(Vector3(1.3, 1.5, 0.45), Color("6a4a2a"), Vector3(fx, 0.76, 0.02), false, dw)
+			var gap: MeshInstance3D = v.box(Vector3(0.95, 1.25, 0.5), Color("0a0a10"), Vector3(fx, 0.68, 0.03), true, dw)
+			var mark: MeshInstance3D = v.box(Vector3(0.45, 0.45, 0.2), Color.WHITE, Vector3(fx, 1.8, 0.15), true, dw)
+			doors[d] = {"gap": gap, "mark": mark}
+		dw.visible = false
+		lane["dw3"] = dw
+		lane["doors3"] = doors
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], o + Vector3(0, 0, 1.6), 0.034, true)
+		lane["lamp3"] = v.lamp(Color("ffc870"), o + Vector3(0, 2.2, 1.6), 2.6, 5.0)
+		lane["ph3"] = "walk"
+		lane["pt3"] = 0.0
+		var l := lane
+		v.tag(o + Vector3(0, 0, -PANEL3.y / 2), func():
+			var p = l["panel"]
+			return "%s %s — room %d / %d" % [l["name"], key_hint(l, "left").replace("]", "/" + Controls.key_name(l["slot"], "middle") + "/" + Controls.key_name(l["slot"], "right") + "]") if l["human"] else "(CPU)",
+				mini(p.forks_passed + 1, p.FORKS), p.FORKS] if p.phase != "out" else "%s — out! 🎉" % l["name"],
+			lane["color"].lightened(0.25), 0.6, 16)
+
+const DIRS3 := ["left", "middle", "right"]
+
+func _update_3d(v, delta: float) -> void:
+	for lane in lanes:
+		var p = lane["panel"]
+		var o: Vector3 = lane["o3"]
+		var n: Node3D = lane["n3"]
+		var dw: Node3D = lane["dw3"]
+		lane["pt3"] += delta
+		var scroll := 0.0
+		# follow the panel's phase, adding the walk-through-the-door beat
+		if p.phase == "fork" and lane["ph3"] != "doors":
+			lane["ph3"] = "doors"
+			lane["pt3"] = 0.0
+			dw.visible = true
+			dw.position = o + Vector3(0, 0, -2.6)
+			for d in DIRS3:
+				var kind: String = p.arms.get(d, "dead")
+				lane["doors3"][d]["gap"].material_override = v.mat(Color("0a0a10"), true)
+				lane["doors3"][d]["mark"].material_override = v.mat(MARK3[kind], true)
+				lane["doors3"][d]["mark"].visible = p.revealed.get(d, false)
+		elif p.phase != "fork" and lane["ph3"] == "doors":
+			lane["ph3"] = "through"   # a door was picked: walk to it and through
+			lane["pt3"] = 0.0
+			var kind2: String = p.arms.get(p.last_pick, "dead")
+			lane["doors3"][p.last_pick]["gap"].material_override = v.mat(MARK3[kind2], true)
+		match lane["ph3"]:
+			"doors":
+				dw.position.z = lerpf(o.z - 2.6, o.z - 1.4, minf(1.0, lane["pt3"] / 0.6))
+				scroll = 2.2 * (1.0 - minf(1.0, lane["pt3"] / 0.6))
+			"through":
+				var door_x: float = o.x + (DIRS3.find(p.last_pick) - 1) * 2.4
+				if lane["pt3"] < 0.45:
+					n.position.x = lerpf(n.position.x, door_x, minf(1.0, delta * 6.0))
+					n.position.z = lerpf(n.position.z, dw.position.z + 0.4, minf(1.0, delta * 6.0))
+				else:
+					n.position.z -= delta * 2.0
+					n.scale = Vector3.ONE * maxf(0.05, 1.0 - (lane["pt3"] - 0.45) * 2.0)
+					if p.msg.begins_with("🕳"):
+						n.position.y -= delta * 3.0
+				if lane["pt3"] > 0.95:
+					v.pop(dw.position + Vector3(door_x - o.x, 0, -0.4), p.msg, Color("ffd24d") if p.phase == "walk" else Color("ff9a9a"), 1.8, 1.1, 17)
+					if p.msg.begins_with("💥"):
+						lane["lamp3"].light_color = Color("ff5050")
+					elif p.msg.begins_with("💰"):
+						lane["lamp3"].light_color = Color("ffe070")
+					n.scale = Vector3.ONE
+					n.position = o + Vector3(0, 0, 1.6)
+					lane["ph3"] = "walk"
+					lane["pt3"] = 0.0
+					if p.phase == "walk":
+						dw.visible = false
+			"walk":
+				scroll = 2.2 if p.phase == "walk" else (-2.4 if p.phase == "back" else 0.0)
+				if dw.visible:
+					dw.position.z += delta * scroll
+					if absf(dw.position.z - o.z) > 2.8:
+						dw.visible = false
+				if lane["pt3"] > 0.6:
+					lane["lamp3"].light_color = Color("ffc870") if p.phase != "out" else Color("b0ffc8")
+		for w in lane["walls3"]:
+			w.position.z += delta * scroll
+			if w.position.z > o.z + 3.0:
+				w.position.z -= 6.3
+			elif w.position.z < o.z - 3.3:
+				w.position.z += 6.3
+			w.visible = not dw.visible or w.position.z > dw.position.z + 0.5
+		if scroll != 0.0:
+			n.position.y = absf(sin(t * 8.0 + lane["idx"])) * 0.12
+		lane["lamp3"].position = n.position + Vector3(0, 2.2, 0)
+		lane["lamp3"].light_energy = 2.5 + sin(t * 17.0 + lane["idx"]) * 0.3 + randf() * 0.2

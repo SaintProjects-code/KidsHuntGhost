@@ -91,6 +91,11 @@ func present(setup: Dictionary) -> void:
 	if atk_mod != 0:
 		for m in _team:
 			m["atk"] = clampi(int(m.get("atk", 1)) + atk_mod, 1, 6)
+	# ☀ Blazing Sun: the heat saps everyone except Fire / Grass (ATK −1, this battle)
+	if WeatherData.is_on("sun"):
+		for m in _team + _opp:
+			if not WeatherData.immune(m):
+				m["atk"] = maxi(1, int(m.get("atk", 1)) - 1)
 	_active = 0
 	_opp_active = 0
 	_over = false
@@ -381,6 +386,38 @@ func _switch_lead(is_me: bool) -> void:
 
 const CRY_ATK := 4   # Battle Cry's one-round ATK boost (was 3)
 
+# ⛈ Storm: lightning may strike one of the two fighters (not Water / Electric).
+func _weather_round_start(me: Dictionary, op: Dictionary) -> void:
+	if not WeatherData.is_on("storm") or randf() >= WeatherData.STORM_BOLT_CHANCE:
+		return
+	var targets: Array = [me, op].filter(func(m): return _alive(m) and not WeatherData.immune(m))
+	if targets.is_empty():
+		return
+	var m: Dictionary = targets.pick_random()
+	var dmg := maxi(1, int(int(m.get("hp", 1)) * WeatherData.STORM_BOLT_PCT))
+	m["current_hp"] = maxi(0, int(m["current_hp"]) - dmg)
+	_anim_shake(m)
+	_float_on(m, "⚡-%d" % dmg, Color("ffe23a"))
+	_logln("[color=#ffe23a]⚡ Lightning strikes %s for %d![/color]" % [_who(m), dmg])
+	if not _quiet():
+		Sfx.play("crit", 1.4)
+	await _beat(0.4)
+
+# 🏜 Sandstorm: sand whips both fighters every round (not Fighting).
+func _weather_round_end(me: Dictionary, op: Dictionary) -> void:
+	if not WeatherData.is_on("sand"):
+		return
+	var hit := false
+	for m in [me, op]:
+		if _alive(m) and not WeatherData.immune(m):
+			var dmg := maxi(1, int(int(m.get("hp", 1)) * WeatherData.SAND_TICK_PCT))
+			m["current_hp"] = maxi(0, int(m["current_hp"]) - dmg)
+			_float_on(m, "-%d" % dmg, Color("e0c080"))
+			hit = true
+	if hit:
+		_logln("[color=#e0c080]🏜 The sandstorm whips the fighters![/color]")
+		await _beat(0.3)
+
 func _clear_round_flags() -> void:
 	for m in _team + _opp:
 		if m.get("_r_cry", false):
@@ -458,6 +495,9 @@ func _sendout_line(is_me: bool) -> String:
 
 func _opening() -> void:
 	_busy = true
+	if WeatherData.current() != "":
+		var w := WeatherData.info(WeatherData.current())
+		_logln("[color=#9fdcff]%s %s! %s[/color]" % [w["icon"], w["name"], w["desc"]])
 	_logln("Battle start! " + _sendout_line(true))
 	await _beat(0.5)
 	if _pvp_names.size() == 2:
@@ -509,6 +549,7 @@ func _round() -> void:
 			await _round_start_abilities(actor, op if actor == me else me, slot)
 	await _bench_round_abilities(_team, _active)
 	await _bench_round_abilities(_opp, _opp_active)
+	await _weather_round_start(me, op)
 	# last call: a card tapped while the round was starting plays now, before
 	# anyone attacks (no await between this check and _attacking = true)
 	for side in 2:
@@ -533,6 +574,7 @@ func _round() -> void:
 	await _helping_hand(_opp, _opp_active)
 	me = _team[_active]
 	op = _opp[_opp_active]
+	await _weather_round_end(me, op)
 	# EXHAUSTION: from FATIGUE_START, both fighters lose escalating HP each round
 	# so heal-loop stalemates always end.
 	if _round_num >= Balance.FATIGUE_START:

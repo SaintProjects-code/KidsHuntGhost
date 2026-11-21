@@ -66,8 +66,12 @@ func _ready() -> void:
 	camera.position = graph.node_pos.get(START_NODE, Vector2.ZERO)
 	if GameState.players.is_empty():
 		_make_dummies()
+	_setup_hideout()   # before the 3D view, so its town label gets the ☠
 	_spawn_tokens()
 	_setup_3d_view()
+	var weather_layer: CanvasLayer = preload("res://Scenes/Board/WeatherOverlay.gd").new()
+	weather_layer.name = "WeatherOverlay"
+	add_child(weather_layer)
 	_spawn_hud()
 	choice_panel.move_to_front()   # popups above the HUD
 	event_panel.move_to_front()
@@ -279,6 +283,10 @@ func _on_turn_started(idx: int) -> void:
 	_tick_traits(idx)
 	if _at_city(idx):
 		_heal_team_at_city(idx, _current_node(idx))
+	_storm_strike()
+	if not p.stolen.is_empty():
+		EventBus.log_entry.emit(idx, "☠ The Grim Gang still has %s — win it back at %s!" % [
+			", ".join(p.stolen.map(func(m): return String(m.get("name", "?")))), graph.label(GameState.gang_hideout)], "#ff9f9f")
 	# rewards / evolutions earned off-turn (or in last turn's battles) happen now
 	BonusReward.run_pending(idx)
 
@@ -351,6 +359,9 @@ func _on_dice_rolled(total: int, faces: Array) -> void:
 		await view.roll_dice(idx, faces, bonus)
 	else:
 		await hud.show_roll(faces, bonus, p.color)
+	if GameState.weather == "sand" and total > 1:
+		total -= 1
+		EventBus.log_entry.emit(idx, "🏜 The sandstorm slows %s down (−1)." % p.player_name, "#e0c080")
 	info_label.text = "%s rolled %d" % [p.player_name, total]
 	await _move_player(idx, total)
 	await BonusReward.run_pending(idx)   # evolutions from this move's battles/catches, after the battle closes
@@ -816,6 +827,8 @@ func _start_encounter(i: int, type: StringName) -> void:
 	var stage: int = map.roll_stage(type)
 	if p.lure:
 		stage = mini(3, stage + 1)
+	if GameState.weather == "mist":   # 🌫 stronger spirits drift out of the mist
+		stage = mini(3, stage + 1)
 	var spirit: Dictionary = SpiritsData.random_spirit(stage)
 	if spirit.is_empty():
 		return
@@ -850,6 +863,77 @@ func _on_dev_tile_requested(kind: StringName) -> void:
 		await _apply_tile(cur, kind)
 	await _check_whiteout(cur)
 	_moving = false
+
+# ---------------- weather / Grim Gang / event board moves ----------------
+
+const WeatherData := preload("res://Data/WeatherData.gd")
+
+# ⛈ At each turn start, lightning may hit a random spirit on the board.
+func _storm_strike() -> void:
+	if GameState.weather != "storm" or randf() >= WeatherData.BOARD_BOLT_CHANCE:
+		return
+	var pool: Array = []
+	for j in GameState.players.size():
+		for m in GameState.players[j].living_team():
+			if not WeatherData.immune(m):
+				pool.append([j, m])
+	if pool.is_empty():
+		return
+	var pick: Array = pool.pick_random()
+	var m: Dictionary = pick[1]
+	var dmg: int = mini(WeatherData.BOARD_BOLT_DMG, int(m["current_hp"]) - 1)   # never faints from it
+	if dmg <= 0:
+		return
+	m["current_hp"] = int(m["current_hp"]) - dmg
+	Sfx.play("crit", 1.4)
+	EventBus.log_entry.emit(pick[0], "⚡ Lightning strikes %s's %s for %d!" % [GameState.players[pick[0]].player_name,
+		m.get("name", "?"), dmg], "#ffe23a")
+
+# The Grim Gang's hideout, marked ☠: town H, the far end of the map (a map
+# without an H uses its last town).
+const HIDEOUT_TOWN := "H"
+
+func _setup_hideout() -> void:
+	var options: Array = graph.cities.filter(func(c): return c != START_NODE and c != RESCUE_NODE)
+	if options.is_empty():
+		return
+	GameState.gang_hideout = HIDEOUT_TOWN if options.has(HIDEOUT_TOWN) else options[options.size() - 1]
+	var h := GameState.gang_hideout
+	var nm := String(map.NAMES.get(h, h))
+	if not nm.begins_with("☠"):
+		map.NAMES[h] = "☠ " + nm
+
+# Slide a player along their current road (+ forward, − back), stopping at
+# the road's ends. No tile is triggered — events use this to push players.
+func shift_player(i: int, steps: int) -> void:
+	var r: int = _route_of[i]
+	var segs: int = graph.stops[r].size() - 1
+	_index_of[i] = clampi(_index_of[i] + steps * _heading_of[i], 0, segs)
+	_token_base[i] = graph.stops[r][_index_of[i]]
+	_reposition_tokens()
+
+# Two players trade places on the board.
+func swap_players(i: int, j: int) -> void:
+	if i == j:
+		return
+	for arr in [_route_of, _index_of, _heading_of, _came_route, _token_base]:
+		var t = arr[i]
+		arr[i] = arr[j]
+		arr[j] = t
+	var tp = _passed[i]
+	_passed[i] = _passed[j]
+	_passed[j] = tp
+	_reposition_tokens()
+	Sfx.play("whoosh")
+
+# Drop a player at a town (no town visit — that happens when they next stop).
+func warp_player(i: int, city: String) -> void:
+	if graph.is_city(city):
+		_teleport_to_city(i, city)
+		Sfx.play("whoosh")
+
+func town_cities() -> Array:
+	return graph.cities.duplicate()
 
 # ---------------- popups ----------------
 

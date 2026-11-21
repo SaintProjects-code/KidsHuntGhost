@@ -124,3 +124,59 @@ func _draw_game() -> void:
 		nameplate(lane, r.position + Vector2(8, 30), "round %d/%d" % [mini(_round + 1, ROUNDS), ROUNDS])
 	if _state == "wait" and running:
 		text(Vector2(0, size.y - 14), "…wait for it…", 16, Color(1, 1, 1, 0.6), size.x, 3)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+func _build_3d(v) -> void:
+	var gap := 4.6
+	v.sky(Color("06050c"), 0.12, 0.15)
+	v.aim(Vector3(0, 6, 10 + lanes.size() * 2.3), Vector3(0, 1.5, 0))
+	v.box(Vector3(lanes.size() * gap + 4, 0.4, 7), Color("2a2040"), Vector3(0, -0.2, 0.5))
+	v.box(Vector3(3, 2, 2), Color("5a3a20"), Vector3(0, 1, -2.5))
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(v.lane_x(i, lanes.size(), gap), 0, 2), 0.04)
+		lane["j3"] = 0.0
+		lane["pop3"] = false
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s %s  %s" % [l["name"], key_hint(l), "★".repeat(l["wins"])], lane["color"].lightened(0.2), 2.8, 15)
+	_boo3 = v.spirit(SpiritsData.sprite_tex("Wispy", "front"), Color(0, 0, 0, 0), Vector3(0, 0, -2.5), 0.12)
+	_boo3.scale = Vector3.ONE * 0.01
+	_spot3 = v.lamp(Color.WHITE, Vector3(0, 6, 3), 0.0, 20)
+
+var _boo3: Node3D
+var _spot3: OmniLight3D
+var _boo_popped := false
+
+func _update_3d(v, delta: float) -> void:
+	var out := _state == "boo" or _state == "result"
+	_boo3.scale = Vector3.ONE * (minf(1.0, _boo3.scale.x + delta * 7.0) if out else 0.01)
+	_boo3.position.y = minf(1.8, _boo3.position.y + delta * 9.0) if out else 0.0
+	_spot3.light_energy = 3.0 if out else 0.0
+	if _state == "boo" and not _boo_popped:
+		_boo_popped = true
+		v.pop(_boo3, "BOO!", Color.WHITE, 5.5, 1.2, 48)
+	if _state == "wait":
+		_boo_popped = false
+	var best := {}
+	for lane in lanes:
+		if lane["pressed"] >= 0.0 and (best.is_empty() or lane["pressed"] < best["pressed"]):
+			best = lane
+	for lane in lanes:
+		var n: Node3D = lane["n3"]
+		var jumped: bool = lane["pressed"] >= 0.0
+		lane["j3"] = minf(1.0, lane["j3"] + delta * 6.0) if jumped else maxf(0.0, lane["j3"] - delta * 3.0)
+		n.position.y = sin(lane["j3"] * PI) * 1.6
+		v.sprite_of(n).modulate = Color(1.6, 0.5, 0.5) if lane["early"] else Color.WHITE
+		if _state == "wait":
+			lane["pop3"] = false
+		elif not lane["pop3"] and (jumped or lane["early"]):
+			lane["pop3"] = true
+			if lane["early"]:
+				v.pop(n, "Too early!", Color("ff6a6a"), 3.0)
+			else:
+				v.pop(n, "%d ms" % int(lane["pressed"] * 1000.0), Color.WHITE, 3.0)
+		if _state == "result" and lane == best and not lane.get("first3", false):
+			lane["first3"] = true
+			v.pop(n, "FIRST!", Color("ffd24d"), 3.6, 1.3, 28)
+		if _state == "wait":
+			lane["first3"] = false

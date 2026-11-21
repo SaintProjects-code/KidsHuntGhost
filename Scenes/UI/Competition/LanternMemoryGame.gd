@@ -157,3 +157,43 @@ func _draw_game() -> void:
 	var msg: String = {"show": "Watch the lanterns…", "input": "Your turn — repeat it!", "pause": "Next round!"}.get(_state, "")
 	if running:
 		text(Vector2(0, size.y - 14), "%s  (pattern of %d)" % [msg, _seq.size()], 16, Color(1, 1, 1, 0.75), size.x, 3)
+
+# ── 3D (3D maps) ──────────────────────────────────────────────────────────────
+# Each player has their own three lanterns; they glow when the pattern shows
+# and when the player presses, and the spirit hops to the lantern it picks.
+func _build_3d(v) -> void:
+	var gap := 6.2
+	v.sky(Color("0f0c1e"), 0.35, 0.3)
+	v.aim(Vector3(0, 6.5, 10 + lanes.size() * 3.0), Vector3(0, 1.6, 0))
+	for i in lanes.size():
+		var lane: Dictionary = lanes[i]
+		var cx: float = v.lane_x(i, lanes.size(), gap)
+		lane["cx3"] = cx
+		v.box(Vector3(5.4, 0.2, 5), Color("2a2444"), Vector3(cx, -0.1, 0))
+		var lans: Array = []
+		for k in 3:
+			var x: float = cx + (k - 1) * 1.6
+			v.box(Vector3(0.1, 2.4, 0.1), Color("4a3a28"), Vector3(x, 1.2, -1.2))
+			lans.append({"l": v.ball(0.42, Color("553018"), Vector3(x, 2.6, -1.2), true), "pl": v.lamp(Color("ff9a40"), Vector3(x, 2.6, -0.8), 0.0, 4)})
+		lane["lans3"] = lans
+		lane["n3"] = v.spirit(lane["tex"], lane["color"], Vector3(cx, 0, 1.4), 0.028)
+		var l := lane
+		v.tag(lane["n3"], func(): return "%s %s  %s  best %d" % [l["name"], key_hint(l, "left").replace("]", "…]") if l["human"] else "(CPU)",
+			"OUT" if l["out"] else "♥".repeat(maxi(0, l["lives"])), l["best"]], lane["color"].lightened(0.25), 2.0, 14)
+
+func _update_3d(v, delta: float) -> void:
+	var shown := -1
+	if _state == "show":
+		var i := int(_state_t / FLASH)
+		if i < _seq.size() and fmod(_state_t, FLASH) < FLASH * 0.75:
+			shown = _seq[i]
+	for lane in lanes:
+		for k in 3:
+			var on: bool = shown == k or (lane["flash"] == k and lane["flash_t"] > 0.0)
+			lane["lans3"][k]["l"].material_override = v.mat(Color("ffd070") if on else Color("553018"), true)
+			lane["lans3"][k]["pl"].light_energy = 3.0 if on else 0.0
+		var n: Node3D = lane["n3"]
+		var tx: float = lane["cx3"] + ((lane["flash"] - 1) * 1.6 if lane["flash"] >= 0 and _state == "input" else 0.0)
+		n.position.x = lerpf(n.position.x, tx, minf(1.0, delta * 6.0))
+		n.position.y = absf(sin(t * 5.0 + lane["idx"])) * 0.15
+		v.sprite_of(n).modulate = Color(0.4, 0.4, 0.45, 0.6) if lane["out"] else Color.WHITE

@@ -126,10 +126,54 @@ func play_field(idx: int, key: String, target = null) -> String:
 			p.inventory.gold += 25
 			msg = "+25 gold!"
 			Sfx.play("coin")
+		"weather_charm":
+			var kind := await _pick_weather(idx)
+			GameState.set_weather(kind)
+			var w: Dictionary = preload("res://Data/WeatherData.gd").info(kind)
+			msg = "%s %s for 2 rounds!" % [w["icon"], w["name"]]
+			Sfx.play("whoosh")
+		"hex":
+			msg = hex_leader(idx)
 	Sfx.play("card")
 	EventBus.card_played.emit(idx, key)
 	EventBus.log_entry.emit(idx, "%s plays %s — %s" % [p.player_name, CardsData.card_name(key), msg], "#7fe0d0")
 	return msg
+
+# Weather Charm: a human picks (board choice), a CPU picks its lead's weather.
+func _pick_weather(idx: int) -> String:
+	var WD = preload("res://Data/WeatherData.gd")
+	var kinds: Array = WD.KINDS.keys()
+	var p: PlayerData = GameState.players[idx]
+	var board := get_tree().current_scene
+	if p.is_cpu or board == null or not board.has_method("_show_choice"):
+		return WD.for_type(String(p.lead().get("type", ""))) if not p.team.is_empty() else kinds.pick_random()
+	var labels: Array = kinds.map(func(k): return "%s %s" % [WD.KINDS[k]["icon"], WD.KINDS[k]["name"]])
+	var pick: int = await board._show_choice("🌦 Weather Charm — pick the weather", labels)
+	return kinds[pick]
+
+# Grim Hex: the points leader (or the next best, if that's you) gets cursed.
+func hex_leader(idx: int) -> String:
+	var j := -1
+	for k in GameState.players.size():
+		if k != idx and (j < 0 or GameState.players[k].progress.points > GameState.players[j].progress.points):
+			j = k
+	if j < 0:
+		return "Nobody to curse…"
+	var q: PlayerData = GameState.players[j]
+	var board := get_tree().current_scene
+	match randi() % 3:
+		0:
+			var g := mini(15, q.inventory.gold)
+			q.inventory.gold -= g
+			GameState.players[idx].inventory.gold += g
+			return "☠ %s loses %d gold to %s!" % [q.player_name, g, GameState.players[idx].player_name]
+		1:
+			if board and board.has_method("shift_player"):
+				board.shift_player(j, -3)
+			return "☠ %s is pushed back 3 spaces!" % q.player_name
+		_:
+			q.skip_turns += 1
+			return "☠ %s will skip their next turn!" % q.player_name
 
 # Move a random card from one hand to another. Returns the key ("" if none).
 func steal(from_idx: int, to_idx: int) -> String:
@@ -188,6 +232,10 @@ func _cpu_target(p: PlayerData, idx: int, key: String, wanted_city: String):
 			return true if randf() < 0.4 else null
 		"warp_door":
 			return wanted_city if wanted_city != "" else null
+		"weather_charm":   # when the sky is clear, call up its lead's weather
+			return true if GameState.weather == "" and randf() < 0.5 else null
+		"hex":
+			return true if randf() < 0.5 else null
 		"sticky_fingers":
 			for j in GameState.players.size():
 				if j != idx and not GameState.players[j].inventory.hand.is_empty():
