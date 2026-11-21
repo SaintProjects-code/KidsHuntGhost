@@ -22,6 +22,7 @@ var _saved_pos: Vector2 = Vector2.ZERO
 var _saved_zoom: Vector2 = Vector2.ONE
 var _phone_held := {}            # 📱 arrows held on the current player's phone (see Remote)
 var _hidden_popups: Array = []   # board popups (a route choice…) tucked away while viewing the map
+var _room_label: Label
 
 func _ready() -> void:
 	for pair in [["ViewMapButton", "🗺 View Map", "secondary"], ["CloseButton", "Back to Game", "primary"],
@@ -38,8 +39,20 @@ func _ready() -> void:
 	sound_slider.max_value = 100
 	sound_slider.value = roundf(db_to_linear(AudioServer.get_bus_volume_db(0)) * 100.0)
 	sound_slider.value_changed.connect(_on_sound_changed)
+	# 📱 phone room info (was on the board): code + address while phones can join
+	_room_label = UIKit.label("", 15, UIKit.GOLD)
+	_room_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_room_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var vbox: VBoxContainer = menu.get_node("Margin/VBox")
+	vbox.add_child(_room_label)
+	vbox.move_child(_room_label, 2)   # under the sound slider
+	menu.offset_top -= 30
+	menu.offset_bottom += 30
 
 func _on_settings_pressed() -> void:
+	_room_label.text = ("📱 Phones — Room %s\n%s" % [Remote.code, Remote.phone_url().trim_prefix("http://")]) if Remote.is_on() \
+		else "📱 No phone room open (start one from Player Setup → Phones)"
+	_room_label.add_theme_color_override("font_color", UIKit.GOLD if Remote.is_on() else Color(1, 1, 1, 0.6))
 	menu.show()
 	get_tree().paused = true
 

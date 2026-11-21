@@ -185,6 +185,31 @@ func _spawn_hud() -> void:
 func _process(delta: float) -> void:
 	if _follow != null and is_instance_valid(_follow):
 		camera.global_position = camera.global_position.lerp(_follow.global_position, clampf(FOLLOW_LERP * delta, 0.0, 1.0))
+	_fade_info(delta)
+
+# The banner at the top ("Ivy rolled 6", "Brooke reached Boo Bayou"…) shows
+# each new message, holds it a moment, then fades away until the next one.
+const INFO_HOLD := 3.0
+const INFO_FADE := 0.6
+var _info_text := ""
+var _info_t := 0.0
+
+const INFO_IN := 0.25
+const INFO_TOP := 50.0   # just under the ⏱ time · turn pill
+
+func _fade_info(delta: float) -> void:
+	if info_label.text != _info_text:
+		_info_text = info_label.text
+		_info_t = 0.0
+	else:
+		_info_t += delta
+	var fade_in := clampf(_info_t / INFO_IN, 0.0, 1.0)
+	var fade_out := clampf(1.0 - (_info_t - INFO_HOLD) / INFO_FADE, 0.0, 1.0)
+	info_label.modulate.a = minf(fade_in, fade_out)
+	# drops down out of the pill as it appears, slides back up as it goes
+	var drop := (1.0 - fade_in) if fade_in < 1.0 else (1.0 - fade_out)
+	info_label.offset_top = INFO_TOP - 14.0 * drop
+	info_label.offset_bottom = info_label.offset_top + 40.0
 
 # ---------------- players & tokens ----------------
 

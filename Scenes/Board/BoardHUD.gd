@@ -17,7 +17,6 @@ var elapsed: float = 0.0         # play time, saved with the game
 
 var _players_col: Control
 var _timer_label: Label
-var _room_label: Label           # 📱 "Room KXRT · 192.168.1.20:8080" while phones can join
 var _last_sig := ""
 var _hand_title: Label
 var _hand_row: HBoxContainer
@@ -31,14 +30,13 @@ var _target_window: Control
 
 func _ready() -> void:
 	_wire_buttons()
-	_timer_label = UIKit.label("00:00", 22)
-	_timer_label.position = Vector2(176, 24)
+	# ⏱ time + turn, a small pill at the top centre (the turn banner fades in
+	# and out just under it — see Board._fade_info)
+	_timer_label = UIKit.label("00:00", 18)
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_timer_label.add_theme_stylebox_override("normal", UIKit.box(Color(UIKit.NIGHT, 0.85), 14, 2, Color(UIKit.GOLD, 0.6), Vector2(14, 4)))
+	_timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_timer_label)
-	_room_label = UIKit.label("", 14, UIKit.GOLD)
-	_room_label.position = Vector2(176, 52)
-	_room_label.add_theme_color_override("font_outline_color", Color.BLACK)
-	_room_label.add_theme_constant_override("outline_size", 4)
-	add_child(_room_label)
 	_build_player_column()
 	_build_hand()
 	_build_dice_tray()
@@ -68,8 +66,10 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	elapsed += delta
-	_timer_label.text = "%02d:%02d" % [int(elapsed) / 60, int(elapsed) % 60]
-	_room_label.text = "📱 Room %s · %s" % [Remote.code, Remote.phone_url().trim_prefix("http://")] if Remote.is_on() else ""
+	var round_n: int = GameState.turn_count / maxi(1, GameState.players.size()) + 1
+	_timer_label.text = "⏱ %02d:%02d   ·   Turn %d" % [int(elapsed) / 60, int(elapsed) % 60, round_n]
+	_timer_label.reset_size()
+	_timer_label.position = Vector2((get_viewport_rect().size.x - _timer_label.size.x) * 0.5, 8)
 	# gold, cards, badges and spirits change all over the place — poll a
 	# cheap snapshot instead of wiring every signal
 	var sig := _player_sig()
